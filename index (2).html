@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smash or Pass — Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- ══ FIREBASE CONFIG ══ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+  import { getDatabase, ref, set, get, update, onValue, off } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyAvORsMuKGubMXQ3VdkSdu2iNAK04RZxN4",
+    authDomain:        "smash-or-pass-bb76b.firebaseapp.com",
+    databaseURL:       "https://smash-or-pass-bb76b-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId:         "smash-or-pass-bb76b",
+    storageBucket:     "smash-or-pass-bb76b.firebasestorage.app",
+    messagingSenderId: "671799235493",
+    appId:             "1:671799235493:web:3596308c863afb55944e4c"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // expose to global scope so non-module code can use
+  window._db     = db;
+  window._ref    = ref;
+  window._set    = set;
+  window._get    = get;
+  window._update = update;
+  window._onValue = onValue;
+  window._off    = off;
+  window._fbReady = true;
+  document.dispatchEvent(new Event('fb-ready'));
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --smash:#ff2d55;
+  --pass:#00aaff;
+  --bg:#07070f;
+  --surface:#0f0f1c;
+  --card:#14142a;
+  --border:#1e1e38;
+  --text:#eeeeff;
+  --muted:#55558a;
+  --accent:#ffdd00;
+  --green:#00e887;
+}
+
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+
+body::after{
+  content:'';position:fixed;inset:0;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:.6;
+}
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:48px 48px;pointer-events:none;z-index:0;
+}
+
+.screen{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem}
+.hidden{display:none!important}
+
+/* ── LOGO ── */
+.logo{
+  font-family:'Bebas Neue',sans-serif;font-size:clamp(2.6rem,9vw,5.5rem);line-height:1;letter-spacing:3px;
+  background:linear-gradient(130deg,var(--smash) 0%,var(--accent) 48%,var(--pass) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 24px rgba(255,45,85,.45));animation:logopulse 4s ease-in-out infinite;
+}
+@keyframes logopulse{0%,100%{filter:drop-shadow(0 0 18px rgba(255,45,85,.35))}50%{filter:drop-shadow(0 0 38px rgba(255,221,0,.5))}}
+.tagline{color:var(--muted);font-size:.68rem;letter-spacing:4px;text-transform:uppercase;margin-top:.3rem;text-align:center}
+
+/* ── CARD ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem;width:100%;max-width:480px}
+.card-title{font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px;color:var(--muted);margin-bottom:1.1rem}
+
+/* ── INPUTS ── */
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:.65rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+input{width:100%;background:#07070f;border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.95rem;padding:.78rem 1.1rem;outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
+.hint{font-size:.7rem;color:var(--muted);margin-top:.3rem;line-height:1.5}
+
+/* ── BUTTONS ── */
+.btn{border:none;border-radius:11px;cursor:pointer;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;transition:transform .15s,opacity .15s;width:100%}
+.btn:hover{transform:translateY(-2px);opacity:.9}
+.btn:active{transform:translateY(0)}
+.btn-fire{background:linear-gradient(135deg,var(--smash),#ff6a00);color:#fff;font-size:1.3rem;padding:.85rem}
+.btn-ice{background:linear-gradient(135deg,#004f70,var(--pass));color:#fff;font-size:1.3rem;padding:.85rem;margin-top:.5rem}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:1rem;padding:.65rem;margin-top:.75rem}
+.btn-ghost:hover{border-color:var(--text);color:var(--text)}
+
+.or-divider{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.68rem;letter-spacing:2px;margin:.2rem 0}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.error{background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.25);border-radius:10px;color:var(--smash);font-size:.82rem;padding:.65rem 1rem;margin-top:.75rem;display:none}
+
+/* ── CONFIG WARNING ── */
+.cfg-warn{
+  background:rgba(255,221,0,.07);border:1px solid rgba(255,221,0,.25);border-radius:14px;
+  color:var(--accent);font-size:.82rem;padding:1rem 1.25rem;max-width:480px;line-height:1.6;
+  display:none;
+}
+.cfg-warn strong{display:block;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;margin-bottom:.35rem}
+
+/* ── WAITING ROOM ── */
+#waiting{gap:1.5rem;width:100%;max-width:700px}
+.room-header{text-align:center}
+.room-code-label{font-size:.65rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+.room-code{font-family:'Bebas Neue',sans-serif;font-size:clamp(3rem,10vw,5.5rem);letter-spacing:8px;color:var(--accent);line-height:1;text-shadow:0 0 30px rgba(255,221,0,.4)}
+.room-share{font-size:.78rem;color:var(--muted);margin-top:.25rem}
+.room-share span{color:var(--text);font-weight:600}
+
+.players-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.65rem;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.1rem;min-height:80px}
+.player-chip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.55rem .85rem;display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:600;animation:chipin .3s cubic-bezier(.4,0,.2,1)}
+@keyframes chipin{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+.player-avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0}
+.player-chip.is-master{border-color:rgba(255,221,0,.4);background:rgba(255,221,0,.06)}
+.waiting-note{color:var(--muted);font-size:.78rem;text-align:center;animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* ── GAME ── */
+#game{gap:1.1rem;width:100%;max-width:920px}
+.top-bar{display:flex;align-items:center;justify-content:space-between;width:100%;gap:1rem}
+.prog-wrap{flex:1;background:var(--border);border-radius:99px;height:5px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--smash),var(--accent));border-radius:99px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+.slide-counter{font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;color:var(--muted);white-space:nowrap}
+.room-pill{background:var(--card);border:1px solid var(--border);border-radius:99px;font-size:.68rem;letter-spacing:2px;color:var(--muted);padding:.22rem .7rem;white-space:nowrap}
+
+.game-layout{display:grid;grid-template-columns:1fr 290px;gap:1rem;width:100%}
+@media(max-width:680px){.game-layout{grid-template-columns:1fr}}
+
+.slide-panel{display:flex;flex-direction:column;gap:.7rem}
+.slide-wrap{background:#000;border-radius:16px;overflow:hidden;aspect-ratio:16/9;position:relative;border:1px solid var(--border)}
+.slide-wrap iframe{width:100%;height:100%;border:none;pointer-events:none}
+.slide-badge{position:absolute;top:.7rem;right:.7rem;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);border-radius:99px;font-family:'Bebas Neue',sans-serif;font-size:.72rem;letter-spacing:2px;padding:.18rem .6rem;color:#fff}
+
+.vote-btns{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}
+.vbtn{border:2px solid;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.28rem;font-family:'Bebas Neue',sans-serif;font-size:1.55rem;letter-spacing:2px;padding:1rem;transition:all .18s cubic-bezier(.4,0,.2,1)}
+.vbtn .vi{font-size:1.7rem}
+.vbtn .vs{font-size:.62rem;font-family:'DM Sans',sans-serif;font-weight:600;letter-spacing:2px;opacity:.7}
+.vbtn-smash{background:rgba(255,45,85,.08);border-color:rgba(255,45,85,.35);color:var(--smash)}
+.vbtn-smash:hover{background:rgba(255,45,85,.2);border-color:var(--smash);transform:scale(1.04)}
+.vbtn-pass{background:rgba(0,170,255,.08);border-color:rgba(0,170,255,.35);color:var(--pass)}
+.vbtn-pass:hover{background:rgba(0,170,255,.2);border-color:var(--pass);transform:scale(1.04)}
+.vbtn:disabled{pointer-events:none;opacity:.45}
+.voted-banner{border-radius:14px;padding:1rem;text-align:center;font-family:'Bebas Neue',sans-serif;font-size:1.9rem;letter-spacing:3px;display:none}
+.voted-banner.smash{background:rgba(255,45,85,.13);border:2px solid rgba(255,45,85,.35);color:var(--smash);display:block}
+.voted-banner.pass{background:rgba(0,170,255,.13);border:2px solid rgba(0,170,255,.35);color:var(--pass);display:block}
+
+.sidebar{display:flex;flex-direction:column;gap:.7rem}
+.votes-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1rem;flex:1}
+.vp-title{font-family:'Bebas Neue',sans-serif;font-size:.95rem;letter-spacing:2px;color:var(--muted);margin-bottom:.65rem;display:flex;align-items:center;justify-content:space-between}
+.vote-tally{display:flex;gap:.35rem;align-items:center}
+.tally-num{font-family:'Bebas Neue',sans-serif;font-size:1.05rem}
+.tally-smash{color:var(--smash)}.tally-pass{color:var(--pass)}
+
+.voter-list{display:flex;flex-direction:column;gap:.35rem;max-height:270px;overflow-y:auto}
+.voter-row{display:flex;align-items:center;justify-content:space-between;font-size:.8rem;padding:.28rem 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.voter-row:last-child{border-bottom:none}
+.voter-name-wrap{display:flex;align-items:center;gap:.4rem;font-weight:500}
+.voter-badge{font-size:.6rem;letter-spacing:1.5px;padding:.12rem .42rem;border-radius:99px;font-weight:700}
+.badge-smash{background:rgba(255,45,85,.15);color:var(--smash);border:1px solid rgba(255,45,85,.3)}
+.badge-pass{background:rgba(0,170,255,.15);color:var(--pass);border:1px solid rgba(0,170,255,.3)}
+.pending-dot{width:6px;height:6px;background:var(--border);border-radius:50%;animation:pendpulse 1.5s ease-in-out infinite}
+@keyframes pendpulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+.master-controls{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1rem}
+.mc-title{font-family:'Bebas Neue',sans-serif;font-size:.8rem;letter-spacing:2px;color:var(--accent);margin-bottom:.55rem}
+.btn-next{background:linear-gradient(135deg,#1a1a2e,#252545);border:1px solid var(--accent);border-radius:10px;color:var(--accent);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:2px;padding:.65rem;width:100%;transition:all .2s}
+.btn-next:hover{background:rgba(255,221,0,.1);transform:translateY(-1px)}
+.btn-next:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.btn-end{background:transparent;border:1px solid rgba(255,45,85,.3);border-radius:10px;color:var(--smash);cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:2px;padding:.45rem;width:100%;margin-top:.45rem;transition:all .2s}
+.btn-end:hover{border-color:var(--smash);background:rgba(255,45,85,.07)}
+.waiting-for-host{color:var(--muted);font-size:.76rem;text-align:center;font-style:italic;padding:.4rem}
+
+/* ── RESULTS ── */
+#results{gap:1.75rem;width:100%;max-width:760px}
+.res-header{text-align:center}
+.res-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(2rem,7vw,4rem);letter-spacing:3px;background:linear-gradient(135deg,var(--smash),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.res-sub{color:var(--muted);font-size:.82rem;margin-top:.25rem}
+
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.65rem}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem;text-align:center}
+.stat-n{font-family:'Bebas Neue',sans-serif;font-size:2.2rem;line-height:1}
+.stat-l{font-size:.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-top:.2rem}
+.sn-smash{color:var(--smash)}.sn-pass{color:var(--pass)}.sn-acc{color:var(--accent)}
+
+.slides-accordion{display:flex;flex-direction:column;gap:.55rem;max-height:52vh;overflow-y:auto;padding-right:.2rem}
+.slide-block{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.slide-block-header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.1rem;cursor:pointer;transition:background .15s;user-select:none}
+.slide-block-header:hover{background:rgba(255,255,255,.025)}
+.sbh-left{display:flex;align-items:center;gap:.7rem}
+.sbh-num{font-family:'Bebas Neue',sans-serif;font-size:.8rem;letter-spacing:2px;color:var(--muted);background:var(--surface);border-radius:6px;padding:.12rem .45rem}
+.sbh-right{display:flex;align-items:center;gap:.45rem}
+.sbh-counts{display:flex;gap:.35rem;font-family:'Bebas Neue',sans-serif;font-size:.88rem}
+.sc-s{color:var(--smash)}.sc-p{color:var(--pass)}
+.sbh-arrow{color:var(--muted);font-size:.7rem;transition:transform .2s}
+.slide-block.open .sbh-arrow{transform:rotate(180deg)}
+.slide-voters{display:none;padding:.5rem 1.1rem .9rem;border-top:1px solid var(--border)}
+.slide-block.open .slide-voters{display:block}
+.sv-cols{display:grid;grid-template-columns:1fr 1fr;gap:.45rem .9rem}
+.sv-col-title{font-size:.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem;font-weight:700}
+.sv-col-title.sm{color:var(--smash)}.sv-col-title.pa{color:var(--pass)}
+.sv-name{font-size:.78rem;padding:.18rem 0;display:flex;align-items:center;gap:.3rem}
+.sv-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.dot-s{background:var(--smash)}.dot-p{background:var(--pass)}
+.no-votes{color:var(--muted);font-size:.72rem;font-style:italic}
+
+.restart-btn{background:linear-gradient(135deg,var(--smash),#ff6a00);border:none;border-radius:12px;color:#fff;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px;padding:.85rem;width:100%;transition:transform .15s,opacity .15s}
+.restart-btn:hover{transform:translateY(-2px);opacity:.9}
+
+/* avatar colours */
+.av0{background:#ff2d5520;color:var(--smash)}
+.av1{background:#00aaff22;color:var(--pass)}
+.av2{background:#ffdd0020;color:var(--accent)}
+.av3{background:#00e88720;color:var(--green)}
+.av4{background:#bf5fff20;color:#bf5fff}
+.av5{background:#ff900020;color:#ff9000}
+.av6{background:#ff7fab20;color:#ff7fab}
+.av7{background:#00cfff20;color:#00cfff}
+
+/* toast */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:.83rem;padding:.6rem 1.2rem;opacity:0;transition:all .32s cubic-bezier(.4,0,.2,1);pointer-events:none;z-index:10000;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
+</style>
+</head>
+<body>
+
+<!-- ══ CONFIG WARNING ══ -->
+<div class="cfg-warn" id="cfgWarn">
+  <strong>⚠️ Firebase Not Configured</strong>
+  Open <code>index.html</code> and replace the placeholder values in the <code>firebaseConfig</code> block with your Firebase project credentials. See <code>SETUP.md</code> for step-by-step instructions.
+</div>
+
+<!-- ══ SCREEN: ENTRY ══ -->
+<div class="screen" id="entry">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:1.75rem;width:100%;max-width:480px">
+    <div>
+      <div class="logo">SMASH OR PASS</div>
+      <div class="tagline">Multiplayer · Live</div>
+    </div>
+    <div class="card">
+      <div class="card-title">🎮 Create a Room</div>
+      <div class="field"><label>Your Name (Host)</label><input type="text" id="hostName" placeholder="Enter your name…" autocomplete="off" /></div>
+      <div class="field"><label>Google Slides URL</label><input type="url" id="slidesUrl" placeholder="https://docs.google.com/presentation/d/…" /><p class="hint">Must be "Anyone with the link can view"</p></div>
+      <div class="field"><label>Number of Slides</label><input type="number" id="slideCount" placeholder="e.g. 10" min="1" max="200" /></div>
+      <button class="btn btn-fire" onclick="createRoom()">CREATE ROOM 🔥</button>
+      <div class="error" id="createErr"></div>
+
+      <div class="or-divider">OR</div>
+
+      <div class="card-title" style="margin-bottom:.75rem">🚪 Join a Room</div>
+      <div class="field"><label>Your Name</label><input type="text" id="joinName" placeholder="Enter your name…" autocomplete="off" /></div>
+      <div class="field"><label>Room Code</label><input type="text" id="joinCode" placeholder="e.g. WOLF47" maxlength="8" style="text-transform:uppercase;letter-spacing:4px;font-family:'Bebas Neue',sans-serif;font-size:1.35rem" /></div>
+      <button class="btn btn-ice" onclick="joinRoom()">JOIN ROOM ❄️</button>
+      <div class="error" id="joinErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: WAITING ══ -->
+<div class="screen hidden" id="waiting">
+  <div class="room-header">
+    <div class="room-code-label">Room Code — share this!</div>
+    <div class="room-code" id="displayCode">------</div>
+    <div class="room-share"><span id="playerCountLabel">1 player</span> connected</div>
+  </div>
+  <div style="width:100%;max-width:700px;display:flex;flex-direction:column;gap:.9rem">
+    <div style="font-size:.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Players in room</div>
+    <div class="players-grid" id="playersGrid"></div>
+    <p class="waiting-note" id="waitingNote">Waiting for players to join…</p>
+    <button class="btn btn-fire" id="startBtn" onclick="startGame()" style="display:none">START GAME 🚀</button>
+    <button class="btn btn-ghost" onclick="leaveRoom()">LEAVE ROOM</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN: GAME ══ -->
+<div class="screen hidden" id="game">
+  <div class="top-bar">
+    <div class="slide-counter" id="slideCounter">1 / 10</div>
+    <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    <div class="room-pill">ROOM <span id="gameRoomCode"></span></div>
+  </div>
+  <div class="game-layout">
+    <div class="slide-panel">
+      <div class="slide-wrap">
+        <iframe id="slideFrame" src="about:blank" allowfullscreen></iframe>
+        <div class="slide-badge" id="slideBadge">01</div>
+      </div>
+      <div id="playerVoteArea">
+        <div class="vote-btns" id="voteBtns">
+          <button class="vbtn vbtn-smash" onclick="castVote('smash')"><span class="vi">🔥</span>SMASH<span class="vs">YES PLEASE</span></button>
+          <button class="vbtn vbtn-pass" onclick="castVote('pass')"><span class="vi">❄️</span>PASS<span class="vs">NOPE</span></button>
+        </div>
+        <div class="voted-banner" id="votedBanner"></div>
+      </div>
+      <div id="masterVoteNote" class="hidden" style="text-align:center;color:var(--muted);font-size:.78rem;font-style:italic;padding:.2rem">You're the host — watching votes live ↗</div>
+    </div>
+    <div class="sidebar">
+      <div class="votes-panel">
+        <div class="vp-title">LIVE VOTES
+          <div class="vote-tally"><span class="tally-num tally-smash" id="tallySmash">0</span>🔥<span style="color:var(--border);margin:0 .15rem">|</span><span class="tally-num tally-pass" id="tallyPass">0</span>❄️</div>
+        </div>
+        <div class="voter-list" id="voterList"></div>
+      </div>
+      <div class="master-controls" id="masterControls" style="display:none">
+        <div class="mc-title">⚡ HOST CONTROLS</div>
+        <button class="btn-next" id="nextBtn" onclick="masterNext()">NEXT SLIDE →</button>
+        <button class="btn-end" onclick="masterEnd()">END GAME</button>
+      </div>
+      <div class="votes-panel" id="playerWaiting" style="display:none">
+        <div class="waiting-for-host">Waiting for host to advance…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: RESULTS ══ -->
+<div class="screen hidden" id="results">
+  <div class="res-header">
+    <div class="res-title">FINAL RESULTS</div>
+    <div class="res-sub" id="resSub"></div>
+  </div>
+  <div class="stat-row" id="statRow"></div>
+  <div class="slides-accordion" id="slidesAccordion"></div>
+  <button class="restart-btn" onclick="goHome()">PLAY AGAIN 🔄</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// Wait for Firebase to initialise
+// ══════════════════════════════════════════════════════════
+let dbReady = false;
+document.addEventListener('fb-ready', () => { dbReady = true; checkConfig(); });
+
+function checkConfig(){
+  const warn = document.getElementById('cfgWarn');
+  // if databaseURL still has placeholder text, show warning
+  try {
+    // We'll detect it by trying a dummy ref — if it throws the config is wrong
+    window._ref(window._db, 'ping');
+    warn.style.display = 'none';
+  } catch(e) {
+    warn.style.display = 'block';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════
+const WORDS = ['FIRE','WOLF','NOVA','FUNK','VIBE','RAZE','HYPE','GLOW','FLEX','BOLT','ROAR','APEX','ZEST','FLUX'];
+function genCode(){ return WORDS[Math.floor(Math.random()*WORDS.length)] + (10+Math.floor(Math.random()*90)) }
+function avatarClass(name){ let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))&0xff; return 'av'+(h%8) }
+function initials(n){ return n.slice(0,2).toUpperCase() }
+function safeKey(n){ return n.replace(/[.#$/\[\]]/g,'_') }
+
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden') }
+function showErr(id,msg){ const el=document.getElementById(id); el.textContent=msg; el.style.display='block' }
+function hideErr(id){ document.getElementById(id).style.display='none' }
+function showToast(msg,dur=2500){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur) }
+
+function embedUrl(rawUrl,n){
+  const m=rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+  if(!m) return 'about:blank';
+  return `https://docs.google.com/presentation/d/${m[1]}/embed?start=false&loop=false&slide=id.p${n}&rm=minimal`;
+}
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let me = { name:'', code:'', isMaster:false };
+let unsubRoom = null;
+let unsubVotes = null;
+
+function roomRef(code){ return window._ref(window._db, `rooms/${code}`) }
+function votesRef(code){ return window._ref(window._db, `votes/${code}`) }
+function voteRef(code,slide,playerKey){ return window._ref(window._db, `votes/${code}/${slide}/${playerKey}`) }
+
+// ══════════════════════════════════════════════════════════
+// CREATE ROOM
+// ══════════════════════════════════════════════════════════
+async function createRoom(){
+  if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
+  const name  = document.getElementById('hostName').value.trim();
+  const url   = document.getElementById('slidesUrl').value.trim();
+  const count = parseInt(document.getElementById('slideCount').value.trim(),10);
+  hideErr('createErr');
+  if(!name)  return showErr('createErr','Enter your name.');
+  if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
+  if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
+
+  const code = genCode();
+  const room = {
+    code, hostName:name, slidesUrl:url, totalSlides:count,
+    state:'waiting', currentSlide:1,
+    players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
+  };
+  await window._set(roomRef(code), room);
+  me = { name, code, isMaster:true };
+  enterWaiting();
+}
+
+// ══════════════════════════════════════════════════════════
+// JOIN ROOM
+// ══════════════════════════════════════════════════════════
+async function joinRoom(){
+  if(!dbReady) return showErr('joinErr','Firebase not ready — check your config.');
+  const name = document.getElementById('joinName').value.trim();
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  hideErr('joinErr');
+  if(!name) return showErr('joinErr','Enter your name.');
+  if(!code) return showErr('joinErr','Enter a room code.');
+
+  const snap = await window._get(roomRef(code));
+  if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
+  const room = snap.val();
+  if(room.state==='done') return showErr('joinErr','This game has already ended.');
+
+  // add player
+  await window._update(window._ref(window._db,`rooms/${code}/players`), {
+    [safeKey(name)]:{ name, color:avatarClass(name) }
+  });
+
+  me = { name, code, isMaster:false };
+  if(room.state==='playing'){ enterGame(); }
+  else { enterWaiting(); }
+}
+
+// ══════════════════════════════════════════════════════════
+// WAITING ROOM
+// ══════════════════════════════════════════════════════════
+function enterWaiting(){
+  show('waiting');
+  document.getElementById('displayCode').textContent = me.code;
+  listenRoom();
+}
+
+function renderWaiting(room){
+  const players = Object.values(room.players||{});
+  const grid = document.getElementById('playersGrid');
+  // only re-render if count changed to avoid flicker
+  if(grid.children.length !== players.length){
+    grid.innerHTML='';
+    players.forEach(p=>{
+      const chip=document.createElement('div');
+      chip.className='player-chip'+(p.name===room.hostName?' is-master':'');
+      chip.innerHTML=`<div class="player-avatar ${p.color}">${initials(p.name)}</div><span>${p.name}</span>${p.name===room.hostName?'<span style="font-size:.7rem">👑</span>':''}`;
+      grid.appendChild(chip);
+    });
+  }
+  const n=players.length;
+  document.getElementById('playerCountLabel').textContent=n+' player'+(n!==1?'s':'');
+  if(me.isMaster){
+    const btn=document.getElementById('startBtn');
+    btn.style.display='';
+    btn.textContent=`START WITH ${n} PLAYER${n!==1?'S':''} 🚀`;
+    document.getElementById('waitingNote').textContent='Share the code · Press start when ready';
+  } else {
+    document.getElementById('startBtn').style.display='none';
+    document.getElementById('waitingNote').textContent='Waiting for the host to start…';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// START GAME (master only)
+// ══════════════════════════════════════════════════════════
+async function startGame(){
+  await window._update(roomRef(me.code),{ state:'playing', currentSlide:1 });
+}
+
+// ══════════════════════════════════════════════════════════
+// GAME
+// ══════════════════════════════════════════════════════════
+let lastSlide = -1;
+let myVotedSlides = {}; // track which slides I've voted on
+
+function enterGame(){
+  show('game');
+  document.getElementById('gameRoomCode').textContent = me.code;
+  document.getElementById('masterControls').style.display = me.isMaster?'':'none';
+  document.getElementById('playerWaiting').style.display = me.isMaster?'none':'';
+  document.getElementById('masterVoteNote').classList.toggle('hidden',!me.isMaster);
+  document.getElementById('playerVoteArea').classList.toggle('hidden',me.isMaster);
+  listenRoom();
+  listenVotes();
+}
+
+function renderGame(room){
+  const s=room.currentSlide, tot=room.totalSlides;
+  document.getElementById('slideCounter').textContent=`${s} / ${tot}`;
+  document.getElementById('progFill').style.width=((s-1)/tot*100)+'%';
+  document.getElementById('slideBadge').textContent=String(s).padStart(2,'0');
+
+  if(s!==lastSlide){
+    lastSlide=s;
+    document.getElementById('slideFrame').src=embedUrl(room.slidesUrl,s);
+    if(!me.isMaster){
+      if(!myVotedSlides[s]){
+        // reset vote UI for this slide
+        document.getElementById('votedBanner').className='voted-banner';
+        document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
+      } else {
+        markVotedUI(myVotedSlides[s]);
+      }
+    }
+  }
+
+  if(me.isMaster){
+    const nb=document.getElementById('nextBtn');
+    nb.disabled=false;
+    nb.textContent=s>=tot?'SHOW RESULTS':'NEXT SLIDE →';
+  }
+}
+
+function renderVoters(room, votesData){
+  const s=room.currentSlide;
+  const slideVotes=votesData[s]||{};
+  const players=Object.values(room.players||{});
+  let smashes=0,passes=0;
+  const list=document.getElementById('voterList');
+  list.innerHTML='';
+  players.forEach(p=>{
+    const key=safeKey(p.name);
+    const choice=slideVotes[key];
+    if(choice==='smash') smashes++;
+    if(choice==='pass') passes++;
+    const row=document.createElement('div');
+    row.className='voter-row';
+    row.innerHTML=`
+      <div class="voter-name-wrap"><div class="player-avatar ${p.color}" style="width:20px;height:20px;font-size:.58rem;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials(p.name)}</div>${p.name}</div>
+      ${choice?`<span class="voter-badge ${choice==='smash'?'badge-smash':'badge-pass'}">${choice==='smash'?'🔥':'❄️'}</span>`:`<span class="pending-dot"></span>`}
+    `;
+    list.appendChild(row);
+  });
+  document.getElementById('tallySmash').textContent=smashes;
+  document.getElementById('tallyPass').textContent=passes;
+
+  // sync my own vote state from db (handles page refresh)
+  if(!me.isMaster){
+    const myChoice=slideVotes[safeKey(me.name)];
+    if(myChoice && !myVotedSlides[s]){
+      myVotedSlides[s]=myChoice;
+      markVotedUI(myChoice);
+    }
+  }
+}
+
+function markVotedUI(choice){
+  const banner=document.getElementById('votedBanner');
+  banner.className='voted-banner '+choice;
+  banner.innerHTML=choice==='smash'?'🔥 SMASHED!':'❄️ PASSED';
+  document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=true);
+}
+
+// ══════════════════════════════════════════════════════════
+// CAST VOTE
+// ══════════════════════════════════════════════════════════
+async function castVote(choice){
+  const snap=await window._get(roomRef(me.code));
+  if(!snap.exists()) return;
+  const room=snap.val();
+  const s=room.currentSlide;
+  if(myVotedSlides[s]) return; // already voted
+  myVotedSlides[s]=choice;
+  await window._set(voteRef(me.code,s,safeKey(me.name)), choice);
+  markVotedUI(choice);
+  showToast(choice==='smash'?'🔥 SMASHED!':'❄️ Passed');
+}
+
+// ══════════════════════════════════════════════════════════
+// MASTER CONTROLS
+// ══════════════════════════════════════════════════════════
+async function masterNext(){
+  const snap=await window._get(roomRef(me.code));
+  if(!snap.exists()) return;
+  const room=snap.val();
+  if(room.currentSlide>=room.totalSlides){
+    await window._update(roomRef(me.code),{state:'done'});
+  } else {
+    await window._update(roomRef(me.code),{currentSlide: room.currentSlide+1});
+  }
+}
+
+async function masterEnd(){
+  if(!confirm('End the game and show results?')) return;
+  await window._update(roomRef(me.code),{state:'done'});
+}
+
+// ══════════════════════════════════════════════════════════
+// REALTIME LISTENERS
+// ══════════════════════════════════════════════════════════
+let _latestRoom = null;
+let _latestVotes = {};
+
+function listenRoom(){
+  if(unsubRoom){ unsubRoom(); unsubRoom=null }
+  unsubRoom = window._onValue(roomRef(me.code), snap=>{
+    if(!snap.exists()) return;
+    const room=snap.val();
+    _latestRoom=room;
+
+    if(room.state==='waiting'){
+      renderWaiting(room);
+    } else if(room.state==='playing'){
+      if(document.getElementById('waiting')&&!document.getElementById('waiting').classList.contains('hidden')){
+        enterGame();
+        return;
+      }
+      renderGame(room);
+      renderVoters(room, _latestVotes);
+    } else if(room.state==='done'){
+      showResultsScreen(room, _latestVotes);
+    }
+  });
+}
+
+function listenVotes(){
+  if(unsubVotes){ unsubVotes(); unsubVotes=null }
+  unsubVotes = window._onValue(votesRef(me.code), snap=>{
+    _latestVotes = snap.exists() ? snap.val() : {};
+    if(_latestRoom && _latestRoom.state==='playing'){
+      renderVoters(_latestRoom, _latestVotes);
+    }
+  });
+}
+
+function stopListeners(){
+  if(unsubRoom){ unsubRoom(); unsubRoom=null }
+  if(unsubVotes){ unsubVotes(); unsubVotes=null }
+}
+
+// ══════════════════════════════════════════════════════════
+// RESULTS
+// ══════════════════════════════════════════════════════════
+function showResultsScreen(room, votesData){
+  stopListeners();
+  show('results');
+  const players=Object.values(room.players||{});
+  document.getElementById('resSub').textContent=`${players.length} player${players.length!==1?'s':''} · ${room.totalSlides} slides`;
+
+  let totalSmash=0,totalPass=0;
+  const accordion=document.getElementById('slidesAccordion');
+  accordion.innerHTML='';
+
+  for(let s=1;s<=room.totalSlides;s++){
+    const sv=votesData[s]||{};
+    const smashers=players.filter(p=>sv[safeKey(p.name)]==='smash');
+    const passers=players.filter(p=>sv[safeKey(p.name)]==='pass');
+    totalSmash+=smashers.length; totalPass+=passers.length;
+
+    const block=document.createElement('div');
+    block.className='slide-block'+(s===1?' open':'');
+    block.innerHTML=`
+      <div class="slide-block-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="sbh-left"><span class="sbh-num">SLIDE ${s}</span></div>
+        <div class="sbh-right"><div class="sbh-counts"><span class="sc-s">${smashers.length}🔥</span><span class="sc-p">${passers.length}❄️</span></div><span class="sbh-arrow">▼</span></div>
+      </div>
+      <div class="slide-voters">
+        <div class="sv-cols">
+          <div><div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>${smashers.length?smashers.map(p=>`<div class="sv-name"><div class="sv-dot dot-s"></div>${p.name}</div>`).join(''):'<div class="no-votes">Nobody</div>'}</div>
+          <div><div class="sv-col-title pa">❄️ PASS (${passers.length})</div>${passers.length?passers.map(p=>`<div class="sv-name"><div class="sv-dot dot-p"></div>${p.name}</div>`).join(''):'<div class="no-votes">Nobody</div>'}</div>
+        </div>
+      </div>`;
+    accordion.appendChild(block);
+  }
+
+  document.getElementById('statRow').innerHTML=`
+    <div class="stat-box"><div class="stat-n sn-smash">${totalSmash}</div><div class="stat-l">Total 🔥 Smashes</div></div>
+    <div class="stat-box"><div class="stat-n sn-pass">${totalPass}</div><div class="stat-l">Total ❄️ Passes</div></div>
+    <div class="stat-box"><div class="stat-n sn-acc">${players.length}</div><div class="stat-l">Players</div></div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// HOME / LEAVE
+// ══════════════════════════════════════════════════════════
+async function leaveRoom(){
+  stopListeners();
+  if(!me.isMaster && me.code && me.name){
+    try{ await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`), null) }catch(e){}
+  }
+  goHome();
+}
+
+function goHome(){
+  stopListeners();
+  me={name:'',code:'',isMaster:false};
+  lastSlide=-1; myVotedSlides={};
+  _latestRoom=null; _latestVotes={};
+  show('entry');
+}
+
+// ── Key shortcuts ──
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!document.getElementById('entry').classList.contains('hidden')){
+    document.getElementById('joinCode').value.trim() ? joinRoom() : createRoom();
+  }
+  if(!document.getElementById('game').classList.contains('hidden')&&!me.isMaster){
+    if(e.key==='ArrowRight') castVote('smash');
+    if(e.key==='ArrowLeft')  castVote('pass');
+  }
+});
+document.getElementById('joinCode').addEventListener('input',function(){ this.value=this.value.toUpperCase() });
+</script>
+</body>
+</html>
