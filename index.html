@@ -977,6 +977,7 @@ input:focus{
 <script>
 let dbReady = false;
 let slideLoadToken = 0;
+let slidePageBase = null;
 
 document.addEventListener('fb-ready', () => {
   dbReady = true;
@@ -1018,11 +1019,75 @@ function getSlideId(rawUrl) {
   return m ? m[1] : null;
 }
 
-function buildSlideUrl(slideId, slideNumber, format) {
-  return `https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=p${slideNumber}&w=1600&h=900&cachebust=${Date.now()}`;
+function getPageIdCandidates(slideNumber, totalSlides = 50) {
+  const likely = [];
+  const maxIdx = Math.max(20, Math.min(totalSlides * 4, 120));
+
+  if (slidePageBase === null) {
+    if (slideNumber === 1) {
+      likely.push('p', 'p1', 'p2', 'p3');
+    } else {
+      likely.push(`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
+    }
+  } else if (slidePageBase === 'p') {
+    likely.push(slideNumber === 1 ? 'p' : `p${slideNumber}`);
+    likely.push(`p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
+  } else {
+    const baseNum = parseInt(slidePageBase.slice(1), 10);
+    if (!isNaN(baseNum)) {
+      const mappedNum = baseNum + slideNumber - 1;
+      likely.push(`p${mappedNum}`, `p${Math.max(1, mappedNum - 1)}`, `p${mappedNum + 1}`);
+    }
+    likely.push(`p${slideNumber}`);
+  }
+
+  for (let i = 1; i <= maxIdx; i++) likely.push(`p${i}`);
+  return [...new Set(likely)];
 }
 
-function loadSlide(rawUrl, slideNumber) {
+function updatePageBaseFromSuccess(slideNumber, url) {
+  const resolvedPageId = inferPageIdFromUrl(url);
+  if (!resolvedPageId) return;
+
+  if (resolvedPageId === 'p') {
+    if (slideNumber === 1) slidePageBase = 'p';
+    return;
+  }
+
+  const n = parseInt(resolvedPageId.slice(1), 10);
+  if (isNaN(n)) return;
+
+  const inferredBase = n - slideNumber + 1;
+  if (inferredBase < 1) return;
+  slidePageBase = `p${inferredBase}`;
+}
+
+function buildSlideUrls(slideId, slideNumber, format, totalSlides = 50) {
+  const cacheBust = Date.now();
+  const urls = [];
+
+  getPageIdCandidates(slideNumber, totalSlides).forEach((pageId) => {
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+  });
+
+  if (slideNumber === 1) {
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?w=1600&h=900&cachebust=${cacheBust}`);
+  }
+
+  return [...new Set(urls)];
+}
+
+function inferPageIdFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.get('pageid');
+  } catch (_) {
+    return null;
+  }
+}
+
+function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
@@ -1042,20 +1107,23 @@ function loadSlide(rawUrl, slideNumber) {
       `This deck could not be loaded through Google's image export URL.
        Even if sharing is set to <strong>Anyone with the link can view</strong>,
        Google may still block direct slide-image export, or the slide page ID may not match.`;
-    errEl.classList.add('visible');errEl.classList.add('visible');
+    errEl.classList.add('visible');
     return;
   }
 
-  function finishSuccess(url){
-    if(token !== slideLoadToken) return;
+  function finishSuccess(url) {
+    if (token !== slideLoadToken) return;
+
+    updatePageBaseFromSuccess(slideNumber, url);
+
     img.onload = () => {
-      if(token !== slideLoadToken) return;
+      if (token !== slideLoadToken) return;
       img.classList.remove('loading');
       loader.classList.add('hidden');
       errEl.classList.remove('visible');
     };
     img.onerror = () => {
-      if(token !== slideLoadToken) return;
+      if (token !== slideLoadToken) return;
       loader.classList.add('hidden');
       img.style.display = 'none';
       errEl.classList.add('visible');
@@ -1063,23 +1131,54 @@ function loadSlide(rawUrl, slideNumber) {
     img.src = url;
   }
 
-  function tryLoad(format, fallback){
-    const probe = new Image();
-    const url = buildSlideUrl(slideId, slideNumber, format);
-    probe.onload = () => {
-      if(token !== slideLoadToken) return;
-      finishSuccess(url);
+  function tryUrls(urls, startIndex, onFail) {
+    if (startIndex >= urls.length) return onFail();
+
+    const batchSize = 8;
+    const timeoutMs = 1800;
+    const batch = urls.slice(startIndex, startIndex + batchSize);
+    let pending = batch.length;
+    let resolved = false;
+
+    const goNextBatch = () => {
+      if (resolved) return;
+      resolved = true;
+      tryUrls(urls, startIndex + batchSize, onFail);
     };
-    probe.onerror = () => {
-      if(token !== slideLoadToken) return;
-      fallback();
-    };
-    probe.src = url;
+
+    batch.forEach((url) => {
+      const probe = new Image();
+      let settled = false;
+
+      const finish = (ok) => {
+        if (settled || resolved) return;
+        settled = true;
+        clearTimeout(timer);
+        if (token !== slideLoadToken) return;
+
+        if (ok) {
+          resolved = true;
+          finishSuccess(url);
+          return;
+        }
+
+        pending -= 1;
+        if (pending === 0) goNextBatch();
+      };
+
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      probe.onload = () => finish(true);
+      probe.onerror = () => finish(false);
+      probe.src = url;
+    });
   }
 
-  tryLoad('jpeg', () => {
-    tryLoad('png', () => {
-      if(token !== slideLoadToken) return;
+  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg', totalSlides);
+  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png', totalSlides);
+
+  tryUrls(jpegUrls, 0, () => {
+    tryUrls(pngUrls, 0, () => {
+      if (token !== slideLoadToken) return;
       loader.classList.add('hidden');
       img.style.display = 'none';
       errEl.classList.add('visible');
@@ -1259,7 +1358,7 @@ function renderGame(room){
 
   if(s !== lastSlide){
     lastSlide = s;
-    loadSlide(room.slidesUrl, s);
+    loadSlide(room.slidesUrl, s, tot);
 
     if(!myVotedSlides[s]){
       document.getElementById('votedBanner').className = 'voted-banner';
@@ -1468,6 +1567,7 @@ function goHome(){
   _latestRoom = null;
   _latestVotes = {};
   slideLoadToken = 0;
+  slidePageBase = null;
 
   const img = document.getElementById('slideImg');
   img.src = '';
