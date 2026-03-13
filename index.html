@@ -1019,7 +1019,8 @@ function getSlideId(rawUrl) {
 }
 
 function buildSlideUrl(slideId, slideNumber, format) {
-  return `https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=p${slideNumber}&w=1600&h=900&cachebust=${Date.now()}`;
+  const pageId = slideNumber === 1 ? 'p' : `p${slideNumber}`;
+  return `https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${Date.now()}`;
 }
 
 function loadSlide(rawUrl, slideNumber) {
