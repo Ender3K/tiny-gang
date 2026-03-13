@@ -1019,27 +1019,55 @@ function getSlideId(rawUrl) {
   return m ? m[1] : null;
 }
 
-function getPageIdCandidates(slideNumber) {
+function getPageIdCandidates(slideNumber, totalSlides = 50) {
+  const cap = Math.min(Math.max(totalSlides + 6, 12), 220);
+  const broad = [];
+  for (let i = 1; i <= cap; i++) broad.push(`p${i}`);
+
   if (slidePageBase === null) {
-    if (slideNumber === 1) return ['p', 'p1', 'p2', 'p3', 'p4', 'p5'];
-    return [`p${slideNumber}`, `p${Math.max(1, slideNumber - 1)}`];
+    if (slideNumber === 1) return ['p', 'p1', 'p2', 'p3', ...broad];
+    return [`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`, ...broad];
   }
 
   if (slidePageBase === 'p') {
-    return slideNumber === 1 ? ['p', 'p1'] : [`p${slideNumber}`, `p${slideNumber + 1}`];
+    return slideNumber === 1
+      ? ['p', 'p1', 'p2', ...broad]
+      : [`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`, ...broad];
   }
 
   const baseNum = parseInt(slidePageBase.slice(1), 10);
-  if (isNaN(baseNum)) return [`p${slideNumber}`];
-  const mapped = `p${baseNum + slideNumber - 1}`;
-  return slideNumber === 1 ? [mapped, 'p', 'p1'] : [mapped, `p${slideNumber}`];
+  if (isNaN(baseNum)) return [`p${slideNumber}`, ...broad];
+
+  const mappedNum = baseNum + slideNumber - 1;
+  const mapped = `p${mappedNum}`;
+  const neighbors = [`p${Math.max(1, mappedNum - 1)}`, `p${mappedNum + 1}`];
+
+  if (slideNumber === 1) return [mapped, 'p', 'p1', ...neighbors, ...broad];
+  return [mapped, ...neighbors, `p${slideNumber}`, ...broad];
 }
 
-function buildSlideUrls(slideId, slideNumber, format) {
+function updatePageBaseFromSuccess(slideNumber, url) {
+  const resolvedPageId = inferPageIdFromUrl(url);
+  if (!resolvedPageId) return;
+
+  if (resolvedPageId === 'p') {
+    if (slideNumber === 1) slidePageBase = 'p';
+    return;
+  }
+
+  const n = parseInt(resolvedPageId.slice(1), 10);
+  if (isNaN(n)) return;
+
+  const inferredBase = n - slideNumber + 1;
+  if (inferredBase < 1) return;
+  slidePageBase = `p${inferredBase}`;
+}
+
+function buildSlideUrls(slideId, slideNumber, format, totalSlides) {
   const cacheBust = Date.now();
   const urls = [];
 
-  getPageIdCandidates(slideNumber).forEach((pageId) => {
+  getPageIdCandidates(slideNumber, totalSlides).forEach((pageId) => {
     urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
     urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
   });
@@ -1061,7 +1089,7 @@ function inferPageIdFromUrl(url) {
   }
 }
 
-function loadSlide(rawUrl, slideNumber) {
+function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
@@ -1088,10 +1116,7 @@ function loadSlide(rawUrl, slideNumber) {
   function finishSuccess(url) {
     if (token !== slideLoadToken) return;
 
-    if (slideNumber === 1) {
-      const resolvedPageId = inferPageIdFromUrl(url);
-      if (resolvedPageId) slidePageBase = resolvedPageId;
-    }
+    updatePageBaseFromSuccess(slideNumber, url);
 
     img.onload = () => {
       if (token !== slideLoadToken) return;
@@ -1124,8 +1149,8 @@ function loadSlide(rawUrl, slideNumber) {
     probe.src = url;
   }
 
-  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg');
-  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png');
+  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg', totalSlides);
+  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png', totalSlides);
 
   tryUrls(jpegUrls, 0, () => {
     tryUrls(pngUrls, 0, () => {
@@ -1309,7 +1334,7 @@ function renderGame(room){
 
   if(s !== lastSlide){
     lastSlide = s;
-    loadSlide(room.slidesUrl, s);
+    loadSlide(room.slidesUrl, s, tot);
 
     if(!myVotedSlides[s]){
       document.getElementById('votedBanner').className = 'voted-banner';
