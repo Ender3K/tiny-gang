@@ -8,7 +8,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+  import { getDatabase, ref, set, get, update, onValue, off } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
 
   try {
     const firebaseConfig = {
@@ -25,7 +25,9 @@
     const db = getDatabase(app);
 
     const testRef = ref(db, ".info/connected");
-    const unsub = onValue(testRef, () => unsub(), (err) => {
+    const unsubscribe = onValue(testRef, () => {
+      unsubscribe();
+    }, (err) => {
       window._fbError = err.message;
       document.dispatchEvent(new Event("fb-error"));
     });
@@ -36,6 +38,8 @@
     window._get = get;
     window._update = update;
     window._onValue = onValue;
+    window._off = off;
+
     document.dispatchEvent(new Event("fb-ready"));
   } catch (e) {
     window._fbError = e.message;
@@ -741,9 +745,9 @@ input:focus{
         <input type="text" id="hostName" placeholder="Enter your name…" autocomplete="off" />
       </div>
       <div class="field">
-        <label>Google Slides URL</label>
-        <input type="url" id="slidesUrl" placeholder="https://docs.google.com/presentation/d/…" />
-        <p class="hint">Must be “Anyone with the link can view”</p>
+        <label>Published Google Slides Embed URL</label>
+        <input type="url" id="slidesUrl" placeholder="Paste the src from Google Slides Publish to web → Embed" />
+        <p class="hint">In Google Slides: File → Share → Publish to web → Embed → Publish. Paste the iframe src URL here.</p>
       </div>
       <div class="field">
         <label>Number of Slides</label>
@@ -900,7 +904,7 @@ document.addEventListener('fb-error', () => {
   warn.style.display = 'block';
   warn.innerHTML = `<strong>⚠️ Firebase Connection Failed</strong>
     Error: <code>${msg}</code><br><br>
-    Most likely your <strong>databaseURL</strong> is wrong, or database rules are blocking reads/writes.`;
+    Check your Firebase config and Realtime Database rules.`;
   show('cfgScreen');
 });
 
@@ -924,14 +928,45 @@ function showToast(msg,dur=2200){
   setTimeout(()=>t.classList.remove('show'),dur);
 }
 
-function embedUrl(rawUrl, n){
-  const m = rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
-  if(!m) return 'about:blank';
-  const id = m[1];
-  return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&slide=${n}`;
+function normalizePublishedEmbedUrl(rawUrl){
+  try{
+    const u = new URL(rawUrl);
+
+    if(u.hostname !== 'docs.google.com') return null;
+
+    // Accept either iframe src or full iframe pasted accidentally
+    if(rawUrl.includes('<iframe')){
+      const match = rawUrl.match(/src=["']([^"']+)["']/i);
+      if(!match) return null;
+      return normalizePublishedEmbedUrl(match[1]);
+    }
+
+    // We only want published embed/preview style URLs
+    if(!u.pathname.includes('/presentation/d/')) return null;
+
+    return u.toString();
+  }catch{
+    // If user pasted iframe HTML instead of URL
+    const match = rawUrl.match(/src=["']([^"']+)["']/i);
+    if(match) return normalizePublishedEmbedUrl(match[1]);
+    return null;
+  }
 }
-function loadSlide(rawUrl, n){
-  document.getElementById('slideFrame').src = embedUrl(rawUrl, n);
+
+function slideUrlFromPublished(baseUrl, slideNumber){
+  const url = new URL(baseUrl);
+
+  // Remove any old hash/query values we control
+  url.hash = `slide=id.p${slideNumber}`;
+  url.searchParams.set('rm', 'minimal');
+  url.searchParams.set('t', Date.now().toString());
+
+  return url.toString();
+}
+
+function loadSlide(rawPublishedUrl, n){
+  const frame = document.getElementById('slideFrame');
+  frame.src = slideUrlFromPublished(rawPublishedUrl, n);
 }
 
 let me = { name:'', code:'', isMaster:false };
@@ -995,19 +1030,21 @@ function renderSmashBoard(targetId, room, votesData){
 async function createRoom(){
   hideErr('createErr');
   if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
+
   const name = document.getElementById('hostName').value.trim();
-  const url = document.getElementById('slidesUrl').value.trim();
+  const rawSlidesInput = document.getElementById('slidesUrl').value.trim();
+  const slidesUrl = normalizePublishedEmbedUrl(rawSlidesInput);
   const count = parseInt(document.getElementById('slideCount').value.trim(),10);
 
   if(!name) return showErr('createErr','Enter your name.');
-  if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
+  if(!slidesUrl) return showErr('createErr','Paste the published Google Slides embed URL (or iframe HTML) from Publish to web → Embed.');
   if(isNaN(count) || count < 1) return showErr('createErr','Enter a valid slide count.');
 
   const code = genCode();
   const room = {
     code,
     hostName:name,
-    slidesUrl:url,
+    slidesUrl,
     totalSlides:count,
     state:'waiting',
     currentSlide:1,
@@ -1206,9 +1243,21 @@ async function masterEnd(){
   await window._update(roomRef(me.code), { state:'done' });
 }
 
+function stopListeners(){
+  if(unsubRoom){
+    window._off(roomRef(me.code), 'value', unsubRoom);
+    unsubRoom = null;
+  }
+  if(unsubVotes){
+    window._off(votesRef(me.code), 'value', unsubVotes);
+    unsubVotes = null;
+  }
+}
+
 function listenRoom(){
-  if(unsubRoom){ unsubRoom(); unsubRoom = null; }
-  unsubRoom = window._onValue(roomRef(me.code), snap => {
+  stopListeners();
+
+  const callback = snap => {
     if(!snap.exists()) return;
     const room = snap.val();
     _latestRoom = room;
@@ -1216,7 +1265,7 @@ function listenRoom(){
     if(room.state === 'waiting'){
       renderWaiting(room);
     } else if(room.state === 'playing'){
-      if(!document.getElementById('game').classList.contains('hidden') === false){
+      if(document.getElementById('game').classList.contains('hidden')){
         enterGame();
         return;
       }
@@ -1225,26 +1274,32 @@ function listenRoom(){
     } else if(room.state === 'done'){
       showResultsScreen(room, _latestVotes);
     }
-  });
+  };
+
+  unsubRoom = callback;
+  window._onValue(roomRef(me.code), callback);
 }
 
 function listenVotes(){
-  if(unsubVotes){ unsubVotes(); unsubVotes = null; }
-  unsubVotes = window._onValue(votesRef(me.code), snap => {
+  if(unsubVotes){
+    window._off(votesRef(me.code), 'value', unsubVotes);
+    unsubVotes = null;
+  }
+
+  const callback = snap => {
     _latestVotes = snap.exists() ? snap.val() : {};
     if(_latestRoom && _latestRoom.state === 'playing'){
       renderVoters(_latestRoom, _latestVotes);
       renderSmashBoard('smashBoard', _latestRoom, _latestVotes);
     }
-  });
-}
+  };
 
-function stopListeners(){
-  unsubRoom = null;
-  unsubVotes = null;
+  unsubVotes = callback;
+  window._onValue(votesRef(me.code), callback);
 }
 
 function showResultsScreen(room, votesData){
+  stopListeners();
   show('results');
 
   const players = getPlayers(room);
@@ -1319,6 +1374,7 @@ function showResultsScreen(room, votesData){
 }
 
 async function leaveRoom(){
+  stopListeners();
   if(!me.isMaster && me.code && me.name){
     try{
       await window._set(window._ref(window._db, `rooms/${me.code}/players/${safeKey(me.name)}`), null);
@@ -1328,6 +1384,7 @@ async function leaveRoom(){
 }
 
 function goHome(){
+  stopListeners();
   me = { name:'', code:'', isMaster:false };
   lastSlide = -1;
   myVotedSlides = {};
