@@ -25,10 +25,9 @@
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
-    // Verify the database is reachable with a quick test read
     const testRef = ref(db, '.info/connected');
     const unsub = onValue(testRef, (snap) => {
-      unsub(); // stop listening after first value
+      unsub();
     }, (err) => {
       window._fbError = err.message;
       document.dispatchEvent(new Event('fb-error'));
@@ -253,13 +252,11 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
 </head>
 <body>
 
-<!-- ══ CONFIG WARNING ══ -->
 <div class="cfg-warn" id="cfgWarn">
   <strong>⚠️ Firebase Not Configured</strong>
   Open <code>index.html</code> and replace the placeholder values in the <code>firebaseConfig</code> block with your Firebase project credentials. See <code>SETUP.md</code> for step-by-step instructions.
 </div>
 
-<!-- ══ SCREEN: ENTRY ══ -->
 <div class="screen" id="entry">
   <div style="display:flex;flex-direction:column;align-items:center;gap:1.75rem;width:100%;max-width:480px">
     <div>
@@ -285,7 +282,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
   </div>
 </div>
 
-<!-- ══ SCREEN: WAITING ══ -->
 <div class="screen hidden" id="waiting">
   <div class="room-header">
     <div class="room-code-label">Room Code — share this!</div>
@@ -301,7 +297,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
   </div>
 </div>
 
-<!-- ══ SCREEN: GAME ══ -->
 <div class="screen hidden" id="game">
   <div class="top-bar">
     <div class="slide-counter" id="slideCounter">1 / 10</div>
@@ -313,7 +308,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
       <div class="slide-wrap" id="slideWrap">
         <iframe id="slideFrame" src="about:blank" allowfullscreen></iframe>
         <div class="slide-badge" id="slideBadge">01</div>
-        <!-- click shield so iframe doesn't steal focus -->
         <div id="slideShield" style="position:absolute;inset:0;z-index:2;cursor:default"></div>
       </div>
       <div id="playerVoteArea">
@@ -344,7 +338,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
   </div>
 </div>
 
-<!-- ══ SCREEN: RESULTS ══ -->
 <div class="screen hidden" id="results">
   <div class="res-header">
     <div class="res-title">FINAL RESULTS</div>
@@ -358,9 +351,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
 <div class="toast" id="toast"></div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// Wait for Firebase to initialise
-// ══════════════════════════════════════════════════════════
 let dbReady = false;
 
 document.addEventListener('fb-ready', () => {
@@ -396,23 +386,17 @@ function showErr(id,msg){ const el=document.getElementById(id); el.textContent=m
 function hideErr(id){ document.getElementById(id).style.display='none' }
 function showToast(msg,dur=2500){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur) }
 
+// FIXED: use present + slide=id.pN instead of #slide=N
 function embedUrl(rawUrl, n){
   const m = rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
   if(!m) return 'about:blank';
   const id = m[1];
-  // /embed with rm=minimal is the clean viewer; we force a reload per slide
-  // by appending slide number as a dummy hash so the browser sees a new URL
-  return `https://docs.google.com/presentation/d/${id}/embed?rm=minimal&start=false&loop=false#slide=${n}`;
+  return `https://docs.google.com/presentation/d/${id}/present?slide=id.p${n}&rm=minimal&t=${Date.now()}`;
 }
 
 function loadSlide(rawUrl, n){
   const frame = document.getElementById('slideFrame');
-  // Detach → change src → reattach forces a true browser reload
-  const parent = frame.parentNode;
-  const sibling = frame.nextSibling;
-  frame.remove();
   frame.src = embedUrl(rawUrl, n);
-  parent.insertBefore(frame, sibling);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -470,7 +454,6 @@ async function joinRoom(){
   const room = snap.val();
   if(room.state==='done') return showErr('joinErr','This game has already ended.');
 
-  // add player
   await window._update(window._ref(window._db,`rooms/${code}/players`), {
     [safeKey(name)]:{ name, color:avatarClass(name) }
   });
@@ -492,7 +475,6 @@ function enterWaiting(){
 function renderWaiting(room){
   const players = Object.values(room.players||{});
   const grid = document.getElementById('playersGrid');
-  // only re-render if count changed to avoid flicker
   if(grid.children.length !== players.length){
     grid.innerHTML='';
     players.forEach(p=>{
@@ -526,7 +508,7 @@ async function startGame(){
 // GAME
 // ══════════════════════════════════════════════════════════
 let lastSlide = -1;
-let myVotedSlides = {}; // track which slides I've voted on
+let myVotedSlides = {};
 
 function enterGame(){
   show('game');
@@ -550,7 +532,6 @@ function renderGame(room){
     loadSlide(room.slidesUrl, s);
     if(!me.isMaster){
       if(!myVotedSlides[s]){
-        // reset vote UI for this slide
         document.getElementById('votedBanner').className='voted-banner';
         document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
       } else {
@@ -589,7 +570,6 @@ function renderVoters(room, votesData){
   document.getElementById('tallySmash').textContent=smashes;
   document.getElementById('tallyPass').textContent=passes;
 
-  // sync my own vote state from db (handles page refresh)
   if(!me.isMaster){
     const myChoice=slideVotes[safeKey(me.name)];
     if(myChoice && !myVotedSlides[s]){
@@ -614,7 +594,7 @@ async function castVote(choice){
   if(!snap.exists()) return;
   const room=snap.val();
   const s=room.currentSlide;
-  if(myVotedSlides[s]) return; // already voted
+  if(myVotedSlides[s]) return;
   myVotedSlides[s]=choice;
   await window._set(voteRef(me.code,s,safeKey(me.name)), choice);
   markVotedUI(choice);
@@ -743,7 +723,6 @@ function goHome(){
   show('entry');
 }
 
-// ── Key shortcuts ──
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!document.getElementById('entry').classList.contains('hidden')){
     document.getElementById('joinCode').value.trim() ? joinRoom() : createRoom();
