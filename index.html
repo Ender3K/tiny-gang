@@ -1019,12 +1019,13 @@ function getSlideId(rawUrl) {
   return m ? m[1] : null;
 }
 
-function getPageIdCandidates(slideNumber) {
+function getPageIdCandidates(slideNumber, totalSlides = 50) {
   const likely = [];
+  const maxIdx = Math.max(20, Math.min(totalSlides * 4, 120));
 
   if (slidePageBase === null) {
     if (slideNumber === 1) {
-      likely.push('p', 'p1', 'p2');
+      likely.push('p', 'p1', 'p2', 'p3');
     } else {
       likely.push(`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
     }
@@ -1040,7 +1041,8 @@ function getPageIdCandidates(slideNumber) {
     likely.push(`p${slideNumber}`);
   }
 
-  return [...new Set(likely)].slice(0, 6);
+  for (let i = 1; i <= maxIdx; i++) likely.push(`p${i}`);
+  return [...new Set(likely)];
 }
 
 function updatePageBaseFromSuccess(slideNumber, url) {
@@ -1060,12 +1062,13 @@ function updatePageBaseFromSuccess(slideNumber, url) {
   slidePageBase = `p${inferredBase}`;
 }
 
-function buildSlideUrls(slideId, slideNumber, format) {
+function buildSlideUrls(slideId, slideNumber, format, totalSlides = 50) {
   const cacheBust = Date.now();
   const urls = [];
 
-  getPageIdCandidates(slideNumber).forEach((pageId) => {
+  getPageIdCandidates(slideNumber, totalSlides).forEach((pageId) => {
     urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
   });
 
   if (slideNumber === 1) {
@@ -1128,30 +1131,50 @@ function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
     img.src = url;
   }
 
-  function tryUrls(urls, i, onFail) {
-    if (i >= urls.length) return onFail();
+  function tryUrls(urls, startIndex, onFail) {
+    if (startIndex >= urls.length) return onFail();
 
-    const probe = new Image();
-    const url = urls[i];
-    let settled = false;
+    const batchSize = 8;
+    const timeoutMs = 1800;
+    const batch = urls.slice(startIndex, startIndex + batchSize);
+    let pending = batch.length;
+    let resolved = false;
 
-    const finish = (ok) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (token !== slideLoadToken) return;
-      if (ok) finishSuccess(url);
-      else tryUrls(urls, i + 1, onFail);
+    const goNextBatch = () => {
+      if (resolved) return;
+      resolved = true;
+      tryUrls(urls, startIndex + batchSize, onFail);
     };
 
-    const timer = setTimeout(() => finish(false), 2500);
-    probe.onload = () => finish(true);
-    probe.onerror = () => finish(false);
-    probe.src = url;
+    batch.forEach((url) => {
+      const probe = new Image();
+      let settled = false;
+
+      const finish = (ok) => {
+        if (settled || resolved) return;
+        settled = true;
+        clearTimeout(timer);
+        if (token !== slideLoadToken) return;
+
+        if (ok) {
+          resolved = true;
+          finishSuccess(url);
+          return;
+        }
+
+        pending -= 1;
+        if (pending === 0) goNextBatch();
+      };
+
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      probe.onload = () => finish(true);
+      probe.onerror = () => finish(false);
+      probe.src = url;
+    });
   }
 
-  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg');
-  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png');
+  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg', totalSlides);
+  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png', totalSlides);
 
   tryUrls(jpegUrls, 0, () => {
     tryUrls(pngUrls, 0, () => {
