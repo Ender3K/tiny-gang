@@ -11,29 +11,43 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
   import { getDatabase, ref, set, get, update, onValue, off } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
 
-  const firebaseConfig = {
-    apiKey:            "AIzaSyAvORsMuKGubMXQ3VdkSdu2iNAK04RZxN4",
-    authDomain:        "smash-or-pass-bb76b.firebaseapp.com",
-    databaseURL:       "https://smash-or-pass-bb76b-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId:         "smash-or-pass-bb76b",
-    storageBucket:     "smash-or-pass-bb76b.firebasestorage.app",
-    messagingSenderId: "671799235493",
-    appId:             "1:671799235493:web:3596308c863afb55944e4c"
-  };
+  try {
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAvORsMuKGubMXQ3VdkSdu2iNAK04RZxN4",
+      authDomain:        "smash-or-pass-bb76b.firebaseapp.com",
+      databaseURL:       "https://smash-or-pass-bb76b-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId:         "smash-or-pass-bb76b",
+      storageBucket:     "smash-or-pass-bb76b.firebasestorage.app",
+      messagingSenderId: "671799235493",
+      appId:             "1:671799235493:web:3596308c863afb55944e4c"
+    };
 
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
+    const app = initializeApp(firebaseConfig);
+    const db  = getDatabase(app);
 
-  // expose to global scope so non-module code can use
-  window._db     = db;
-  window._ref    = ref;
-  window._set    = set;
-  window._get    = get;
-  window._update = update;
-  window._onValue = onValue;
-  window._off    = off;
-  window._fbReady = true;
-  document.dispatchEvent(new Event('fb-ready'));
+    // Verify the database is reachable with a quick test read
+    const testRef = ref(db, '.info/connected');
+    const unsub = onValue(testRef, (snap) => {
+      unsub(); // stop listening after first value
+    }, (err) => {
+      window._fbError = err.message;
+      document.dispatchEvent(new Event('fb-error'));
+    });
+
+    window._db      = db;
+    window._ref     = ref;
+    window._set     = set;
+    window._get     = get;
+    window._update  = update;
+    window._onValue = onValue;
+    window._off     = off;
+    window._fbReady = true;
+    document.dispatchEvent(new Event('fb-ready'));
+
+  } catch(e) {
+    window._fbError = e.message;
+    document.dispatchEvent(new Event('fb-error'));
+  }
 </script>
 
 <style>
@@ -346,19 +360,25 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
 // Wait for Firebase to initialise
 // ══════════════════════════════════════════════════════════
 let dbReady = false;
-document.addEventListener('fb-ready', () => { dbReady = true; checkConfig(); });
 
-function checkConfig(){
+document.addEventListener('fb-ready', () => {
+  dbReady = true;
+  document.getElementById('cfgWarn').style.display = 'none';
+  console.log('✅ Firebase connected');
+});
+
+document.addEventListener('fb-error', () => {
+  const msg = window._fbError || 'Unknown error';
+  console.error('❌ Firebase error:', msg);
   const warn = document.getElementById('cfgWarn');
-  // if databaseURL still has placeholder text, show warning
-  try {
-    // We'll detect it by trying a dummy ref — if it throws the config is wrong
-    window._ref(window._db, 'ping');
-    warn.style.display = 'none';
-  } catch(e) {
-    warn.style.display = 'block';
-  }
-}
+  warn.style.display = 'block';
+  warn.innerHTML = `<strong>⚠️ Firebase Connection Failed</strong>
+    Error: <code>${msg}</code><br><br>
+    Most likely your <strong>databaseURL</strong> is wrong. Go to
+    <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Firebase Console</a>
+    → Build → Realtime Database and copy the exact URL shown at the top.
+    It looks like: <code>https://YOUR-PROJECT-default-rtdb.REGION.firebasedatabase.app</code>`;
+});
 
 // ══════════════════════════════════════════════════════════
 // HELPERS
@@ -395,11 +415,11 @@ function voteRef(code,slide,playerKey){ return window._ref(window._db, `votes/${
 // CREATE ROOM
 // ══════════════════════════════════════════════════════════
 async function createRoom(){
-  if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
+  hideErr('createErr');
+  if(!dbReady) return showErr('createErr','Firebase not ready — check your config and the yellow banner above.');
   const name  = document.getElementById('hostName').value.trim();
   const url   = document.getElementById('slidesUrl').value.trim();
   const count = parseInt(document.getElementById('slideCount').value.trim(),10);
-  hideErr('createErr');
   if(!name)  return showErr('createErr','Enter your name.');
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
   if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
@@ -410,9 +430,13 @@ async function createRoom(){
     state:'waiting', currentSlide:1,
     players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
   };
-  await window._set(roomRef(code), room);
-  me = { name, code, isMaster:true };
-  enterWaiting();
+  try {
+    await window._set(roomRef(code), room);
+    me = { name, code, isMaster:true };
+    enterWaiting();
+  } catch(e) {
+    showErr('createErr', '❌ Database error: ' + e.message + ' — Check your Firebase Realtime Database rules are set to test mode.');
+  }
 }
 
 // ══════════════════════════════════════════════════════════
