@@ -20,8 +20,7 @@
       messagingSenderId: "671799235493",
       appId:             "1:671799235493:web:3596308c863afb55944e4c"
     };
-    
-    let slideImageCache = {};
+
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
@@ -978,7 +977,7 @@ input:focus{
 
 <script>
 const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwU3-zlc0EqXUr2ncYybguEtyiCudnIUevNwlNV4LQiRiyidVTjC24cd2e4HDxViZqh/exec";
-
+let slideImageCache = {};
 let dbReady = false;
 let slideLoadToken = 0;
 
@@ -1027,8 +1026,8 @@ function jsonp(url) {
     const cbName = "__jsonp_cb_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
     const sep = url.includes("?") ? "&" : "?";
-
     let cleaned = false;
+
     function cleanup() {
       if (cleaned) return;
       cleaned = true;
@@ -1072,6 +1071,8 @@ async function fetchSlidePageIdsViaAppsScript(rawUrl) {
     `${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`
   );
 
+  console.log("fetchSlidePageIdsViaAppsScript response", data);
+
   if (!data || !data.ok) {
     throw new Error(data?.error || "Could not fetch slide IDs.");
   }
@@ -1080,8 +1081,8 @@ async function fetchSlidePageIdsViaAppsScript(rawUrl) {
 }
 
 async function fetchSlideImageDataUrl(rawUrl, pageId) {
-const presentationId = getSlideId(rawUrl);
-if (!presentationId) {
+  const presentationId = getSlideId(rawUrl);
+  if (!presentationId) {
     throw new Error("Invalid Google Slides URL.");
   }
 
@@ -1094,12 +1095,54 @@ if (!presentationId) {
     `${APPS_SCRIPT_WEBAPP_URL}?action=image&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}`
   );
 
+  console.log("fetchSlideImageDataUrl response", data);
+
   if (!data || !data.ok || !data.dataUrl) {
     throw new Error(data?.error || "Could not fetch slide image.");
   }
 
   slideImageCache[cacheKey] = data.dataUrl;
   return data.dataUrl;
+}
+
+async function createRoom(){
+  hideErr('createErr');
+  if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
+
+  const name  = document.getElementById('hostName').value.trim();
+  const url   = document.getElementById('slidesUrl').value.trim();
+  const count = parseInt(document.getElementById('slideCount').value.trim(),10);
+
+  if(!name) return showErr('createErr','Enter your name.');
+  if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
+  if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
+
+  try {
+    const deck = await fetchSlidePageIdsViaAppsScript(url);
+
+    if (count > deck.totalSlides) {
+      return showErr('createErr', `Deck only has ${deck.totalSlides} slides.`);
+    }
+
+    const code = genCode();
+    const room = {
+      code,
+      hostName:name,
+      slidesUrl:url,
+      totalSlides:count,
+      slidePageIds: deck.slidePageIds.slice(0, count),
+      state:'waiting',
+      currentSlide:1,
+      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
+    };
+
+    await window._set(roomRef(code), room);
+    me = { name, code, isMaster:true };
+    enterWaiting();
+  } catch(e) {
+    console.error("createRoom failed", e);
+    showErr('createErr','❌ ' + e.message);
+  }
 }
 
 async function loadSlide(rawUrl, slideNumber, totalSlides = 50, slidePageIds = []) {
@@ -1208,45 +1251,6 @@ function stopListeners(){
   if(unsubVotes){ unsubVotes(); unsubVotes = null; }
 }
 
-async function createRoom(){
-  hideErr('createErr');
-  if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
-
-  const name  = document.getElementById('hostName').value.trim();
-  const url   = document.getElementById('slidesUrl').value.trim();
-  const count = parseInt(document.getElementById('slideCount').value.trim(),10);
-
-  if(!name) return showErr('createErr','Enter your name.');
-  if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
-  if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
-
-  try {
-    const deck = await fetchSlidePageIdsViaAppsScript(url);
-
-    if (count > deck.totalSlides) {
-      return showErr('createErr', `Deck only has ${deck.totalSlides} slides.`);
-    }
-
-    const code = genCode();
-    const room = {
-      code,
-      hostName:name,
-      slidesUrl:url,
-      totalSlides:count,
-      slidePageIds: deck.slidePageIds.slice(0, count),
-      state:'waiting',
-      currentSlide:1,
-      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
-    };
-
-    await window._set(roomRef(code), room);
-    me = { name, code, isMaster:true };
-    enterWaiting();
-  } catch(e) {
-    showErr('createErr','❌ ' + e.message);
-  }
-}
-
 async function joinRoom(){
   hideErr('joinErr');
   if(!dbReady) return showErr('joinErr','Firebase not ready — check your config.');
@@ -1328,6 +1332,14 @@ function renderGame(room){
   document.getElementById('slideCounter').textContent = `${s} / ${tot}`;
   document.getElementById('progFill').style.width = (((s-1)/tot)*100)+'%';
   document.getElementById('slideBadge').textContent = String(s).padStart(2,'0');
+
+  console.log("renderGame", {
+    currentSlide: s,
+    totalSlides: tot,
+    hasSlidePageIds: Array.isArray(room.slidePageIds),
+    slidePageIdsLength: room.slidePageIds?.length,
+    currentPageId: room.slidePageIds?.[s - 1]
+  });
 
   if(s !== lastSlide){
     lastSlide = s;
@@ -1539,10 +1551,12 @@ function goHome(){
   myVotedSlides = {};
   _latestRoom = null;
   _latestVotes = {};
-  slideLoadToken = 0;
   slideImageCache = {};
+  slideLoadToken = 0;
 
   const img = document.getElementById('slideImg');
+  img.onload = null;
+  img.onerror = null;
   img.src = '';
   img.className = 'loading';
   img.style.display = 'block';
