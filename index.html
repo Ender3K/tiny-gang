@@ -373,7 +373,6 @@ input:focus{
   width:100%;
 }
 
-/* ── Slide display: img-based, no iframe ── */
 .slide-wrap{
   background:#000;
   border-radius:20px;
@@ -820,7 +819,7 @@ input:focus{
       <div class="field">
         <label>Google Slides URL</label>
         <input type="url" id="slidesUrl" placeholder="https://docs.google.com/presentation/d/…" />
-        <p class="hint">Must be "Anyone with the link can view"</p>
+        <p class="hint">Use a normal Google Slides URL. The app will render slides as images, so players cannot interact with the deck.</p>
       </div>
       <div class="field">
         <label>Number of Slides</label>
@@ -876,8 +875,7 @@ input:focus{
       <div class="game-layout">
         <div class="slide-panel">
           <div class="slide-wrap">
-            <!-- img-based slide display — no iframe needed -->
-            <img id="slideImg" src="" alt="Slide" class="loading" crossorigin="anonymous" />
+            <img id="slideImg" src="" alt="Slide" class="loading" />
             <div class="slide-loader" id="slideLoader">
               <div class="spinner"></div>
               <span>Loading slide…</span>
@@ -886,7 +884,7 @@ input:focus{
               <div class="slide-error-icon">⚠️</div>
               <div class="slide-error-title">Could not load slide</div>
               <div class="slide-error-hint">
-                Make sure the presentation is set to <strong>"Anyone with the link can view"</strong> in Google Slides sharing settings, then reload.
+                Make sure the presentation is set to <strong>Anyone with the link can view</strong>. Some Google Slides decks also block direct export if they are restricted.
               </div>
               <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
             </div>
@@ -978,6 +976,7 @@ input:focus{
 
 <script>
 let dbReady = false;
+let slideLoadToken = 0;
 
 document.addEventListener('fb-ready', () => {
   dbReady = true;
@@ -1014,30 +1013,23 @@ function showToast(msg,dur=2200){
   setTimeout(()=>t.classList.remove('show'),dur);
 }
 
-// ── Slide image loading ─────────────────────────────────────────────────────
-// Uses Google's /export/jpeg endpoint which works for publicly shared decks.
-// Slides are 1-indexed in UI; the export endpoint takes a 0-based page index.
-// We try JPEG first, then fall back to PNG if that fails.
-
 function getSlideId(rawUrl) {
   const m = rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
   return m ? m[1] : null;
 }
 
-function buildSlideUrl(slideId, slideIndex, format) {
-  // slideIndex is 0-based
-  return `https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=g${slideIndex}&sz=s1280&cachebust=${Date.now()}`;
+function buildSlideUrl(slideId, slideNumber, format) {
+  return `https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=p${slideNumber}&w=1600&h=900&cachebust=${Date.now()}`;
 }
 
 function loadSlide(rawUrl, slideNumber) {
-  const img        = document.getElementById('slideImg');
-  const loader     = document.getElementById('slideLoader');
-  const errEl      = document.getElementById('slideError');
-  const errLink    = document.getElementById('slideErrorLink');
-  const slideIndex = slideNumber - 1; // 0-based
-  const slideId    = getSlideId(rawUrl);
+  const img = document.getElementById('slideImg');
+  const loader = document.getElementById('slideLoader');
+  const errEl = document.getElementById('slideError');
+  const errLink = document.getElementById('slideErrorLink');
+  const slideId = getSlideId(rawUrl);
+  const token = ++slideLoadToken;
 
-  // Reset UI state
   img.style.display = 'block';
   img.classList.add('loading');
   loader.classList.remove('hidden');
@@ -1050,29 +1042,46 @@ function loadSlide(rawUrl, slideNumber) {
     return;
   }
 
-  function tryLoad(format, onFail) {
-    const url = buildSlideUrl(slideId, slideIndex, format);
-    const probe = new Image();
-    probe.onload = () => {
-      img.src = probe.src;
+  function finishSuccess(url){
+    if(token !== slideLoadToken) return;
+    img.onload = () => {
+      if(token !== slideLoadToken) return;
       img.classList.remove('loading');
       loader.classList.add('hidden');
       errEl.classList.remove('visible');
     };
-    probe.onerror = onFail;
+    img.onerror = () => {
+      if(token !== slideLoadToken) return;
+      loader.classList.add('hidden');
+      img.style.display = 'none';
+      errEl.classList.add('visible');
+    };
+    img.src = url;
+  }
+
+  function tryLoad(format, fallback){
+    const probe = new Image();
+    const url = buildSlideUrl(slideId, slideNumber, format);
+    probe.onload = () => {
+      if(token !== slideLoadToken) return;
+      finishSuccess(url);
+    };
+    probe.onerror = () => {
+      if(token !== slideLoadToken) return;
+      fallback();
+    };
     probe.src = url;
   }
 
-  // Try JPEG → PNG → show error
   tryLoad('jpeg', () => {
     tryLoad('png', () => {
-      img.style.display = 'none';
+      if(token !== slideLoadToken) return;
       loader.classList.add('hidden');
+      img.style.display = 'none';
       errEl.classList.add('visible');
     });
   });
 }
-// ────────────────────────────────────────────────────────────────────────────
 
 let me = { name:'', code:'', isMaster:false };
 let unsubRoom = null;
@@ -1094,6 +1103,7 @@ function getSmashTotals(room, votesData){
   const players = getPlayers(room);
   const totals = {};
   players.forEach(p => totals[safeKey(p.name)] = 0);
+
   for(let s=1; s<=room.totalSlides; s++){
     const slideVotes = votesData[s] || {};
     players.forEach(p => {
@@ -1101,6 +1111,7 @@ function getSmashTotals(room, votesData){
       if(slideVotes[key] === 'smash') totals[key]++;
     });
   }
+
   return players
     .map(p => ({ name:p.name, color:p.color, key:safeKey(p.name), smashes:totals[safeKey(p.name)]||0 }))
     .sort((a,b) => b.smashes - a.smashes || a.name.localeCompare(b.name));
@@ -1123,21 +1134,34 @@ function renderSmashBoard(targetId, room, votesData){
   `).join('') || `<div class="no-votes">No players yet.</div>`;
 }
 
+function stopListeners(){
+  if(unsubRoom){ unsubRoom(); unsubRoom = null; }
+  if(unsubVotes){ unsubVotes(); unsubVotes = null; }
+}
+
 async function createRoom(){
   hideErr('createErr');
   if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
+
   const name  = document.getElementById('hostName').value.trim();
   const url   = document.getElementById('slidesUrl').value.trim();
   const count = parseInt(document.getElementById('slideCount').value.trim(),10);
-  if(!name)  return showErr('createErr','Enter your name.');
+
+  if(!name) return showErr('createErr','Enter your name.');
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
   if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
+
   const code = genCode();
   const room = {
-    code, hostName:name, slidesUrl:url, totalSlides:count,
-    state:'waiting', currentSlide:1,
+    code,
+    hostName:name,
+    slidesUrl:url,
+    totalSlides:count,
+    state:'waiting',
+    currentSlide:1,
     players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
   };
+
   try{
     await window._set(roomRef(code), room);
     me = { name, code, isMaster:true };
@@ -1150,17 +1174,23 @@ async function createRoom(){
 async function joinRoom(){
   hideErr('joinErr');
   if(!dbReady) return showErr('joinErr','Firebase not ready — check your config.');
+
   const name = document.getElementById('joinName').value.trim();
   const code = document.getElementById('joinCode').value.trim().toUpperCase();
+
   if(!name) return showErr('joinErr','Enter your name.');
   if(!code) return showErr('joinErr','Enter a room code.');
+
   const snap = await window._get(roomRef(code));
   if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
+
   const room = snap.val();
   if(room.state==='done') return showErr('joinErr','This game has already ended.');
+
   await window._update(window._ref(window._db,`rooms/${code}/players`),{
     [safeKey(name)]:{ name, color:avatarClass(name) }
   });
+
   me = { name, code, isMaster:false };
   if(room.state==='playing') enterGame();
   else enterWaiting();
@@ -1176,6 +1206,7 @@ function renderWaiting(room){
   const players = getPlayers(room);
   const grid = document.getElementById('playersGrid');
   grid.innerHTML = '';
+
   players.forEach(p => {
     const chip = document.createElement('div');
     chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
@@ -1186,8 +1217,10 @@ function renderWaiting(room){
     `;
     grid.appendChild(chip);
   });
+
   const n = players.length;
   document.getElementById('playerCountLabel').textContent = n+' player'+(n!==1?'s':'');
+
   if(me.isMaster){
     const btn = document.getElementById('startBtn');
     btn.style.display = '';
@@ -1215,12 +1248,15 @@ function enterGame(){
 function renderGame(room){
   const s = room.currentSlide;
   const tot = room.totalSlides;
+
   document.getElementById('slideCounter').textContent = `${s} / ${tot}`;
   document.getElementById('progFill').style.width = (((s-1)/tot)*100)+'%';
   document.getElementById('slideBadge').textContent = String(s).padStart(2,'0');
+
   if(s !== lastSlide){
     lastSlide = s;
     loadSlide(room.slidesUrl, s);
+
     if(!myVotedSlides[s]){
       document.getElementById('votedBanner').className = 'voted-banner';
       document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
@@ -1228,11 +1264,13 @@ function renderGame(room){
       markVotedUI(myVotedSlides[s]);
     }
   }
+
   if(me.isMaster){
     const nb = document.getElementById('nextBtn');
     nb.disabled = false;
     nb.textContent = s>=tot?'SHOW RESULTS':'NEXT SLIDE →';
   }
+
   renderSmashBoard('smashBoard', room, _latestVotes);
 }
 
@@ -1242,12 +1280,15 @@ function renderVoters(room, votesData){
   const players = getPlayers(room);
   const list = document.getElementById('voterList');
   let smashes=0, passes=0;
+
   list.innerHTML = '';
+
   players.forEach(p => {
     const key = safeKey(p.name);
     const choice = slideVotes[key];
     if(choice==='smash') smashes++;
     if(choice==='pass')  passes++;
+
     const row = document.createElement('div');
     row.className = 'voter-row';
     row.innerHTML = `
@@ -1262,13 +1303,16 @@ function renderVoters(room, votesData){
     `;
     list.appendChild(row);
   });
+
   document.getElementById('tallySmash').textContent = smashes;
   document.getElementById('tallyPass').textContent  = passes;
+
   const myChoice = slideVotes[safeKey(me.name)];
   if(myChoice && !myVotedSlides[s]){
     myVotedSlides[s] = myChoice;
     markVotedUI(myChoice);
   }
+
   renderSmashBoard('smashBoard', room, votesData);
 }
 
@@ -1282,9 +1326,11 @@ function markVotedUI(choice){
 async function castVote(choice){
   const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
+
   const room = snap.val();
   const s = room.currentSlide;
   if(myVotedSlides[s]) return;
+
   myVotedSlides[s] = choice;
   await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
   markVotedUI(choice);
@@ -1294,6 +1340,7 @@ async function castVote(choice){
 async function masterNext(){
   const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
+
   const room = snap.val();
   if(room.currentSlide >= room.totalSlides){
     await window._update(roomRef(me.code),{ state:'done' });
@@ -1308,16 +1355,19 @@ async function masterEnd(){
 }
 
 function listenRoom(){
-  if(unsubRoom){ unsubRoom(); unsubRoom=null; }
+  if(unsubRoom){ unsubRoom(); unsubRoom = null; }
+
   unsubRoom = window._onValue(roomRef(me.code), snap => {
     if(!snap.exists()) return;
     const room = snap.val();
     _latestRoom = room;
+
     if(room.state==='waiting'){
       renderWaiting(room);
     } else if(room.state==='playing'){
-      if(!document.getElementById('game').classList.contains('hidden')===false){
-        enterGame(); return;
+      if(document.getElementById('game').classList.contains('hidden')){
+        enterGame();
+        return;
       }
       renderGame(room);
       renderVoters(room, _latestVotes);
@@ -1328,7 +1378,8 @@ function listenRoom(){
 }
 
 function listenVotes(){
-  if(unsubVotes){ unsubVotes(); unsubVotes=null; }
+  if(unsubVotes){ unsubVotes(); unsubVotes = null; }
+
   unsubVotes = window._onValue(votesRef(me.code), snap => {
     _latestVotes = snap.exists()?snap.val():{};
     if(_latestRoom && _latestRoom.state==='playing'){
@@ -1339,18 +1390,24 @@ function listenVotes(){
 }
 
 function showResultsScreen(room, votesData){
+  stopListeners();
   show('results');
+
   const players = getPlayers(room);
   document.getElementById('resSub').textContent = `${players.length} player${players.length!==1?'s':''} · ${room.totalSlides} slides`;
+
   let totalSmash=0, totalPass=0;
   const accordion = document.getElementById('slidesAccordion');
   accordion.innerHTML = '';
+
   for(let s=1; s<=room.totalSlides; s++){
     const sv = votesData[s]||{};
     const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
     const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
+
     totalSmash += smashers.length;
     totalPass  += passers.length;
+
     const block = document.createElement('div');
     block.className = 'slide-block'+(s===1?' open':'');
     block.innerHTML = `
@@ -1368,35 +1425,54 @@ function showResultsScreen(room, votesData){
         <div class="sv-cols">
           <div>
             <div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>
-            ${smashers.length?smashers.map(p=>`<div class="sv-name"><div class="sv-dot dot-s"></div>${p.name}</div>`).join(''):'<div class="no-votes">Nobody</div>'}
+            ${smashers.length ? smashers.map(p=>`<div class="sv-name"><div class="sv-dot dot-s"></div>${p.name}</div>`).join('') : '<div class="no-votes">Nobody</div>'}
           </div>
           <div>
             <div class="sv-col-title pa">❄️ PASS (${passers.length})</div>
-            ${passers.length?passers.map(p=>`<div class="sv-name"><div class="sv-dot dot-p"></div>${p.name}</div>`).join(''):'<div class="no-votes">Nobody</div>'}
+            ${passers.length ? passers.map(p=>`<div class="sv-name"><div class="sv-dot dot-p"></div>${p.name}</div>`).join('') : '<div class="no-votes">Nobody</div>'}
           </div>
         </div>
       </div>
     `;
     accordion.appendChild(block);
   }
+
   document.getElementById('statRow').innerHTML = `
     <div class="stat-box"><div class="stat-n sn-smash">${totalSmash}</div><div class="stat-l">Total 🔥 Smashes</div></div>
     <div class="stat-box"><div class="stat-n sn-pass">${totalPass}</div><div class="stat-l">Total ❄️ Passes</div></div>
     <div class="stat-box"><div class="stat-n sn-acc">${players.length}</div><div class="stat-l">Players</div></div>
   `;
+
   renderSmashBoard('resultsSmashBoard', room, votesData);
 }
 
 async function leaveRoom(){
+  stopListeners();
   if(!me.isMaster && me.code && me.name){
-    try{ await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null); }catch(e){}
+    try{
+      await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null);
+    }catch(e){}
   }
   goHome();
 }
 
 function goHome(){
+  stopListeners();
   me = { name:'', code:'', isMaster:false };
-  lastSlide = -1; myVotedSlides = {}; _latestRoom = null; _latestVotes = {};
+  lastSlide = -1;
+  myVotedSlides = {};
+  _latestRoom = null;
+  _latestVotes = {};
+  slideLoadToken = 0;
+
+  const img = document.getElementById('slideImg');
+  img.src = '';
+  img.className = 'loading';
+  img.style.display = 'block';
+
+  document.getElementById('slideLoader').classList.add('hidden');
+  document.getElementById('slideError').classList.remove('visible');
+
   show('entry');
 }
 
