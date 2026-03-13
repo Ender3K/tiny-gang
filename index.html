@@ -397,7 +397,8 @@ function showToast(msg,dur=2500){ const t=document.getElementById('toast'); t.te
 function embedUrl(rawUrl,n){
   const m=rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
   if(!m) return 'about:blank';
-  return `https://docs.google.com/presentation/d/${m[1]}/embed?start=false&loop=false&slide=id.p${n}&rm=minimal`;
+  // Cache-bust with _cb= so browser fully reloads on every slide change
+  return `https://docs.google.com/presentation/d/${m[1]}/embed?rm=minimal&loop=false&delayms=99999&slide=id.p${n}&_cb=${n}`;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -532,7 +533,10 @@ function renderGame(room){
 
   if(s!==lastSlide){
     lastSlide=s;
-    document.getElementById('slideFrame').src=embedUrl(room.slidesUrl,s);
+    // Blank first so the browser treats the next URL as a fresh load
+    const frame = document.getElementById('slideFrame');
+    frame.src = 'about:blank';
+    setTimeout(() => { frame.src = embedUrl(room.slidesUrl, s); }, 80);
     if(!me.isMaster){
       if(!myVotedSlides[s]){
         // reset vote UI for this slide
