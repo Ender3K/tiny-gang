@@ -928,7 +928,7 @@ function embedUrl(rawUrl, n){
   const m = rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
   if(!m) return 'about:blank';
   const id = m[1];
-  return `https://docs.google.com/presentation/d/${id}/present?slide=id.p${n}&rm=minimal&t=${Date.now()}`;
+  return `https://docs.google.com/presentation/d/${id}/embed?start=false&loop=false&slide=${n}`;
 }
 function loadSlide(rawUrl, n){
   document.getElementById('slideFrame').src = embedUrl(rawUrl, n);
