@@ -819,11 +819,12 @@ input:focus{
       <div class="field">
         <label>Google Slides URL</label>
         <input type="url" id="slidesUrl" placeholder="https://docs.google.com/presentation/d/…" />
-        <p class="hint">Use a normal Google Slides URL. The app will render slides as images, so players cannot interact with the deck.</p>
+        <p class="hint">Use a normal Google Slides URL. The deck should be shared as <strong>Anyone with the link can view</strong>.</p>
       </div>
       <div class="field">
         <label>Number of Slides</label>
         <input type="number" id="slideCount" placeholder="e.g. 10" min="1" max="200" />
+        <p class="hint">Enter how many slides from the deck you want to use.</p>
       </div>
       <button class="btn btn-fire" onclick="createRoom()">CREATE ROOM 🔥</button>
       <div class="error" id="createErr"></div>
@@ -884,7 +885,7 @@ input:focus{
               <div class="slide-error-icon">⚠️</div>
               <div class="slide-error-title">Could not load slide</div>
               <div class="slide-error-hint">
-                Make sure the presentation is set to <strong>Anyone with the link can view</strong>. Some Google Slides decks also block direct export if they are restricted.
+                Make sure the presentation is set to <strong>Anyone with the link can view</strong>. Also confirm your Apps Script web app URL is correct and deployed.
               </div>
               <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
             </div>
@@ -975,9 +976,10 @@ input:focus{
 <div class="toast" id="toast"></div>
 
 <script>
+const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyieELCr6hQweARDgrFH8xHsBWhjpDo4y751Gkts7AjiE169jZ1ROL9puWZhQENbpAn/exec";
+
 let dbReady = false;
 let slideLoadToken = 0;
-let slidePageBase = null;
 
 document.addEventListener('fb-ready', () => {
   dbReady = true;
@@ -1019,115 +1021,64 @@ function getSlideId(rawUrl) {
   return m ? m[1] : null;
 }
 
-function getPageIdCandidates(slideNumber) {
-  const candidates = [];
+function jsonp(url) {
+  return new Promise((resolve, reject) => {
+    const cbName = "__jsonp_cb_" + Math.random().toString(36).slice(2);
+    const script = document.createElement("script");
+    const sep = url.includes("?") ? "&" : "?";
 
-  if (slidePageBase === null) {
-    if (slideNumber === 1) {
-      candidates.push('p', 'p1', 'p2');
-    } else {
-      candidates.push(`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
+    let cleaned = false;
+    function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
+      try { delete window[cbName]; } catch (_) {}
+      if (script.parentNode) script.parentNode.removeChild(script);
     }
-  } else if (slidePageBase === 'p') {
-    candidates.push(slideNumber === 1 ? 'p' : `p${slideNumber}`);
-    candidates.push(`p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
-  } else {
-    const baseNum = parseInt(slidePageBase.slice(1), 10);
-    if (!isNaN(baseNum)) {
-      const mappedNum = baseNum + slideNumber - 1;
-      candidates.push(`p${mappedNum}`, `p${Math.max(1, mappedNum - 1)}`, `p${mappedNum + 1}`);
-    }
-    candidates.push(`p${slideNumber}`);
-  }
 
-  return [...new Set(candidates)].slice(0, 6);
-}
+    window[cbName] = (data) => {
+      cleanup();
+      resolve(data);
+    };
 
-function updatePageBaseFromSuccess(slideNumber, url) {
-  const resolvedPageId = inferPageIdFromUrl(url);
-  if (!resolvedPageId) return;
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("Apps Script request failed."));
+    };
 
-  if (resolvedPageId === 'p') {
-    if (slideNumber === 1) slidePageBase = 'p';
-    return;
-  }
+    script.src = `${url}${sep}callback=${cbName}`;
+    document.head.appendChild(script);
 
-  const n = parseInt(resolvedPageId.slice(1), 10);
-  if (isNaN(n)) return;
-
-  const inferredBase = n - slideNumber + 1;
-  if (inferredBase < 1) return;
-  slidePageBase = `p${inferredBase}`;
-}
-
-function buildSlideUrls(slideId, slideNumber, format) {
-  const cacheBust = Date.now();
-  const urls = [];
-
-  getPageIdCandidates(slideNumber).forEach((pageId) => {
-    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
-    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+    setTimeout(() => {
+      if (!cleaned) {
+        cleanup();
+        reject(new Error("Apps Script request timed out."));
+      }
+    }, 10000);
   });
-
-  if (slideNumber === 1) {
-    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?w=1600&h=900&cachebust=${cacheBust}`);
-  }
-
-  return [...new Set(urls)].slice(0, 12);
 }
 
-function inferPageIdFromUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.searchParams.get('pageid');
-  } catch (_) {
-    return null;
-  }
-}
-
-function updatePageBaseFromSuccess(slideNumber, url) {
-  const resolvedPageId = inferPageIdFromUrl(url);
-  if (!resolvedPageId) return;
-
-  if (resolvedPageId === 'p') {
-    if (slideNumber === 1) slidePageBase = 'p';
-    return;
+async function fetchSlidePageIdsViaAppsScript(rawUrl) {
+  const presentationId = getSlideId(rawUrl);
+  if (!presentationId) {
+    throw new Error("Invalid Google Slides URL.");
   }
 
-  const n = parseInt(resolvedPageId.slice(1), 10);
-  if (isNaN(n)) return;
-
-  const inferredBase = n - slideNumber + 1;
-  if (inferredBase < 1) return;
-  slidePageBase = `p${inferredBase}`;
-}
-
-function buildSlideUrls(slideId, slideNumber, format, totalSlides = 50) {
-  const cacheBust = Date.now();
-  const urls = [];
-
-  getPageIdCandidates(slideNumber, totalSlides).forEach((pageId) => {
-    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
-    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
-  });
-
-  if (slideNumber === 1) {
-    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?w=1600&h=900&cachebust=${cacheBust}`);
+  if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+    throw new Error("Set APPS_SCRIPT_WEBAPP_URL in index.html first.");
   }
 
-  return [...new Set(urls)];
-}
+  const data = await jsonp(
+    `${APPS_SCRIPT_WEBAPP_URL}?presentationId=${encodeURIComponent(presentationId)}`
+  );
 
-function inferPageIdFromUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return parsed.searchParams.get('pageid');
-  } catch (_) {
-    return null;
+  if (!data || !data.ok) {
+    throw new Error(data?.error || "Could not fetch slide IDs.");
   }
+
+  return data;
 }
 
-function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
+function loadSlide(rawUrl, slideNumber, totalSlides = 50, slidePageIds = []) {
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
@@ -1147,74 +1098,80 @@ function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
     return;
   }
 
+  const pageId = slidePageIds[slideNumber - 1];
+  if (!pageId) {
+    loader.classList.add('hidden');
+    errEl.classList.add('visible');
+    return;
+  }
+
+  const cacheBust = Date.now();
+  const urls = [
+    `https://docs.google.com/presentation/d/${slideId}/export/png?pageid=${encodeURIComponent(pageId)}&w=1600&h=900&cachebust=${cacheBust}`,
+    `https://docs.google.com/presentation/d/${slideId}/export/png?id=${slideId}&pageid=${encodeURIComponent(pageId)}&w=1600&h=900&cachebust=${cacheBust}`,
+    `https://docs.google.com/presentation/d/${slideId}/export/jpeg?pageid=${encodeURIComponent(pageId)}&w=1600&h=900&cachebust=${cacheBust}`,
+    `https://docs.google.com/presentation/d/${slideId}/export/jpeg?id=${slideId}&pageid=${encodeURIComponent(pageId)}&w=1600&h=900&cachebust=${cacheBust}`
+  ];
+
   let done = false;
-  const overallTimer = setTimeout(() => {
+
+  const fail = () => {
     if (done || token !== slideLoadToken) return;
     done = true;
     loader.classList.add('hidden');
     img.style.display = 'none';
     errEl.classList.add('visible');
-  }, 9000);
-
-  const finishSuccess = (url) => {
-    if (done || token !== slideLoadToken) return;
-    updatePageBaseFromSuccess(slideNumber, url);
-
-    img.onload = () => {
-      if (done || token !== slideLoadToken) return;
-      done = true;
-      clearTimeout(overallTimer);
-      img.classList.remove('loading');
-      loader.classList.add('hidden');
-      errEl.classList.remove('visible');
-    };
-    img.onerror = () => {
-      if (done || token !== slideLoadToken) return;
-      done = true;
-      clearTimeout(overallTimer);
-      loader.classList.add('hidden');
-      img.style.display = 'none';
-      errEl.classList.add('visible');
-    };
-    img.src = url;
   };
 
-  const tryUrls = (urls, i, onFail) => {
+  const overallTimer = setTimeout(fail, 9000);
+
+  const tryUrls = (i = 0) => {
     if (done || token !== slideLoadToken) return;
-    if (i >= urls.length) return onFail();
+
+    if (i >= urls.length) {
+      clearTimeout(overallTimer);
+      fail();
+      return;
+    }
 
     const probe = new Image();
     const url = urls[i];
     let settled = false;
 
-    const finishProbe = (ok) => {
+    const finish = (ok) => {
       if (settled || done) return;
       settled = true;
       clearTimeout(timer);
-      if (token !== slideLoadToken) return;
-      if (ok) finishSuccess(url);
-      else tryUrls(urls, i + 1, onFail);
+
+      if (!ok) {
+        tryUrls(i + 1);
+        return;
+      }
+
+      img.onload = () => {
+        if (done || token !== slideLoadToken) return;
+        done = true;
+        clearTimeout(overallTimer);
+        img.classList.remove('loading');
+        loader.classList.add('hidden');
+        errEl.classList.remove('visible');
+      };
+
+      img.onerror = () => {
+        if (done || token !== slideLoadToken) return;
+        tryUrls(i + 1);
+      };
+
+      img.src = url;
     };
 
-    const timer = setTimeout(() => finishProbe(false), 4000);
-    probe.onload = () => finishProbe(true);
-    probe.onerror = () => finishProbe(false);
+    const timer = setTimeout(() => finish(false), 4000);
+    probe.onload = () => finish(true);
+    probe.onerror = () => finish(false);
     probe.src = url;
   };
 
-  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg');
-  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png');
-
-  tryUrls(jpegUrls, 0, () => {
-    tryUrls(pngUrls, 0, () => {
-      if (done || token !== slideLoadToken) return;
-      done = true;
-      clearTimeout(overallTimer);
-      loader.classList.add('hidden');
-      img.style.display = 'none';
-      errEl.classList.add('visible');
-    });
-  });
+  tryUrls();
 }
 
 let me = { name:'', code:'', isMaster:false };
@@ -1285,23 +1242,30 @@ async function createRoom(){
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
   if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
 
-  const code = genCode();
-  const room = {
-    code,
-    hostName:name,
-    slidesUrl:url,
-    totalSlides:count,
-    state:'waiting',
-    currentSlide:1,
-    players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
-  };
+  try {
+    const deck = await fetchSlidePageIdsViaAppsScript(url);
 
-  try{
+    if (count > deck.totalSlides) {
+      return showErr('createErr', `Deck only has ${deck.totalSlides} slides.`);
+    }
+
+    const code = genCode();
+    const room = {
+      code,
+      hostName:name,
+      slidesUrl:url,
+      totalSlides:count,
+      slidePageIds: deck.slidePageIds.slice(0, count),
+      state:'waiting',
+      currentSlide:1,
+      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
+    };
+
     await window._set(roomRef(code), room);
     me = { name, code, isMaster:true };
     enterWaiting();
-  }catch(e){
-    showErr('createErr','❌ Database error: '+e.message);
+  } catch(e) {
+    showErr('createErr','❌ ' + e.message);
   }
 }
 
@@ -1389,7 +1353,7 @@ function renderGame(room){
 
   if(s !== lastSlide){
     lastSlide = s;
-    loadSlide(room.slidesUrl, s, tot);
+    loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
 
     if(!myVotedSlides[s]){
       document.getElementById('votedBanner').className = 'voted-banner';
@@ -1598,7 +1562,6 @@ function goHome(){
   _latestRoom = null;
   _latestVotes = {};
   slideLoadToken = 0;
-  slidePageBase = null;
 
   const img = document.getElementById('slideImg');
   img.src = '';
