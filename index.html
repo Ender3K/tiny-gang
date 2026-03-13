@@ -1085,7 +1085,49 @@ function inferPageIdFromUrl(url) {
   }
 }
 
-function loadSlide(rawUrl, slideNumber) {
+function updatePageBaseFromSuccess(slideNumber, url) {
+  const resolvedPageId = inferPageIdFromUrl(url);
+  if (!resolvedPageId) return;
+
+  if (resolvedPageId === 'p') {
+    if (slideNumber === 1) slidePageBase = 'p';
+    return;
+  }
+
+  const n = parseInt(resolvedPageId.slice(1), 10);
+  if (isNaN(n)) return;
+
+  const inferredBase = n - slideNumber + 1;
+  if (inferredBase < 1) return;
+  slidePageBase = `p${inferredBase}`;
+}
+
+function buildSlideUrls(slideId, slideNumber, format, totalSlides = 50) {
+  const cacheBust = Date.now();
+  const urls = [];
+
+  getPageIdCandidates(slideNumber, totalSlides).forEach((pageId) => {
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+  });
+
+  if (slideNumber === 1) {
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?w=1600&h=900&cachebust=${cacheBust}`);
+  }
+
+  return [...new Set(urls)];
+}
+
+function inferPageIdFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.get('pageid');
+  } catch (_) {
+    return null;
+  }
+}
+
+function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
@@ -1347,7 +1389,7 @@ function renderGame(room){
 
   if(s !== lastSlide){
     lastSlide = s;
-    loadSlide(room.slidesUrl, s);
+    loadSlide(room.slidesUrl, s, tot);
 
     if(!myVotedSlides[s]){
       document.getElementById('votedBanner').className = 'voted-banner';
