@@ -310,9 +310,11 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,221,0,.07)}
   </div>
   <div class="game-layout">
     <div class="slide-panel">
-      <div class="slide-wrap">
+      <div class="slide-wrap" id="slideWrap">
         <iframe id="slideFrame" src="about:blank" allowfullscreen></iframe>
         <div class="slide-badge" id="slideBadge">01</div>
+        <!-- click shield so iframe doesn't steal focus -->
+        <div id="slideShield" style="position:absolute;inset:0;z-index:2;cursor:default"></div>
       </div>
       <div id="playerVoteArea">
         <div class="vote-btns" id="voteBtns">
@@ -394,11 +396,23 @@ function showErr(id,msg){ const el=document.getElementById(id); el.textContent=m
 function hideErr(id){ document.getElementById(id).style.display='none' }
 function showToast(msg,dur=2500){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur) }
 
-function embedUrl(rawUrl,n){
-  const m=rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+function embedUrl(rawUrl, n){
+  const m = rawUrl.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
   if(!m) return 'about:blank';
-  // Cache-bust with _cb= so browser fully reloads on every slide change
-  return `https://docs.google.com/presentation/d/${m[1]}/embed?rm=minimal&loop=false&delayms=99999&slide=id.p${n}&_cb=${n}`;
+  const id = m[1];
+  // /embed with rm=minimal is the clean viewer; we force a reload per slide
+  // by appending slide number as a dummy hash so the browser sees a new URL
+  return `https://docs.google.com/presentation/d/${id}/embed?rm=minimal&start=false&loop=false#slide=${n}`;
+}
+
+function loadSlide(rawUrl, n){
+  const frame = document.getElementById('slideFrame');
+  // Detach → change src → reattach forces a true browser reload
+  const parent = frame.parentNode;
+  const sibling = frame.nextSibling;
+  frame.remove();
+  frame.src = embedUrl(rawUrl, n);
+  parent.insertBefore(frame, sibling);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -533,10 +547,7 @@ function renderGame(room){
 
   if(s!==lastSlide){
     lastSlide=s;
-    // Blank first so the browser treats the next URL as a fresh load
-    const frame = document.getElementById('slideFrame');
-    frame.src = 'about:blank';
-    setTimeout(() => { frame.src = embedUrl(room.slidesUrl, s); }, 80);
+    loadSlide(room.slidesUrl, s);
     if(!me.isMaster){
       if(!myVotedSlides[s]){
         // reset vote UI for this slide
