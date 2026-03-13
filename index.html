@@ -1038,7 +1038,11 @@ function loadSlide(rawUrl, slideNumber) {
 
   if (!slideId) {
     loader.classList.add('hidden');
-    errEl.classList.add('visible');
+    document.querySelector('#slideError .slide-error-hint').innerHTML =
+      `This deck could not be loaded through Google's image export URL.
+       Even if sharing is set to <strong>Anyone with the link can view</strong>,
+       Google may still block direct slide-image export, or the slide page ID may not match.`;
+    errEl.classList.add('visible');errEl.classList.add('visible');
     return;
   }
 
