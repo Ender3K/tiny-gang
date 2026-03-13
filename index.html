@@ -977,6 +977,7 @@ input:focus{
 <script>
 let dbReady = false;
 let slideLoadToken = 0;
+let slidePageBase = null;
 
 document.addEventListener('fb-ready', () => {
   dbReady = true;
@@ -1018,8 +1019,46 @@ function getSlideId(rawUrl) {
   return m ? m[1] : null;
 }
 
-function buildSlideUrl(slideId, slideNumber, format) {
-  return `https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=p${slideNumber}&w=1600&h=900&cachebust=${Date.now()}`;
+function getPageIdCandidates(slideNumber) {
+  if (slidePageBase === null) {
+    if (slideNumber === 1) return ['p', 'p1', 'p2', 'p3', 'p4', 'p5'];
+    return [`p${slideNumber}`, `p${Math.max(1, slideNumber - 1)}`];
+  }
+
+  if (slidePageBase === 'p') {
+    return slideNumber === 1 ? ['p', 'p1'] : [`p${slideNumber}`, `p${slideNumber + 1}`];
+  }
+
+  const baseNum = parseInt(slidePageBase.slice(1), 10);
+  if (isNaN(baseNum)) return [`p${slideNumber}`];
+  const mapped = `p${baseNum + slideNumber - 1}`;
+  return slideNumber === 1 ? [mapped, 'p', 'p1'] : [mapped, `p${slideNumber}`];
+}
+
+function buildSlideUrls(slideId, slideNumber, format) {
+  const cacheBust = Date.now();
+  const urls = [];
+
+  getPageIdCandidates(slideNumber).forEach((pageId) => {
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&pageid=${pageId}&w=1600&h=900&cachebust=${cacheBust}`);
+  });
+
+  if (slideNumber === 1) {
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?w=1600&h=900&cachebust=${cacheBust}`);
+    urls.push(`https://docs.google.com/presentation/d/${slideId}/export/${format}?id=${slideId}&w=1600&h=900&cachebust=${cacheBust}`);
+  }
+
+  return [...new Set(urls)];
+}
+
+function inferPageIdFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.searchParams.get('pageid');
+  } catch (_) {
+    return null;
+  }
 }
 
 function loadSlide(rawUrl, slideNumber) {
@@ -1042,20 +1081,26 @@ function loadSlide(rawUrl, slideNumber) {
       `This deck could not be loaded through Google's image export URL.
        Even if sharing is set to <strong>Anyone with the link can view</strong>,
        Google may still block direct slide-image export, or the slide page ID may not match.`;
-    errEl.classList.add('visible');errEl.classList.add('visible');
+    errEl.classList.add('visible');
     return;
   }
 
-  function finishSuccess(url){
-    if(token !== slideLoadToken) return;
+  function finishSuccess(url) {
+    if (token !== slideLoadToken) return;
+
+    if (slideNumber === 1) {
+      const resolvedPageId = inferPageIdFromUrl(url);
+      if (resolvedPageId) slidePageBase = resolvedPageId;
+    }
+
     img.onload = () => {
-      if(token !== slideLoadToken) return;
+      if (token !== slideLoadToken) return;
       img.classList.remove('loading');
       loader.classList.add('hidden');
       errEl.classList.remove('visible');
     };
     img.onerror = () => {
-      if(token !== slideLoadToken) return;
+      if (token !== slideLoadToken) return;
       loader.classList.add('hidden');
       img.style.display = 'none';
       errEl.classList.add('visible');
@@ -1063,23 +1108,28 @@ function loadSlide(rawUrl, slideNumber) {
     img.src = url;
   }
 
-  function tryLoad(format, fallback){
+  function tryUrls(urls, i, onFail) {
+    if (i >= urls.length) return onFail();
+
     const probe = new Image();
-    const url = buildSlideUrl(slideId, slideNumber, format);
+    const url = urls[i];
     probe.onload = () => {
-      if(token !== slideLoadToken) return;
+      if (token !== slideLoadToken) return;
       finishSuccess(url);
     };
     probe.onerror = () => {
-      if(token !== slideLoadToken) return;
-      fallback();
+      if (token !== slideLoadToken) return;
+      tryUrls(urls, i + 1, onFail);
     };
     probe.src = url;
   }
 
-  tryLoad('jpeg', () => {
-    tryLoad('png', () => {
-      if(token !== slideLoadToken) return;
+  const jpegUrls = buildSlideUrls(slideId, slideNumber, 'jpeg');
+  const pngUrls = buildSlideUrls(slideId, slideNumber, 'png');
+
+  tryUrls(jpegUrls, 0, () => {
+    tryUrls(pngUrls, 0, () => {
+      if (token !== slideLoadToken) return;
       loader.classList.add('hidden');
       img.style.display = 'none';
       errEl.classList.add('visible');
@@ -1468,6 +1518,7 @@ function goHome(){
   _latestRoom = null;
   _latestVotes = {};
   slideLoadToken = 0;
+  slidePageBase = null;
 
   const img = document.getElementById('slideImg');
   img.src = '';
