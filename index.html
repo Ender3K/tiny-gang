@@ -1020,30 +1020,29 @@ function getSlideId(rawUrl) {
 }
 
 function getPageIdCandidates(slideNumber, totalSlides = 50) {
-  const cap = Math.min(Math.max(totalSlides + 6, 12), 220);
-  const broad = [];
-  for (let i = 1; i <= cap; i++) broad.push(`p${i}`);
+  const maxIdx = Math.max(1, Math.min(totalSlides + 2, 80));
+  const likely = [];
 
   if (slidePageBase === null) {
-    if (slideNumber === 1) return ['p', 'p1', 'p2', 'p3', ...broad];
-    return [`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`, ...broad];
+    if (slideNumber === 1) {
+      likely.push('p', 'p1', 'p2', 'p3');
+    } else {
+      likely.push(`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
+    }
+  } else if (slidePageBase === 'p') {
+    likely.push(slideNumber === 1 ? 'p' : `p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`);
+  } else {
+    const baseNum = parseInt(slidePageBase.slice(1), 10);
+    if (!isNaN(baseNum)) {
+      const mappedNum = baseNum + slideNumber - 1;
+      likely.push(`p${mappedNum}`, `p${Math.max(1, mappedNum - 1)}`, `p${mappedNum + 1}`);
+    }
+    likely.push(`p${slideNumber}`);
   }
 
-  if (slidePageBase === 'p') {
-    return slideNumber === 1
-      ? ['p', 'p1', 'p2', ...broad]
-      : [`p${slideNumber}`, `p${slideNumber + 1}`, `p${Math.max(1, slideNumber - 1)}`, ...broad];
-  }
+  for (let i = 1; i <= maxIdx; i++) likely.push(`p${i}`);
 
-  const baseNum = parseInt(slidePageBase.slice(1), 10);
-  if (isNaN(baseNum)) return [`p${slideNumber}`, ...broad];
-
-  const mappedNum = baseNum + slideNumber - 1;
-  const mapped = `p${mappedNum}`;
-  const neighbors = [`p${Math.max(1, mappedNum - 1)}`, `p${mappedNum + 1}`];
-
-  if (slideNumber === 1) return [mapped, 'p', 'p1', ...neighbors, ...broad];
-  return [mapped, ...neighbors, `p${slideNumber}`, ...broad];
+  return [...new Set(likely)].slice(0, 20);
 }
 
 function updatePageBaseFromSuccess(slideNumber, url) {
@@ -1138,14 +1137,20 @@ function loadSlide(rawUrl, slideNumber, totalSlides = 50) {
 
     const probe = new Image();
     const url = urls[i];
-    probe.onload = () => {
+    let settled = false;
+
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (token !== slideLoadToken) return;
-      finishSuccess(url);
+      if (ok) finishSuccess(url);
+      else tryUrls(urls, i + 1, onFail);
     };
-    probe.onerror = () => {
-      if (token !== slideLoadToken) return;
-      tryUrls(urls, i + 1, onFail);
-    };
+
+    const timer = setTimeout(() => finish(false), 1200);
+    probe.onload = () => finish(true);
+    probe.onerror = () => finish(false);
     probe.src = url;
   }
 
