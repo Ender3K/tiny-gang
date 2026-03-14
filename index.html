@@ -1512,7 +1512,12 @@ function listenRoom(){
       renderGame(room);
       renderVoters(room, _latestVotes);
     } else if(room.state==='done'){
-      showResultsScreen(room, _latestVotes);
+      if(!document.getElementById('results').classList.contains('hidden')) return;
+      window._get(votesRef(me.code)).then(vSnap => {
+        showResultsScreen(room, vSnap.exists() ? vSnap.val() : _latestVotes);
+      }).catch(() => {
+        showResultsScreen(room, _latestVotes);
+      });
     }
   });
 }
@@ -1526,6 +1531,7 @@ function listenVotes(){
       renderVoters(_latestRoom, _latestVotes);
       renderSmashBoard('smashBoard', _latestRoom, _latestVotes);
     }
+    // Keep _latestVotes up to date even when state changes to 'done'
   });
 }
 
