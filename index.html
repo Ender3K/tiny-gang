@@ -1096,6 +1096,93 @@ input:focus{
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px}
 
+/* ── Emoji picker ── */
+.emoji-config{
+  background:rgba(20,20,42,.9);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:1rem 1.25rem;
+}
+.emoji-config-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.9rem;
+  letter-spacing:2px;
+  color:var(--smash);
+  margin-bottom:.85rem;
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+.emoji-themes{
+  display:flex;
+  gap:.45rem;
+  flex-wrap:wrap;
+  margin-bottom:.85rem;
+}
+.theme-btn{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:.75rem;
+  font-family:'DM Sans',sans-serif;
+  font-weight:600;
+  letter-spacing:.5px;
+  padding:.38rem .7rem;
+  transition:all .15s;
+  display:flex;
+  align-items:center;
+  gap:.3rem;
+}
+.theme-btn:hover{border-color:var(--smash);color:var(--text)}
+.theme-btn.active{border-color:var(--smash);color:var(--smash);background:rgba(255,45,85,.07)}
+.emoji-custom-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.65rem;
+}
+.emoji-col label{
+  display:block;
+  font-size:.62rem;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  margin-bottom:.3rem;
+  font-weight:700;
+}
+.emoji-col-smash label{color:var(--smash)}
+.emoji-col-pass  label{color:var(--pass)}
+.emoji-input{
+  width:100%;
+  background:#07070f;
+  border:1px solid var(--border);
+  border-radius:10px;
+  color:var(--text);
+  font-size:1.1rem;
+  padding:.5rem .7rem;
+  letter-spacing:3px;
+  outline:none;
+  transition:border-color .2s;
+}
+.emoji-input:focus{border-color:var(--smash)}
+.emoji-hint{font-size:.68rem;color:var(--muted);margin-top:.3rem;line-height:1.5}
+.emoji-preview{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  margin-top:.75rem;
+  padding:.6rem .75rem;
+  background:var(--surface);
+  border-radius:10px;
+  border:1px solid var(--border);
+  font-size:.72rem;
+  color:var(--muted);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  flex-wrap:wrap;
+}
+.emoji-preview-group{display:flex;gap:.2rem;font-size:1.1rem}
+
 /* ── CFG screen ── */
 #cfgScreen .screen-inner{max-width:860px}
 </style>
@@ -1183,6 +1270,37 @@ input:focus{
           </div>
           <input class="timer-custom-input" type="number" id="timerCustom" value="15" min="5" max="300" placeholder="s"
             onchange="onCustomTimerChange()" oninput="onCustomTimerChange()" />
+        </div>
+      </div>
+
+      <!-- Emoji picker — only visible to host -->
+      <div class="emoji-config" id="emojiConfigPanel" style="display:none">
+        <div class="emoji-config-title">😍 Reaction Emojis</div>
+        <div class="emoji-themes" id="emojiThemes">
+          <button class="theme-btn active" onclick="applyEmojiTheme('classic')">🔥❄️ Classic</button>
+          <button class="theme-btn" onclick="applyEmojiTheme('hearts')">💘💔 Hearts</button>
+          <button class="theme-btn" onclick="applyEmojiTheme('food')">🍕🥦 Food</button>
+          <button class="theme-btn" onclick="applyEmojiTheme('chaos')">💀✅ Chaos</button>
+          <button class="theme-btn" onclick="applyEmojiTheme('animals')">🐶🐱 Animals</button>
+          <button class="theme-btn" onclick="applyEmojiTheme('custom')">✏️ Custom</button>
+        </div>
+        <div class="emoji-custom-row" id="emojiCustomRow" style="display:none">
+          <div class="emoji-col emoji-col-smash">
+            <label>Smash emojis</label>
+            <input class="emoji-input" type="text" id="smashEmojiInput" placeholder="🔥 💯 😍"
+              oninput="onCustomEmojiChange()" />
+            <div class="emoji-hint">Space-separated emojis, picked randomly on votes</div>
+          </div>
+          <div class="emoji-col emoji-col-pass">
+            <label>Pass emojis</label>
+            <input class="emoji-input" type="text" id="passEmojiInput" placeholder="❄️ 🥶 💀"
+              oninput="onCustomEmojiChange()" />
+          </div>
+        </div>
+        <div class="emoji-preview" id="emojiPreview">
+          <span>Preview:</span>
+          <span>SMASH</span><div class="emoji-preview-group" id="previewSmash"></div>
+          <span style="margin-left:.35rem">PASS</span><div class="emoji-preview-group" id="previewPass"></div>
         </div>
       </div>
 
@@ -1619,12 +1737,82 @@ function updateTimerUI(){
 }
 
 // ── Reaction animations ───────────────────────────────────────────────────────
-const SMASH_EMOJIS = ['🔥','💯','😍','🤩','❤️‍🔥','👀','😘','💘','🥵','✨'];
-const PASS_EMOJIS  = ['❄️','🥶','💀','😬','🙅','🚫','😐','😑','💨','⛔'];
+const EMOJI_THEMES = {
+  classic: { smash:['🔥','💯','😍','🤩','❤️‍🔥','👀','😘','💘','🥵','✨'], pass:['❄️','🥶','💀','😬','🙅','🚫','😐','😑','💨','⛔'] },
+  hearts:  { smash:['💘','💖','💗','❤️','😍','🥰','💓','💞','😻','💝'], pass:['💔','😢','🙁','😞','😔','💧','🫠','😒','🤧','😿'] },
+  food:    { smash:['🍕','🍔','🌮','🍣','🍩','🤤','😋','🍦','🧁','🍟'], pass:['🥦','🥒','🫑','🥬','🫛','😒','🤮','🥴','😵','🚯'] },
+  chaos:   { smash:['✅','💯','🎯','🏆','👑','🎉','💪','🔑','⚡','🎊'], pass:['💀','❌','🚫','☠️','🗑️','💩','🤡','👎','🪦','🔥'] },
+  animals: { smash:['🐶','🐱','🦊','🐼','🐨','🦁','🐯','🦋','🐬','🦄'], pass:['🐍','🦂','🦟','🪲','🐛','🦗','🐀','🦞','🪳','🦖'] },
+};
+
+// Active emoji sets (mutable, synced from room)
+let activeSmashEmojis = [...EMOJI_THEMES.classic.smash];
+let activePassEmojis  = [...EMOJI_THEMES.classic.pass];
+let emojiCfg = { theme: 'classic', customSmash: '', customPass: '' };
+
+function applyEmojiTheme(theme){
+  emojiCfg.theme = theme;
+  document.querySelectorAll('#emojiThemes .theme-btn').forEach(b=>{
+    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${theme}'`));
+  });
+
+  const customRow = document.getElementById('emojiCustomRow');
+  if(theme === 'custom'){
+    customRow.style.display = 'grid';
+    // prefill inputs if empty
+    if(!document.getElementById('smashEmojiInput').value)
+      document.getElementById('smashEmojiInput').value = EMOJI_THEMES.classic.smash.join(' ');
+    if(!document.getElementById('passEmojiInput').value)
+      document.getElementById('passEmojiInput').value = EMOJI_THEMES.classic.pass.join(' ');
+    onCustomEmojiChange();
+  } else {
+    customRow.style.display = 'none';
+    emojiCfg.customSmash = '';
+    emojiCfg.customPass  = '';
+    updateEmojiPreview(EMOJI_THEMES[theme].smash, EMOJI_THEMES[theme].pass);
+  }
+}
+
+function onCustomEmojiChange(){
+  const rawSmash = document.getElementById('smashEmojiInput').value;
+  const rawPass  = document.getElementById('passEmojiInput').value;
+  // Parse emoji by splitting on whitespace and filtering non-empty
+  const smashArr = parseEmojiInput(rawSmash);
+  const passArr  = parseEmojiInput(rawPass);
+  emojiCfg.customSmash = rawSmash;
+  emojiCfg.customPass  = rawPass;
+  updateEmojiPreview(smashArr.length ? smashArr : EMOJI_THEMES.classic.smash,
+                     passArr.length  ? passArr  : EMOJI_THEMES.classic.pass);
+}
+
+function parseEmojiInput(str){
+  // Split on whitespace, filter empty strings
+  return str.trim().split(/\s+/).filter(s => s.length > 0);
+}
+
+function updateEmojiPreview(smashArr, passArr){
+  const ps = document.getElementById('previewSmash');
+  const pp = document.getElementById('previewPass');
+  if(ps) ps.textContent = smashArr.slice(0,6).join(' ');
+  if(pp) pp.textContent = passArr.slice(0,6).join(' ');
+}
+
+function resolveEmojiSets(){
+  // Returns the actual arrays to use, from emojiCfg
+  if(emojiCfg.theme === 'custom'){
+    const s = parseEmojiInput(emojiCfg.customSmash);
+    const p = parseEmojiInput(emojiCfg.customPass);
+    return {
+      smash: s.length ? s : EMOJI_THEMES.classic.smash,
+      pass:  p.length ? p : EMOJI_THEMES.classic.pass,
+    };
+  }
+  return EMOJI_THEMES[emojiCfg.theme] || EMOJI_THEMES.classic;
+}
 
 function spawnReaction(choice, count = 1){
   const layer = document.getElementById('reactionLayer');
-  const emojis = choice === 'smash' ? SMASH_EMOJIS : PASS_EMOJIS;
+  const emojis = choice === 'smash' ? activeSmashEmojis : activePassEmojis;
 
   for(let i = 0; i < count; i++){
     const el = document.createElement('div');
@@ -1850,6 +2038,10 @@ function enterWaiting(){
     document.getElementById('timerEnabled').checked = timerCfg.enabled;
     document.getElementById('timerDurationRow').style.display = timerCfg.enabled ? 'flex' : 'none';
     document.getElementById('timerCustom').value = timerCfg.duration;
+
+    // Show emoji picker
+    document.getElementById('emojiConfigPanel').style.display = '';
+    applyEmojiTheme(emojiCfg.theme);
   }
 
   listenRoom();
@@ -1886,12 +2078,15 @@ function renderWaiting(room){
 }
 
 async function startGame(){
-  // Persist timer config into the room so all clients know
+  const sets = resolveEmojiSets();
+  // Persist timer + emoji config into the room so all clients know
   await window._update(roomRef(me.code),{
     state:'playing',
     currentSlide:1,
     timerEnabled: timerCfg.enabled,
     timerDuration: timerCfg.duration,
+    emojiSmash: sets.smash,
+    emojiPass:  sets.pass,
   });
 }
 
@@ -1921,6 +2116,10 @@ function renderGame(room){
     timerState.enabled = room.timerEnabled;
     timerState.duration = room.timerDuration || 15;
   }
+
+  // Sync emoji sets from room (set by host at game start)
+  if(Array.isArray(room.emojiSmash) && room.emojiSmash.length) activeSmashEmojis = room.emojiSmash;
+  if(Array.isArray(room.emojiPass)  && room.emojiPass.length)  activePassEmojis  = room.emojiPass;
 
   // Sync in-game timer controls for host
   if(me.isMaster){
@@ -2082,6 +2281,9 @@ function listenRoom(){
           timerState.enabled = room.timerEnabled;
           timerState.duration = room.timerDuration || 15;
         }
+        // Sync emoji sets for all clients
+        if(room.emojiSmash) activeSmashEmojis = room.emojiSmash;
+        if(room.emojiPass)  activePassEmojis  = room.emojiPass;
         enterGame();
         return;
       }
@@ -2245,6 +2447,9 @@ function goHome(){
   timerCfg = { enabled: false, duration: 15 };
   timerState = { enabled:false, duration:15, remaining:15, paused:false, intervalId:null };
   prevVoteCounts = { smash:0, pass:0 };
+  emojiCfg = { theme: 'classic', customSmash: '', customPass: '' };
+  activeSmashEmojis = [...EMOJI_THEMES.classic.smash];
+  activePassEmojis  = [...EMOJI_THEMES.classic.pass];
 
   const img = document.getElementById('slideImg');
   img.onload = null; img.onerror = null;
