@@ -24,11 +24,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const testRef = ref(db, ".info/connected");
-    let unsub = onValue(testRef, () => unsub && unsub(), (err) => {
-      window._fbError = err.message;
-      document.dispatchEvent(new Event("fb-error"));
-    });
+    // Just expose the db — connection errors will surface when real queries fail
+    // (the .info/connected self-unsubscribe trick has a TDZ race with synchronous Firebase callbacks)
 
     window._db = db;
     window._ref = ref;
