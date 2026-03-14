@@ -83,6 +83,27 @@ body::before{
   pointer-events:none;z-index:0;
 }
 
+/* ── Reaction burst layer ── */
+#reactionLayer{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:8000;
+  overflow:hidden;
+}
+.reaction-emoji{
+  position:absolute;
+  font-size:2rem;
+  will-change:transform,opacity;
+  animation:reactionFly var(--dur,1.8s) ease-out forwards;
+  pointer-events:none;
+}
+@keyframes reactionFly{
+  0%  {transform:translateY(0) scale(0.4) rotate(var(--rot-start,0deg)); opacity:1;}
+  15% {transform:translateY(calc(var(--vy,-120px) * .15)) scale(1.15) rotate(var(--rot-mid,8deg)); opacity:1;}
+  100%{transform:translateY(var(--vy,-260px)) translateX(var(--vx,0px)) scale(0.7) rotate(var(--rot-end,20deg)); opacity:0;}
+}
+
 .screen{
   position:relative;
   z-index:1;
@@ -293,6 +314,88 @@ input:focus{
   text-align:center;
 }
 
+/* ── Timer config in waiting room ── */
+.timer-config{
+  background:rgba(20,20,42,.9);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:1rem 1.25rem;
+}
+.timer-config-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.9rem;
+  letter-spacing:2px;
+  color:var(--accent);
+  margin-bottom:.75rem;
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+.timer-toggle-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:.75rem;
+}
+.timer-toggle-label{font-size:.82rem;color:var(--text)}
+.toggle-switch{
+  position:relative;
+  width:44px;height:24px;
+  flex-shrink:0;
+}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-track{
+  position:absolute;inset:0;
+  background:var(--border);
+  border-radius:999px;
+  cursor:pointer;
+  transition:background .2s;
+}
+.toggle-track::after{
+  content:'';
+  position:absolute;
+  top:3px;left:3px;
+  width:18px;height:18px;
+  border-radius:50%;
+  background:#fff;
+  transition:transform .2s;
+}
+.toggle-switch input:checked + .toggle-track{background:var(--accent)}
+.toggle-switch input:checked + .toggle-track::after{transform:translateX(20px)}
+
+.timer-duration-row{
+  display:flex;
+  align-items:center;
+  gap:.75rem;
+}
+.timer-duration-row label{font-size:.72rem;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap}
+.timer-presets{display:flex;gap:.4rem;flex-wrap:wrap}
+.preset-btn{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--muted);
+  cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.85rem;
+  letter-spacing:1.5px;
+  padding:.28rem .6rem;
+  transition:all .15s;
+}
+.preset-btn:hover,.preset-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(255,221,0,.08)}
+.timer-custom-input{
+  width:70px;
+  background:#07070f;
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:.9rem;
+  padding:.3rem .6rem;
+  text-align:center;
+}
+.timer-custom-input:focus{border-color:var(--accent)}
+
 #game .screen-inner{
   width:100%;
   max-width:var(--maxw);
@@ -341,6 +444,71 @@ input:focus{
   transition:width .35s ease
 }
 
+/* ── Countdown timer widget ── */
+.timer-widget{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  background:rgba(20,20,42,.9);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:.35rem .75rem;
+  transition:border-color .3s;
+}
+.timer-widget.timer-urgent{
+  border-color:rgba(255,45,85,.6);
+  animation:timerPulse .5s ease infinite alternate;
+}
+@keyframes timerPulse{
+  from{box-shadow:0 0 0 rgba(255,45,85,0)}
+  to{box-shadow:0 0 12px rgba(255,45,85,.35)}
+}
+.timer-display{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.1rem;
+  letter-spacing:2px;
+  min-width:2.2ch;
+  text-align:center;
+  transition:color .2s;
+}
+.timer-display.urgent{color:var(--smash)}
+.timer-arc{
+  position:relative;
+  width:28px;height:28px;
+  flex-shrink:0;
+}
+.timer-arc svg{
+  width:100%;height:100%;
+  transform:rotate(-90deg);
+}
+.timer-arc-bg{stroke:var(--border);fill:none;stroke-width:3}
+.timer-arc-fill{
+  stroke:var(--accent);
+  fill:none;
+  stroke-width:3;
+  stroke-linecap:round;
+  transition:stroke-dashoffset .95s linear, stroke .3s;
+}
+.timer-arc-fill.urgent{stroke:var(--smash)}
+.timer-controls-inline{
+  display:flex;
+  align-items:center;
+  gap:.25rem;
+}
+.tci-btn{
+  background:none;
+  border:none;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:.8rem;
+  padding:.1rem .25rem;
+  border-radius:6px;
+  transition:color .15s,background .15s;
+  line-height:1;
+}
+.tci-btn:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.timer-widget.timer-disabled{opacity:.35}
+
 .game-layout{
   width:100%;
   max-width:1180px;
@@ -373,7 +541,9 @@ input:focus{
   display:flex;
   align-items:center;
   justify-content:center;
+  transition:border-color .3s;
 }
+.slide-wrap.timer-urgent{border-color:rgba(255,45,85,.4)}
 #slideImg{
   width:100%;
   height:100%;
@@ -597,6 +767,7 @@ input:focus{
   letter-spacing:1.5px;
 }
 
+/* ── Master controls with timer settings ── */
 .master-controls .mc-title{
   font-family:'Bebas Neue',sans-serif;
   font-size:.82rem;
@@ -634,6 +805,50 @@ input:focus{
   transition:all .2s
 }
 .btn-end:hover{border-color:var(--smash);background:rgba(255,45,85,.07)}
+
+/* In-game timer settings for host */
+.timer-settings-inline{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:.75rem;
+  margin-bottom:.6rem;
+}
+.tsi-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.5rem;
+  margin-bottom:.5rem;
+}
+.tsi-row:last-child{margin-bottom:0}
+.tsi-label{font-size:.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.tsi-right{display:flex;align-items:center;gap:.4rem}
+.tsi-presets{display:flex;gap:.3rem}
+.tsi-preset{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--muted);
+  cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.78rem;
+  letter-spacing:1px;
+  padding:.2rem .45rem;
+  transition:all .15s;
+}
+.tsi-preset:hover,.tsi-preset.active{border-color:var(--accent);color:var(--accent)}
+.tsi-custom{
+  width:52px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text);
+  font-size:.82rem;
+  padding:.2rem .4rem;
+  text-align:center;
+}
+.tsi-custom:focus{border-color:var(--accent);outline:none}
 
 #results .screen-inner{max-width:1080px}
 .res-header{text-align:center}
@@ -854,9 +1069,15 @@ input:focus{
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px}
+
+/* ── CFG screen ── */
+#cfgScreen .screen-inner{max-width:860px}
 </style>
 </head>
 <body>
+
+<!-- Reaction burst layer -->
+<div id="reactionLayer"></div>
 
 <div class="screen hidden" id="cfgScreen">
   <div class="screen-inner">
@@ -882,7 +1103,6 @@ input:focus{
         <input type="url" id="slidesUrl" placeholder="https://docs.google.com/presentation/d/…" />
         <p class="hint">Use a normal Google Slides URL. The deck should be shared as <strong>Anyone with the link can view</strong>.</p>
       </div>
-      <!-- Slide count is now auto-detected from the presentation -->
       <button class="btn btn-fire" onclick="createRoom()">CREATE ROOM 🔥</button>
       <div class="error" id="createErr"></div>
 
@@ -914,6 +1134,32 @@ input:focus{
     <div class="waiting-wrap">
       <div class="section-label">Players in room</div>
       <div class="players-grid" id="playersGrid"></div>
+
+      <!-- Timer config — only visible to host -->
+      <div class="timer-config" id="timerConfigPanel" style="display:none">
+        <div class="timer-config-title">⏱ Countdown Timer</div>
+        <div class="timer-toggle-row">
+          <span class="timer-toggle-label">Enable countdown per slide</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="timerEnabled" onchange="onTimerToggle()" />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="timer-duration-row" id="timerDurationRow" style="display:none">
+          <label>Duration</label>
+          <div class="timer-presets">
+            <button class="preset-btn" onclick="setTimerPreset(10)">10s</button>
+            <button class="preset-btn active" onclick="setTimerPreset(15)">15s</button>
+            <button class="preset-btn" onclick="setTimerPreset(20)">20s</button>
+            <button class="preset-btn" onclick="setTimerPreset(30)">30s</button>
+            <button class="preset-btn" onclick="setTimerPreset(45)">45s</button>
+            <button class="preset-btn" onclick="setTimerPreset(60)">60s</button>
+          </div>
+          <input class="timer-custom-input" type="number" id="timerCustom" value="15" min="5" max="300" placeholder="s"
+            onchange="onCustomTimerChange()" oninput="onCustomTimerChange()" />
+        </div>
+      </div>
+
       <p class="waiting-note" id="waitingNote">Waiting for players to join…</p>
       <button class="btn btn-fire" id="startBtn" onclick="startGame()" style="display:none">START GAME 🚀</button>
       <button class="btn btn-ghost" onclick="leaveRoom()">LEAVE ROOM</button>
@@ -927,12 +1173,28 @@ input:focus{
       <div class="top-bar">
         <div class="slide-counter" id="slideCounter">1 / 10</div>
         <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-        <!-- room code pill removed from game screen -->
+
+        <!-- Timer widget -->
+        <div class="timer-widget hidden" id="timerWidget">
+          <div class="timer-arc" id="timerArc">
+            <svg viewBox="0 0 28 28">
+              <circle class="timer-arc-bg" cx="14" cy="14" r="11"/>
+              <circle class="timer-arc-fill" id="timerArcFill" cx="14" cy="14" r="11"
+                stroke-dasharray="69.1" stroke-dashoffset="0"/>
+            </svg>
+          </div>
+          <div class="timer-display" id="timerDisplay">15</div>
+          <!-- Host-only controls inside widget -->
+          <div class="timer-controls-inline" id="timerInlineControls" style="display:none">
+            <button class="tci-btn" id="timerPauseBtn" onclick="toggleTimerPause()" title="Pause/Resume">⏸</button>
+            <button class="tci-btn" onclick="toggleTimerEnabled()" title="Disable timer" id="timerDisableBtn">✕</button>
+          </div>
+        </div>
       </div>
 
       <div class="game-layout">
         <div class="slide-panel">
-          <div class="slide-wrap">
+          <div class="slide-wrap" id="slideWrap">
             <img id="slideImg" src="" alt="Slide" class="loading" />
             <div class="slide-loader" id="slideLoader">
               <div class="spinner"></div>
@@ -986,6 +1248,33 @@ input:focus{
 
           <div class="panel master-controls" id="masterControls" style="display:none">
             <div class="mc-title">⚡ HOST CONTROLS</div>
+
+            <!-- In-game timer settings -->
+            <div class="timer-settings-inline" id="timerSettingsInline">
+              <div class="tsi-row">
+                <span class="tsi-label">Timer</span>
+                <div class="tsi-right">
+                  <label class="toggle-switch" style="width:36px;height:20px">
+                    <input type="checkbox" id="timerGameEnabled" onchange="onGameTimerToggle()" />
+                    <span class="toggle-track" style="border-radius:999px"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="tsi-row" id="timerGameDurationRow" style="display:none">
+                <span class="tsi-label">Duration</span>
+                <div class="tsi-right">
+                  <div class="tsi-presets">
+                    <button class="tsi-preset" onclick="setGameTimerPreset(10)">10s</button>
+                    <button class="tsi-preset active" onclick="setGameTimerPreset(15)">15s</button>
+                    <button class="tsi-preset" onclick="setGameTimerPreset(20)">20s</button>
+                    <button class="tsi-preset" onclick="setGameTimerPreset(30)">30s</button>
+                  </div>
+                  <input class="tsi-custom" type="number" id="timerGameCustom" value="15" min="5" max="300"
+                    onchange="onGameCustomTimerChange()" oninput="onGameCustomTimerChange()" />
+                </div>
+              </div>
+            </div>
+
             <button class="btn-next" id="nextBtn" onclick="masterNext()">NEXT SLIDE →</button>
             <button class="btn-end" onclick="masterEnd()">END GAME</button>
           </div>
@@ -1039,6 +1328,19 @@ let slideImagePromises = {};
 let slidePreloadPromises = {};
 let dbReady = false;
 let slideLoadToken = 0;
+
+// ── Timer state ──────────────────────────────────────────────────────────────
+const TIMER_CIRCUMFERENCE = 2 * Math.PI * 11; // r=11 → ~69.1
+let timerState = {
+  enabled: false,
+  duration: 15,       // seconds, configurable
+  remaining: 15,
+  paused: false,
+  intervalId: null,
+};
+
+// Preset & config for waiting-room setup
+let timerCfg = { enabled: false, duration: 15 };
 
 document.addEventListener('fb-ready', () => {
   dbReady = true;
@@ -1118,58 +1420,30 @@ function jsonp(url) {
 
 async function fetchSlidePageIdsViaAppsScript(rawUrl) {
   const presentationId = getSlideId(rawUrl);
-  if (!presentationId) {
-    throw new Error("Invalid Google Slides URL.");
-  }
-
-  if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE")) {
+  if (!presentationId) throw new Error("Invalid Google Slides URL.");
+  if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE"))
     throw new Error("Set APPS_SCRIPT_WEBAPP_URL in index.html first.");
-  }
 
-  const data = await jsonp(
-    `${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`
-  );
-
-  console.log("fetchSlidePageIdsViaAppsScript response", data);
-
-  if (!data || !data.ok) {
-    throw new Error(data?.error || "Could not fetch slide IDs.");
-  }
-
+  const data = await jsonp(`${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`);
+  if (!data || !data.ok) throw new Error(data?.error || "Could not fetch slide IDs.");
   return data;
 }
 
 async function fetchSlideImageDataUrl(rawUrl, pageId) {
   const presentationId = getSlideId(rawUrl);
-  if (!presentationId) {
-    throw new Error("Invalid Google Slides URL.");
-  }
+  if (!presentationId) throw new Error("Invalid Google Slides URL.");
 
   const cacheKey = `${presentationId}::${pageId}`;
-  if (slideImageCache[cacheKey]) {
-    return slideImageCache[cacheKey];
-  }
-
-  if (slideImagePromises[cacheKey]) {
-    return slideImagePromises[cacheKey];
-  }
+  if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
+  if (slideImagePromises[cacheKey]) return slideImagePromises[cacheKey];
 
   slideImagePromises[cacheKey] = jsonp(
     `${APPS_SCRIPT_WEBAPP_URL}?action=image&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}`
-  )
-    .then((data) => {
-      console.log("fetchSlideImageDataUrl response", data);
-
-      if (!data || !data.ok || !data.dataUrl) {
-        throw new Error(data?.error || "Could not fetch slide image.");
-      }
-
-      slideImageCache[cacheKey] = data.dataUrl;
-      return data.dataUrl;
-    })
-    .finally(() => {
-      delete slideImagePromises[cacheKey];
-    });
+  ).then((data) => {
+    if (!data || !data.ok || !data.dataUrl) throw new Error(data?.error || "Could not fetch slide image.");
+    slideImageCache[cacheKey] = data.dataUrl;
+    return data.dataUrl;
+  }).finally(() => { delete slideImagePromises[cacheKey]; });
 
   return slideImagePromises[cacheKey];
 }
@@ -1177,35 +1451,205 @@ async function fetchSlideImageDataUrl(rawUrl, pageId) {
 async function prefetchSlide(rawUrl, pageId) {
   const presentationId = getSlideId(rawUrl);
   if (!presentationId || !pageId) return null;
-
   const cacheKey = `${presentationId}::${pageId}`;
-
-  if (slideImageCache[cacheKey]) {
-    return slideImageCache[cacheKey];
-  }
-
-  if (slidePreloadPromises[cacheKey]) {
-    return slidePreloadPromises[cacheKey];
-  }
+  if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
+  if (slidePreloadPromises[cacheKey]) return slidePreloadPromises[cacheKey];
 
   slidePreloadPromises[cacheKey] = fetchSlideImageDataUrl(rawUrl, pageId)
     .then((dataUrl) => {
       const img = new Image();
       img.src = dataUrl;
-
-      if (img.decode) {
-        return img.decode().catch(() => {}).then(() => dataUrl);
-      }
-
+      if (img.decode) return img.decode().catch(() => {}).then(() => dataUrl);
       return dataUrl;
-    })
-    .finally(() => {
-      delete slidePreloadPromises[cacheKey];
-    });
+    }).finally(() => { delete slidePreloadPromises[cacheKey]; });
 
   return slidePreloadPromises[cacheKey];
 }
 
+// ── Waiting-room timer config (host only) ────────────────────────────────────
+function onTimerToggle(){
+  const en = document.getElementById('timerEnabled').checked;
+  timerCfg.enabled = en;
+  document.getElementById('timerDurationRow').style.display = en ? 'flex' : 'none';
+}
+function setTimerPreset(secs){
+  timerCfg.duration = secs;
+  document.getElementById('timerCustom').value = secs;
+  document.querySelectorAll('#timerConfigPanel .preset-btn').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.textContent)===secs);
+  });
+}
+function onCustomTimerChange(){
+  const v = parseInt(document.getElementById('timerCustom').value);
+  if(v>=5 && v<=300){
+    timerCfg.duration = v;
+    document.querySelectorAll('#timerConfigPanel .preset-btn').forEach(b=>b.classList.remove('active'));
+  }
+}
+
+// ── In-game timer settings (host only) ───────────────────────────────────────
+function onGameTimerToggle(){
+  const en = document.getElementById('timerGameEnabled').checked;
+  timerState.enabled = en;
+  document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
+  if(en){
+    startSlideTimer();
+    document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
+  } else {
+    stopSlideTimer();
+    document.getElementById('timerWidget').classList.add('hidden');
+  }
+}
+function setGameTimerPreset(secs){
+  timerState.duration = secs;
+  document.getElementById('timerGameCustom').value = secs;
+  document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.textContent)===secs);
+  });
+  if(timerState.enabled) startSlideTimer();
+}
+function onGameCustomTimerChange(){
+  const v = parseInt(document.getElementById('timerGameCustom').value);
+  if(v>=5 && v<=300){
+    timerState.duration = v;
+    document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>b.classList.remove('active'));
+    if(timerState.enabled) startSlideTimer();
+  }
+}
+
+// Toggle pause from the widget button (host only)
+function toggleTimerPause(){
+  timerState.paused = !timerState.paused;
+  const btn = document.getElementById('timerPauseBtn');
+  btn.textContent = timerState.paused ? '▶' : '⏸';
+  btn.title = timerState.paused ? 'Resume' : 'Pause';
+}
+
+// Toggle timer enabled from the widget ✕ button
+function toggleTimerEnabled(){
+  const en = !timerState.enabled;
+  timerState.enabled = en;
+  document.getElementById('timerGameEnabled').checked = en;
+  document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
+  if(!en){
+    stopSlideTimer();
+    const w = document.getElementById('timerWidget');
+    w.classList.add('hidden');
+  } else {
+    startSlideTimer();
+    document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
+  }
+}
+
+function startSlideTimer(){
+  stopSlideTimer();
+  if(!timerState.enabled) return;
+
+  timerState.remaining = timerState.duration;
+  timerState.paused = false;
+  const btn = document.getElementById('timerPauseBtn');
+  if(btn) { btn.textContent = '⏸'; btn.title = 'Pause'; }
+
+  updateTimerUI();
+
+  timerState.intervalId = setInterval(() => {
+    if(timerState.paused) return;
+    timerState.remaining -= 1;
+    updateTimerUI();
+    if(timerState.remaining <= 0){
+      stopSlideTimer();
+      // Auto-advance (host only)
+      if(me.isMaster) masterNext();
+    }
+  }, 1000);
+}
+
+function stopSlideTimer(){
+  if(timerState.intervalId){ clearInterval(timerState.intervalId); timerState.intervalId = null; }
+}
+
+function updateTimerUI(){
+  const r = Math.max(0, timerState.remaining);
+  const total = timerState.duration;
+  const frac = total > 0 ? r / total : 0;
+  const urgent = r <= Math.min(5, Math.floor(total * 0.25));
+
+  const disp = document.getElementById('timerDisplay');
+  const arcFill = document.getElementById('timerArcFill');
+  const widget = document.getElementById('timerWidget');
+  const slideWrap = document.getElementById('slideWrap');
+
+  if(disp){
+    disp.textContent = r;
+    disp.classList.toggle('urgent', urgent);
+  }
+  if(arcFill){
+    const offset = TIMER_CIRCUMFERENCE * (1 - frac);
+    arcFill.style.strokeDashoffset = offset;
+    arcFill.classList.toggle('urgent', urgent);
+  }
+  if(widget) widget.classList.toggle('timer-urgent', urgent);
+  if(slideWrap) slideWrap.classList.toggle('timer-urgent', urgent);
+}
+
+// ── Reaction animations ───────────────────────────────────────────────────────
+const SMASH_EMOJIS = ['🔥','💯','😍','🤩','❤️‍🔥','👀','😘','💘','🥵','✨'];
+const PASS_EMOJIS  = ['❄️','🥶','💀','😬','🙅','🚫','😐','😑','💨','⛔'];
+
+function spawnReaction(choice, count = 1){
+  const layer = document.getElementById('reactionLayer');
+  const emojis = choice === 'smash' ? SMASH_EMOJIS : PASS_EMOJIS;
+
+  for(let i = 0; i < count; i++){
+    const el = document.createElement('div');
+    el.className = 'reaction-emoji';
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    el.textContent = emoji;
+
+    // Random position near bottom of viewport
+    const x = 10 + Math.random() * 80; // % of viewport width
+    const y = 70 + Math.random() * 20; // % of viewport height (bottom zone)
+    const vx = (Math.random() - 0.5) * 120; // horizontal drift px
+    const vy = -(160 + Math.random() * 200); // upward distance px
+    const dur = 1.4 + Math.random() * 0.8;
+    const rotStart = (Math.random() - 0.5) * 20 + 'deg';
+    const rotMid   = (Math.random() - 0.5) * 30 + 'deg';
+    const rotEnd   = (Math.random() - 0.5) * 45 + 'deg';
+    const delay = i * (80 + Math.random() * 60);
+
+    el.style.cssText = `
+      left:${x}vw;
+      top:${y}vh;
+      --vy:${vy}px;
+      --vx:${vx}px;
+      --dur:${dur}s;
+      --rot-start:${rotStart};
+      --rot-mid:${rotMid};
+      --rot-end:${rotEnd};
+      animation-delay:${delay}ms;
+      font-size:${1.4 + Math.random() * 1.2}rem;
+    `;
+
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), (dur * 1000) + delay + 200);
+  }
+}
+
+// Track previous vote counts to only react to *new* votes
+let prevVoteCounts = { smash: 0, pass: 0 };
+
+function triggerVoteReactions(smashCount, passCount){
+  const newSmashes = smashCount - prevVoteCounts.smash;
+  const newPasses  = passCount  - prevVoteCounts.pass;
+
+  if(newSmashes > 0) spawnReaction('smash', Math.min(newSmashes * 2, 6));
+  if(newPasses  > 0) spawnReaction('pass',  Math.min(newPasses  * 2, 6));
+
+  prevVoteCounts.smash = smashCount;
+  prevVoteCounts.pass  = passCount;
+}
+
+// ── Room / game logic (mostly unchanged) ─────────────────────────────────────
 async function createRoom(){
   hideErr('createErr');
   if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
@@ -1216,16 +1660,13 @@ async function createRoom(){
   if(!name) return showErr('createErr','Enter your name.');
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
 
-  // Show loading state on button
   const btn = document.querySelector('#entry .btn-fire');
   btn.textContent = 'LOADING SLIDES…';
   btn.disabled = true;
 
   try {
     const deck = await fetchSlidePageIdsViaAppsScript(url);
-    // Use all slides from the deck (totalSlides comes from Apps Script)
     const count = deck.totalSlides;
-
     const code = genCode();
     const room = {
       code,
@@ -1277,17 +1718,10 @@ async function loadSlide(rawUrl, slideNumber, totalSlides = 50, slidePageIds = [
 
     const preImg = new Image();
     preImg.src = dataUrl;
-
-    if (preImg.decode) {
-      try {
-        await preImg.decode();
-      } catch (_) {}
-    }
-
+    if (preImg.decode) { try { await preImg.decode(); } catch (_) {} }
     if (token !== slideLoadToken) return;
 
-    img.onload = null;
-    img.onerror = null;
+    img.onload = null; img.onerror = null;
     img.src = dataUrl;
     img.classList.remove('loading');
     loader.classList.add('hidden');
@@ -1313,9 +1747,7 @@ function roomRef(code){ return window._ref(window._db, `rooms/${code}`); }
 function votesRef(code){ return window._ref(window._db, `votes/${code}`); }
 function voteRef(code,slide,playerKey){ return window._ref(window._db, `votes/${code}/${slide}/${playerKey}`); }
 
-function getPlayers(room){
-  return Object.values(room.players || {});
-}
+function getPlayers(room){ return Object.values(room.players || {}); }
 
 function getSmashTotals(room, votesData){
   const players = getPlayers(room);
@@ -1385,6 +1817,15 @@ async function joinRoom(){
 function enterWaiting(){
   show('waiting');
   document.getElementById('displayCode').textContent = me.code;
+
+  if(me.isMaster){
+    document.getElementById('timerConfigPanel').style.display = '';
+    // sync UI to current timerCfg
+    document.getElementById('timerEnabled').checked = timerCfg.enabled;
+    document.getElementById('timerDurationRow').style.display = timerCfg.enabled ? 'flex' : 'none';
+    document.getElementById('timerCustom').value = timerCfg.duration;
+  }
+
   listenRoom();
 }
 
@@ -1419,13 +1860,24 @@ function renderWaiting(room){
 }
 
 async function startGame(){
-  await window._update(roomRef(me.code),{ state:'playing', currentSlide:1 });
+  // Persist timer config into the room so all clients know
+  await window._update(roomRef(me.code),{
+    state:'playing',
+    currentSlide:1,
+    timerEnabled: timerCfg.enabled,
+    timerDuration: timerCfg.duration,
+  });
 }
 
 function enterGame(){
   show('game');
-  document.getElementById('masterControls').style.display = me.isMaster?'':'none';
-  document.getElementById('voteHead').textContent = me.isMaster?'Host can vote too':'Cast your vote';
+  const isHost = me.isMaster;
+  document.getElementById('masterControls').style.display = isHost ? '' : 'none';
+  document.getElementById('voteHead').textContent = isHost ? 'Host can vote too' : 'Cast your vote';
+
+  // Show host inline controls inside timer widget
+  if(isHost) document.getElementById('timerInlineControls').style.display = '';
+
   listenRoom();
   listenVotes();
 }
@@ -1438,23 +1890,34 @@ function renderGame(room){
   document.getElementById('progFill').style.width = (((s-1)/tot)*100)+'%';
   document.getElementById('slideBadge').textContent = String(s).padStart(2,'0');
 
-  console.log("renderGame", {
-    currentSlide: s,
-    totalSlides: tot,
-    hasSlidePageIds: Array.isArray(room.slidePageIds),
-    slidePageIdsLength: room.slidePageIds?.length,
-    currentPageId: room.slidePageIds?.[s - 1]
-  });
+  // Sync timer state from room if it changed (first render or host changed settings)
+  if(typeof room.timerEnabled !== 'undefined'){
+    timerState.enabled = room.timerEnabled;
+    timerState.duration = room.timerDuration || 15;
+  }
+
+  // Sync in-game timer controls for host
+  if(me.isMaster){
+    document.getElementById('timerGameEnabled').checked = timerState.enabled;
+    document.getElementById('timerGameDurationRow').style.display = timerState.enabled ? 'flex' : 'none';
+    document.getElementById('timerGameCustom').value = timerState.duration;
+    // sync presets
+    document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>{
+      b.classList.toggle('active', parseInt(b.textContent)===timerState.duration);
+    });
+  }
 
   if(s !== lastSlide){
     lastSlide = s;
+
+    // Reset reaction counters on new slide
+    prevVoteCounts = { smash: 0, pass: 0 };
+
     loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
 
     for (let offset = 0; offset < 5; offset++) {
       const upcomingPageId = room.slidePageIds?.[s + offset];
-      if (upcomingPageId) {
-        prefetchSlide(room.slidesUrl, upcomingPageId);
-      }
+      if (upcomingPageId) prefetchSlide(room.slidesUrl, upcomingPageId);
     }
 
     if(!myVotedSlides[s]){
@@ -1462,6 +1925,16 @@ function renderGame(room){
       document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
     } else {
       markVotedUI(myVotedSlides[s]);
+    }
+
+    // Start/reset timer on new slide
+    const widget = document.getElementById('timerWidget');
+    if(timerState.enabled){
+      widget.classList.remove('hidden','timer-disabled');
+      startSlideTimer();
+    } else {
+      widget.classList.add('hidden');
+      stopSlideTimer();
     }
   }
 
@@ -1507,6 +1980,9 @@ function renderVoters(room, votesData){
   document.getElementById('tallySmash').textContent = smashes;
   document.getElementById('tallyPass').textContent  = passes;
 
+  // Trigger reactions for newly arrived votes
+  triggerVoteReactions(smashes, passes);
+
   const myChoice = slideVotes[safeKey(me.name)];
   if(myChoice && !myVotedSlides[s]){
     myVotedSlides[s] = myChoice;
@@ -1535,9 +2011,13 @@ async function castVote(choice){
   await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
   markVotedUI(choice);
   showToast(choice==='smash'?'🔥 SMASHED!':'❄️ Passed');
+
+  // Local burst for own vote
+  spawnReaction(choice, 4);
 }
 
 async function masterNext(){
+  stopSlideTimer();
   const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
 
@@ -1545,12 +2025,17 @@ async function masterNext(){
   if(room.currentSlide >= room.totalSlides){
     await window._update(roomRef(me.code),{ state:'done' });
   } else {
-    await window._update(roomRef(me.code),{ currentSlide:room.currentSlide+1 });
+    await window._update(roomRef(me.code),{
+      currentSlide: room.currentSlide+1,
+      timerEnabled: timerState.enabled,
+      timerDuration: timerState.duration,
+    });
   }
 }
 
 async function masterEnd(){
   if(!confirm('End the game and show results?')) return;
+  stopSlideTimer();
   await window._update(roomRef(me.code),{ state:'done' });
 }
 
@@ -1566,6 +2051,11 @@ function listenRoom(){
       renderWaiting(room);
     } else if(room.state==='playing'){
       if(document.getElementById('game').classList.contains('hidden')){
+        // Sync timer config from room before entering game
+        if(typeof room.timerEnabled !== 'undefined'){
+          timerState.enabled = room.timerEnabled;
+          timerState.duration = room.timerDuration || 15;
+        }
         enterGame();
         return;
       }
@@ -1573,6 +2063,7 @@ function listenRoom(){
       renderVoters(room, _latestVotes);
     } else if(room.state==='done'){
       if(!document.getElementById('results').classList.contains('hidden')) return;
+      stopSlideTimer();
       window._get(votesRef(me.code)).then(vSnap => {
         showResultsScreen(room, vSnap.exists() ? vSnap.val() : _latestVotes);
       }).catch(() => {
@@ -1598,7 +2089,7 @@ function getPlayerStats(player, room, votesData){
   const key = safeKey(player.name);
   const tot = room.totalSlides;
   let smashes = 0, passes = 0, skipped = 0;
-  let streak = 0, maxStreak = 0, currentStreak = 0;
+  let maxStreak = 0, currentStreak = 0;
   let altCount = 0;
   let lastVote = null;
 
@@ -1704,6 +2195,7 @@ function showResultsScreen(room, votesData){
 
 async function leaveRoom(){
   stopListeners();
+  stopSlideTimer();
   if(!me.isMaster && me.code && me.name){
     try{
       await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null);
@@ -1714,6 +2206,7 @@ async function leaveRoom(){
 
 function goHome(){
   stopListeners();
+  stopSlideTimer();
   me = { name:'', code:'', isMaster:false };
   lastSlide = -1;
   myVotedSlides = {};
@@ -1723,16 +2216,21 @@ function goHome(){
   slideImagePromises = {};
   slidePreloadPromises = {};
   slideLoadToken = 0;
+  timerCfg = { enabled: false, duration: 15 };
+  timerState = { enabled:false, duration:15, remaining:15, paused:false, intervalId:null };
+  prevVoteCounts = { smash:0, pass:0 };
 
   const img = document.getElementById('slideImg');
-  img.onload = null;
-  img.onerror = null;
+  img.onload = null; img.onerror = null;
   img.src = '';
   img.className = 'loading';
   img.style.display = 'block';
 
   document.getElementById('slideLoader').classList.add('hidden');
   document.getElementById('slideError').classList.remove('visible');
+  document.getElementById('timerWidget').classList.add('hidden');
+  document.getElementById('timerEnabled').checked = false;
+  document.getElementById('timerDurationRow').style.display = 'none';
 
   show('entry');
 }
@@ -1743,7 +2241,8 @@ document.addEventListener('keydown', e => {
   }
   if(!document.getElementById('game').classList.contains('hidden')){
     if(e.key==='ArrowLeft') castVote('smash');
-    if(e.key==='ArrowRight')  castVote('pass');
+    if(e.key==='ArrowRight') castVote('pass');
+    if(e.key===' ' && me.isMaster){ e.preventDefault(); toggleTimerPause(); }
   }
 });
 
