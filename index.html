@@ -1390,14 +1390,11 @@ function renderGame(room){
     lastSlide = s;
     loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
 
-    const nextPageId = room.slidePageIds?.[s];
-    if (nextPageId) {
-      prefetchSlide(room.slidesUrl, nextPageId);
-    }
-
-    const nextNextPageId = room.slidePageIds?.[s + 1];
-    if (nextNextPageId) {
-      prefetchSlide(room.slidesUrl, nextNextPageId);
+    for (let offset = 0; offset < 5; offset++) {
+      const upcomingPageId = room.slidePageIds?.[s + offset];
+      if (upcomingPageId) {
+        prefetchSlide(room.slidesUrl, upcomingPageId);
+      }
     }
 
     if(!myVotedSlides[s]){
