@@ -738,6 +738,14 @@ input:focus{
 .slide-block.open .sbh-arrow{transform:rotate(180deg)}
 .slide-voters{display:none;padding:.55rem 1rem 1rem;border-top:1px solid var(--border)}
 .slide-block.open .slide-voters{display:block}
+.results-slide-thumb{
+  width:100%;
+  display:block;
+  border-radius:12px;
+  margin-bottom:.8rem;
+  border:1px solid var(--border);
+  background:#000;
+}
 .sv-cols{display:grid;grid-template-columns:1fr 1fr;gap:.55rem 1rem}
 .sv-col-title{font-size:.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem;font-weight:700}
 .sv-col-title.sm{color:var(--smash)} .sv-col-title.pa{color:var(--pass)}
@@ -1391,7 +1399,7 @@ function renderGame(room){
     loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
 
     for (let offset = 0; offset < 5; offset++) {
-      const upcomingPageId = room.slidePageIds?.[s + offset];
+      const upcomingPageId = room.slidePageIds?.[s - 1 + offset];
       if (upcomingPageId) {
         prefetchSlide(room.slidesUrl, upcomingPageId);
       }
@@ -1529,7 +1537,7 @@ function listenVotes(){
   });
 }
 
-function showResultsScreen(room, votesData){
+async function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
 
@@ -1540,10 +1548,25 @@ function showResultsScreen(room, votesData){
   const accordion = document.getElementById('slidesAccordion');
   accordion.innerHTML = '';
 
+  for (let s = 1; s <= room.totalSlides; s++) {
+    const pageId = room.slidePageIds?.[s - 1];
+    if (pageId) {
+      try {
+        await prefetchSlide(room.slidesUrl, pageId);
+      } catch (e) {
+        console.warn(`Could not preload slide ${s}`, e);
+      }
+    }
+  }
+
   for(let s=1; s<=room.totalSlides; s++){
     const sv = votesData[s]||{};
     const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
     const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
+    const pageId = room.slidePageIds?.[s - 1];
+    const thumbSrc = pageId && getSlideId(room.slidesUrl)
+      ? slideImageCache[`${getSlideId(room.slidesUrl)}::${pageId}`] || ''
+      : '';
 
     totalSmash += smashers.length;
     totalPass  += passers.length;
@@ -1562,6 +1585,7 @@ function showResultsScreen(room, votesData){
         </div>
       </div>
       <div class="slide-voters">
+        ${thumbSrc ? `<img src="${thumbSrc}" alt="Slide ${s}" class="results-slide-thumb" />` : ''}
         <div class="sv-cols">
           <div>
             <div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>
