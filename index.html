@@ -975,6 +975,42 @@ input:focus{
 
 <div class="toast" id="toast"></div>
 
+
+<script>
+let slideImageCache = {};
+let slidePreloadPromises = {};
+
+async function prefetchSlide(rawUrl, pageId) {
+  const presentationId = getSlideId(rawUrl);
+  if (!presentationId || !pageId) return null;
+
+  const cacheKey = `${presentationId}::${pageId}`;
+
+  if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
+  if (slidePreloadPromises[cacheKey]) return slidePreloadPromises[cacheKey];
+
+  slidePreloadPromises[cacheKey] = fetchSlideImageDataUrl(rawUrl, pageId)
+    .then((dataUrl) => {
+      slideImageCache[cacheKey] = dataUrl;
+
+      // Warm image decode too
+      const img = new Image();
+      img.src = dataUrl;
+      if (img.decode) {
+        return img.decode().catch(() => {}).then(() => dataUrl);
+      }
+      return dataUrl;
+    })
+    .finally(() => {
+      delete slidePreloadPromises[cacheKey];
+    });
+
+  return slidePreloadPromises[cacheKey];
+}
+</script>
+
+
+  
 <script>
 const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwU3-zlc0EqXUr2ncYybguEtyiCudnIUevNwlNV4LQiRiyidVTjC24cd2e4HDxViZqh/exec";
 let slideImageCache = {};
@@ -1344,6 +1380,16 @@ function renderGame(room){
   if(s !== lastSlide){
     lastSlide = s;
     loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
+  
+    const nextPageId = room.slidePageIds?.[s];
+    if (nextPageId) {
+      prefetchSlide(room.slidesUrl, nextPageId);
+    }
+  
+    const nextNextPageId = room.slidePageIds?.[s + 1];
+    if (nextNextPageId) {
+      prefetchSlide(room.slidesUrl, nextNextPageId);
+    }
 
     if(!myVotedSlides[s]){
       document.getElementById('votedBanner').className = 'voted-banner';
