@@ -25,9 +25,6 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Just expose the db — connection errors will surface when real queries fail
-    // (the .info/connected self-unsubscribe trick has a TDZ race with synchronous Firebase callbacks)
-
     window._db = db;
     window._ref = ref;
     window._set = set;
@@ -318,21 +315,14 @@ input:focus{
   margin:0 auto;
   flex-wrap:wrap;
 }
-.slide-counter,.room-pill{
+.slide-counter{
   background:rgba(20,20,42,.9);
   border:1px solid var(--border);
   border-radius:999px;
   padding:.45rem .8rem;
-  white-space:nowrap
-}
-.slide-counter{
+  white-space:nowrap;
   font-family:'Bebas Neue',sans-serif;
   font-size:1rem;
-  letter-spacing:2px;
-  color:var(--muted)
-}
-.room-pill{
-  font-size:.68rem;
   letter-spacing:2px;
   color:var(--muted)
 }
@@ -892,11 +882,7 @@ input:focus{
         <input type="url" id="slidesUrl" placeholder="https://docs.google.com/presentation/d/…" />
         <p class="hint">Use a normal Google Slides URL. The deck should be shared as <strong>Anyone with the link can view</strong>.</p>
       </div>
-      <div class="field">
-        <label>Number of Slides</label>
-        <input type="number" id="slideCount" placeholder="e.g. 10" min="1" max="200" />
-        <p class="hint">Enter how many slides from the deck you want to use.</p>
-      </div>
+      <!-- Slide count is now auto-detected from the presentation -->
       <button class="btn btn-fire" onclick="createRoom()">CREATE ROOM 🔥</button>
       <div class="error" id="createErr"></div>
 
@@ -941,7 +927,7 @@ input:focus{
       <div class="top-bar">
         <div class="slide-counter" id="slideCounter">1 / 10</div>
         <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-        <div class="room-pill">ROOM <span id="gameRoomCode"></span></div>
+        <!-- room code pill removed from game screen -->
       </div>
 
       <div class="game-layout">
@@ -1224,20 +1210,21 @@ async function createRoom(){
   hideErr('createErr');
   if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
 
-  const name  = document.getElementById('hostName').value.trim();
-  const url   = document.getElementById('slidesUrl').value.trim();
-  const count = parseInt(document.getElementById('slideCount').value.trim(),10);
+  const name = document.getElementById('hostName').value.trim();
+  const url  = document.getElementById('slidesUrl').value.trim();
 
   if(!name) return showErr('createErr','Enter your name.');
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
-  if(isNaN(count)||count<1) return showErr('createErr','Enter a valid slide count.');
+
+  // Show loading state on button
+  const btn = document.querySelector('#entry .btn-fire');
+  btn.textContent = 'LOADING SLIDES…';
+  btn.disabled = true;
 
   try {
     const deck = await fetchSlidePageIdsViaAppsScript(url);
-
-    if (count > deck.totalSlides) {
-      return showErr('createErr', `Deck only has ${deck.totalSlides} slides.`);
-    }
+    // Use all slides from the deck (totalSlides comes from Apps Script)
+    const count = deck.totalSlides;
 
     const code = genCode();
     const room = {
@@ -1245,7 +1232,7 @@ async function createRoom(){
       hostName:name,
       slidesUrl:url,
       totalSlides:count,
-      slidePageIds: deck.slidePageIds.slice(0, count),
+      slidePageIds: deck.slidePageIds,
       state:'waiting',
       currentSlide:1,
       players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
@@ -1257,6 +1244,9 @@ async function createRoom(){
   } catch(e) {
     console.error("createRoom failed", e);
     showErr('createErr','❌ ' + e.message);
+  } finally {
+    btn.textContent = 'CREATE ROOM 🔥';
+    btn.disabled = false;
   }
 }
 
@@ -1434,7 +1424,6 @@ async function startGame(){
 
 function enterGame(){
   show('game');
-  document.getElementById('gameRoomCode').textContent = me.code;
   document.getElementById('masterControls').style.display = me.isMaster?'':'none';
   document.getElementById('voteHead').textContent = me.isMaster?'Host can vote too':'Cast your vote';
   listenRoom();
@@ -1602,7 +1591,6 @@ function listenVotes(){
       renderVoters(_latestRoom, _latestVotes);
       renderSmashBoard('smashBoard', _latestRoom, _latestVotes);
     }
-    // Keep _latestVotes up to date even when state changes to 'done'
   });
 }
 
@@ -1611,7 +1599,7 @@ function getPlayerStats(player, room, votesData){
   const tot = room.totalSlides;
   let smashes = 0, passes = 0, skipped = 0;
   let streak = 0, maxStreak = 0, currentStreak = 0;
-  let altCount = 0; // alternations smash->pass or pass->smash
+  let altCount = 0;
   let lastVote = null;
 
   for(let s = 1; s <= tot; s++){
@@ -1635,7 +1623,6 @@ function getPlayerStats(player, room, votesData){
   const voted = smashes + passes;
   const smashPct = voted > 0 ? Math.round((smashes / voted) * 100) : 0;
 
-  // Fun title logic
   let title = '';
   if(voted === 0) title = '👻 Ghost';
   else if(skipped > tot * 0.4) title = '🦥 Selective';
@@ -1674,11 +1661,9 @@ function showResultsScreen(room, votesData){
     <div class="stat-box"><div class="stat-n sn-acc">${players.length}</div><div class="stat-l">Players</div></div>
   `;
 
-  // Player stats cards
   const list = document.getElementById('playerStatsList');
   list.innerHTML = '';
 
-  // Sort by smash% descending
   const sorted = [...players].sort((a,b) => {
     const sa = getPlayerStats(a, room, votesData);
     const sb = getPlayerStats(b, room, votesData);
