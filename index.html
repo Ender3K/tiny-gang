@@ -1626,8 +1626,8 @@ document.addEventListener('keydown', e => {
     document.getElementById('joinCode').value.trim() ? joinRoom() : createRoom();
   }
   if(!document.getElementById('game').classList.contains('hidden')){
-    if(e.key==='ArrowRight') castVote('smash');
-    if(e.key==='ArrowLeft')  castVote('pass');
+    if(e.key==='ArrowLeft') castVote('smash');
+    if(e.key==='ArrowRight')  castVote('pass');
   }
 });
 
