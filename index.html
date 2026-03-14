@@ -1359,10 +1359,10 @@ input:focus{
             <div class="vote-zone-head" id="voteHead">Cast your vote</div>
             <div class="vote-btns" id="voteBtns">
               <button class="vbtn vbtn-smash" onclick="castVote('smash')">
-                <span class="vi">🔥</span>SMASH<span class="vs">YES PLEASE</span>
+                <span class="vi" id="smashBtnIcon">🔥</span>SMASH<span class="vs">YES PLEASE</span>
               </button>
               <button class="vbtn vbtn-pass" onclick="castVote('pass')">
-                <span class="vi">❄️</span>PASS<span class="vs">NOPE</span>
+                <span class="vi" id="passBtnIcon">❄️</span>PASS<span class="vs">NOPE</span>
               </button>
             </div>
             <div class="voted-banner" id="votedBanner"></div>
@@ -1810,6 +1810,13 @@ function resolveEmojiSets(){
   return EMOJI_THEMES[emojiCfg.theme] || EMOJI_THEMES.classic;
 }
 
+
+function updateVoteBtnIcons(){
+  const si = document.getElementById('smashBtnIcon');
+  const pi = document.getElementById('passBtnIcon');
+  if(si) si.textContent = activeSmashEmojis[0] || '🔥';
+  if(pi) pi.textContent = activePassEmojis[0]  || '❄️';
+}
 function spawnReaction(choice, count = 1){
   const layer = document.getElementById('reactionLayer');
   const emojis = choice === 'smash' ? activeSmashEmojis : activePassEmojis;
@@ -2120,6 +2127,7 @@ function renderGame(room){
   // Sync emoji sets from room (set by host at game start)
   if(Array.isArray(room.emojiSmash) && room.emojiSmash.length) activeSmashEmojis = room.emojiSmash;
   if(Array.isArray(room.emojiPass)  && room.emojiPass.length)  activePassEmojis  = room.emojiPass;
+  updateVoteBtnIcons();
 
   // Sync in-game timer controls for host
   if(me.isMaster){
@@ -2220,7 +2228,8 @@ function renderVoters(room, votesData){
 function markVotedUI(choice){
   const banner = document.getElementById('votedBanner');
   banner.className = 'voted-banner '+choice;
-  banner.innerHTML = choice==='smash'?'🔥 SMASHED!':'❄️ PASSED';
+  const e = choice==='smash' ? activeSmashEmojis[0] : activePassEmojis[0];
+  banner.innerHTML = choice==='smash' ? e+' SMASHED!' : e+' PASSED';
   document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=true);
 }
 
@@ -2450,6 +2459,7 @@ function goHome(){
   emojiCfg = { theme: 'classic', customSmash: '', customPass: '' };
   activeSmashEmojis = [...EMOJI_THEMES.classic.smash];
   activePassEmojis  = [...EMOJI_THEMES.classic.pass];
+  updateVoteBtnIcons();
 
   const img = document.getElementById('slideImg');
   img.onload = null; img.onerror = null;
