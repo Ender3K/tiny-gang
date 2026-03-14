@@ -738,14 +738,8 @@ input:focus{
 .slide-block.open .sbh-arrow{transform:rotate(180deg)}
 .slide-voters{display:none;padding:.55rem 1rem 1rem;border-top:1px solid var(--border)}
 .slide-block.open .slide-voters{display:block}
-.results-slide-thumb{
-  width:100%;
-  display:block;
-  border-radius:12px;
-  margin-bottom:.8rem;
-  border:1px solid var(--border);
-  background:#000;
-}
+.results-thumb-wrap:empty{display:none}
+.results-slide-thumb{width:100%;display:block;border-radius:12px;margin-bottom:.8rem;border:1px solid var(--border);background:#000}
 .sv-cols{display:grid;grid-template-columns:1fr 1fr;gap:.55rem 1rem}
 .sv-col-title{font-size:.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem;font-weight:700}
 .sv-col-title.sm{color:var(--smash)} .sv-col-title.pa{color:var(--pass)}
@@ -1541,6 +1535,7 @@ function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
 
+  votesData = votesData || {};
   const players = getPlayers(room);
   document.getElementById('resSub').textContent = `${players.length} player${players.length!==1?'s':''} · ${room.totalSlides} slides`;
 
@@ -1554,9 +1549,7 @@ function showResultsScreen(room, votesData){
     const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
     const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
     const pageId = room.slidePageIds?.[s - 1];
-    const thumbSrc = pageId && slideId
-      ? slideImageCache[`${slideId}::${pageId}`] || ''
-      : '';
+    const thumbSrc = pageId && slideId ? (slideImageCache[`${slideId}::${pageId}`] || '') : '';
 
     totalSmash += smashers.length;
     totalPass  += passers.length;
@@ -1575,7 +1568,7 @@ function showResultsScreen(room, votesData){
         </div>
       </div>
       <div class="slide-voters">
-        <div class="results-thumb-wrap">${thumbSrc ? `<img src="${thumbSrc}" alt="Slide ${s}" class="results-slide-thumb" />` : `<div class="results-slide-thumb placeholder">Loading slide ${s}…</div>`}</div>
+        <div class="results-thumb-wrap">${thumbSrc ? `<img src="${thumbSrc}" alt="Slide ${s}" class="results-slide-thumb" />` : ''}</div>
         <div class="sv-cols">
           <div>
             <div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>
@@ -1590,19 +1583,13 @@ function showResultsScreen(room, votesData){
     `;
     accordion.appendChild(block);
 
-    if (pageId && slideId && !thumbSrc) {
-      prefetchSlide(room.slidesUrl, pageId)
-        .then((dataUrl) => {
-          const wrap = block.querySelector('.results-thumb-wrap');
-          if (!wrap) return;
+    if(pageId && slideId && !thumbSrc){
+      prefetchSlide(room.slidesUrl, pageId).then((dataUrl) => {
+        const wrap = block.querySelector('.results-thumb-wrap');
+        if(wrap && wrap.childElementCount===0){
           wrap.innerHTML = `<img src="${dataUrl}" alt="Slide ${s}" class="results-slide-thumb" />`;
-        })
-        .catch((e) => {
-          console.warn(`Could not load results thumbnail for slide ${s}`, e);
-          const wrap = block.querySelector('.results-thumb-wrap');
-          if (!wrap) return;
-          wrap.innerHTML = `<div class="results-slide-thumb placeholder">Preview unavailable</div>`;
-        });
+        }
+      }).catch(err => console.warn(`Could not load results thumbnail for slide ${s}`, err));
     }
   }
 
