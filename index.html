@@ -746,6 +746,79 @@ input:focus{
 .dot-s{background:var(--smash)} .dot-p{background:var(--pass)}
 .no-votes{color:var(--muted);font-size:.74rem;font-style:italic}
 
+.player-stats-list{
+  display:flex;
+  flex-direction:column;
+  gap:.6rem;
+  max-height:56vh;
+  overflow-y:auto;
+  padding-right:.2rem;
+}
+.pstat-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:.75rem 1rem;
+}
+.pstat-top{
+  display:flex;
+  align-items:center;
+  gap:.55rem;
+  margin-bottom:.65rem;
+}
+.pstat-name{
+  font-weight:700;
+  font-size:.9rem;
+  flex:1;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.pstat-title{
+  font-size:.6rem;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:var(--accent);
+  background:rgba(255,221,0,.08);
+  border:1px solid rgba(255,221,0,.2);
+  border-radius:999px;
+  padding:.12rem .45rem;
+  white-space:nowrap;
+}
+.pstat-pills{
+  display:flex;
+  gap:.4rem;
+  flex-wrap:wrap;
+}
+.pstat-pill{
+  display:flex;
+  align-items:center;
+  gap:.3rem;
+  font-size:.72rem;
+  font-weight:600;
+  border-radius:999px;
+  padding:.22rem .6rem;
+}
+.pill-smash{background:rgba(255,45,85,.12);color:var(--smash);border:1px solid rgba(255,45,85,.25)}
+.pill-pass{background:rgba(0,170,255,.12);color:var(--pass);border:1px solid rgba(0,170,255,.25)}
+.pill-streak{background:rgba(255,221,0,.1);color:var(--accent);border:1px solid rgba(255,221,0,.22)}
+.pill-skipped{background:rgba(115,115,165,.1);color:var(--muted);border:1px solid rgba(115,115,165,.2)}
+.pill-chaos{background:rgba(191,95,255,.12);color:#bf5fff;border:1px solid rgba(191,95,255,.25)}
+.pstat-bar-wrap{
+  margin-top:.55rem;
+  height:5px;
+  background:var(--border);
+  border-radius:99px;
+  overflow:hidden;
+}
+.pstat-bar-fill{
+  height:100%;
+  border-radius:99px;
+  background:linear-gradient(90deg,var(--smash),var(--accent));
+  transition:width .4s ease;
+}
+
 .restart-btn{
   background:linear-gradient(135deg,var(--smash),#ff6a00);
   border:none;
@@ -961,10 +1034,10 @@ input:focus{
       <div class="results-side">
         <div class="panel">
           <div class="panel-title">
-            <span>SLIDE BREAKDOWN</span>
-            <span style="font-size:.68rem;color:var(--muted)">per slide</span>
+            <span>PLAYER STATS</span>
+            <span style="font-size:.68rem;color:var(--muted)">per person</span>
           </div>
-          <div class="slides-accordion" id="slidesAccordion"></div>
+          <div class="player-stats-list" id="playerStatsList"></div>
         </div>
       </div>
     </div>
@@ -1535,6 +1608,51 @@ function listenVotes(){
   });
 }
 
+function getPlayerStats(player, room, votesData){
+  const key = safeKey(player.name);
+  const tot = room.totalSlides;
+  let smashes = 0, passes = 0, skipped = 0;
+  let streak = 0, maxStreak = 0, currentStreak = 0;
+  let altCount = 0; // alternations smash->pass or pass->smash
+  let lastVote = null;
+
+  for(let s = 1; s <= tot; s++){
+    const sv = votesData[s] || votesData[String(s)] || {};
+    const v = sv[key];
+    if(v === 'smash') smashes++;
+    else if(v === 'pass') passes++;
+    else { skipped++; currentStreak = 0; lastVote = null; continue; }
+
+    if(v === 'smash'){
+      currentStreak++;
+      if(lastVote === 'pass') altCount++;
+    } else {
+      currentStreak = 0;
+      if(lastVote === 'smash') altCount++;
+    }
+    if(currentStreak > maxStreak) maxStreak = currentStreak;
+    lastVote = v;
+  }
+
+  const voted = smashes + passes;
+  const smashPct = voted > 0 ? Math.round((smashes / voted) * 100) : 0;
+
+  // Fun title logic
+  let title = '';
+  if(voted === 0) title = '👻 Ghost';
+  else if(skipped > tot * 0.4) title = '🦥 Selective';
+  else if(smashPct === 100) title = '🔥 All In';
+  else if(smashPct === 0) title = '❄️ Ice Cold';
+  else if(smashPct >= 80) title = '💘 Simp';
+  else if(smashPct <= 20) title = '😤 Picky';
+  else if(altCount >= voted * 0.7) title = '🎲 Chaotic';
+  else if(maxStreak >= 5) title = '🚀 On Fire';
+  else if(Math.abs(smashPct - 50) <= 10) title = '⚖️ Balanced';
+  else title = '😏 Player';
+
+  return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title };
+}
+
 function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
@@ -1543,44 +1661,13 @@ function showResultsScreen(room, votesData){
   document.getElementById('resSub').textContent = `${players.length} player${players.length!==1?'s':''} · ${room.totalSlides} slides`;
 
   let totalSmash=0, totalPass=0;
-  const accordion = document.getElementById('slidesAccordion');
-  accordion.innerHTML = '';
-
   for(let s=1; s<=room.totalSlides; s++){
     const sv = votesData[s] || votesData[String(s)] || {};
-    const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
-    const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
-
-    totalSmash += smashers.length;
-    totalPass  += passers.length;
-
-    const block = document.createElement('div');
-    block.className = 'slide-block'+(s===1?' open':'');
-    block.innerHTML = `
-      <div class="slide-block-header" onclick="this.parentElement.classList.toggle('open')">
-        <div class="sbh-left"><span class="sbh-num">SLIDE ${s}</span></div>
-        <div class="sbh-right">
-          <div class="sbh-counts">
-            <span class="sc-s">${smashers.length}🔥</span>
-            <span class="sc-p">${passers.length}❄️</span>
-          </div>
-          <span class="sbh-arrow">▼</span>
-        </div>
-      </div>
-      <div class="slide-voters">
-        <div class="sv-cols">
-          <div>
-            <div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>
-            ${smashers.length ? smashers.map(p=>`<div class="sv-name"><div class="sv-dot dot-s"></div>${p.name}</div>`).join('') : '<div class="no-votes">Nobody</div>'}
-          </div>
-          <div>
-            <div class="sv-col-title pa">❄️ PASS (${passers.length})</div>
-            ${passers.length ? passers.map(p=>`<div class="sv-name"><div class="sv-dot dot-p"></div>${p.name}</div>`).join('') : '<div class="no-votes">Nobody</div>'}
-          </div>
-        </div>
-      </div>
-    `;
-    accordion.appendChild(block);
+    players.forEach(p => {
+      const v = sv[safeKey(p.name)];
+      if(v==='smash') totalSmash++;
+      if(v==='pass')  totalPass++;
+    });
   }
 
   document.getElementById('statRow').innerHTML = `
@@ -1588,6 +1675,46 @@ function showResultsScreen(room, votesData){
     <div class="stat-box"><div class="stat-n sn-pass">${totalPass}</div><div class="stat-l">Total ❄️ Passes</div></div>
     <div class="stat-box"><div class="stat-n sn-acc">${players.length}</div><div class="stat-l">Players</div></div>
   `;
+
+  // Player stats cards
+  const list = document.getElementById('playerStatsList');
+  list.innerHTML = '';
+
+  // Sort by smash% descending
+  const sorted = [...players].sort((a,b) => {
+    const sa = getPlayerStats(a, room, votesData);
+    const sb = getPlayerStats(b, room, votesData);
+    return sb.smashPct - sa.smashPct;
+  });
+
+  sorted.forEach(p => {
+    const st = getPlayerStats(p, room, votesData);
+    const card = document.createElement('div');
+    card.className = 'pstat-card';
+
+    const pills = [];
+    pills.push(`<span class="pstat-pill pill-smash">🔥 ${st.smashes} smashed</span>`);
+    pills.push(`<span class="pstat-pill pill-pass">❄️ ${st.passes} passed</span>`);
+    if(st.maxStreak >= 3) pills.push(`<span class="pstat-pill pill-streak">⚡ ${st.maxStreak}x streak</span>`);
+    if(st.skipped > 0)    pills.push(`<span class="pstat-pill pill-skipped">💤 ${st.skipped} skipped</span>`);
+    if(st.altCount >= 4)  pills.push(`<span class="pstat-pill pill-chaos">🎲 ${st.altCount} flips</span>`);
+
+    card.innerHTML = `
+      <div class="pstat-top">
+        <div class="player-avatar ${p.color}" style="width:28px;height:28px;font-size:.62rem">${initials(p.name)}</div>
+        <div class="pstat-name">${p.name}</div>
+        <div class="pstat-title">${st.title}</div>
+      </div>
+      <div class="pstat-pills">${pills.join('')}</div>
+      <div class="pstat-bar-wrap">
+        <div class="pstat-bar-fill" style="width:${st.smashPct}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:.3rem;font-size:.62rem;color:var(--muted);letter-spacing:1px">
+        <span>SMASH RATE</span><span>${st.smashPct}%</span>
+      </div>
+    `;
+    list.appendChild(card);
+  });
 
   renderSmashBoard('resultsSmashBoard', room, votesData);
 }
