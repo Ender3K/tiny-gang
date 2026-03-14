@@ -25,7 +25,7 @@
     const db = getDatabase(app);
 
     const testRef = ref(db, ".info/connected");
-    const unsub = onValue(testRef, () => unsub(), (err) => {
+    let unsub = onValue(testRef, () => unsub && unsub(), (err) => {
       window._fbError = err.message;
       document.dispatchEvent(new Event("fb-error"));
     });
