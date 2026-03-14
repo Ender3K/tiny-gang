@@ -1537,7 +1537,7 @@ function listenVotes(){
   });
 }
 
-async function showResultsScreen(room, votesData){
+function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
 
@@ -1547,25 +1547,15 @@ async function showResultsScreen(room, votesData){
   let totalSmash=0, totalPass=0;
   const accordion = document.getElementById('slidesAccordion');
   accordion.innerHTML = '';
-
-  for (let s = 1; s <= room.totalSlides; s++) {
-    const pageId = room.slidePageIds?.[s - 1];
-    if (pageId) {
-      try {
-        await prefetchSlide(room.slidesUrl, pageId);
-      } catch (e) {
-        console.warn(`Could not preload slide ${s}`, e);
-      }
-    }
-  }
+  const slideId = getSlideId(room.slidesUrl);
 
   for(let s=1; s<=room.totalSlides; s++){
     const sv = votesData[s]||{};
     const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
     const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
     const pageId = room.slidePageIds?.[s - 1];
-    const thumbSrc = pageId && getSlideId(room.slidesUrl)
-      ? slideImageCache[`${getSlideId(room.slidesUrl)}::${pageId}`] || ''
+    const thumbSrc = pageId && slideId
+      ? slideImageCache[`${slideId}::${pageId}`] || ''
       : '';
 
     totalSmash += smashers.length;
@@ -1585,7 +1575,7 @@ async function showResultsScreen(room, votesData){
         </div>
       </div>
       <div class="slide-voters">
-        ${thumbSrc ? `<img src="${thumbSrc}" alt="Slide ${s}" class="results-slide-thumb" />` : ''}
+        <div class="results-thumb-wrap">${thumbSrc ? `<img src="${thumbSrc}" alt="Slide ${s}" class="results-slide-thumb" />` : `<div class="results-slide-thumb placeholder">Loading slide ${s}…</div>`}</div>
         <div class="sv-cols">
           <div>
             <div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>
@@ -1599,6 +1589,21 @@ async function showResultsScreen(room, votesData){
       </div>
     `;
     accordion.appendChild(block);
+
+    if (pageId && slideId && !thumbSrc) {
+      prefetchSlide(room.slidesUrl, pageId)
+        .then((dataUrl) => {
+          const wrap = block.querySelector('.results-thumb-wrap');
+          if (!wrap) return;
+          wrap.innerHTML = `<img src="${dataUrl}" alt="Slide ${s}" class="results-slide-thumb" />`;
+        })
+        .catch((e) => {
+          console.warn(`Could not load results thumbnail for slide ${s}`, e);
+          const wrap = block.querySelector('.results-thumb-wrap');
+          if (!wrap) return;
+          wrap.innerHTML = `<div class="results-slide-thumb placeholder">Preview unavailable</div>`;
+        });
+    }
   }
 
   document.getElementById('statRow').innerHTML = `
