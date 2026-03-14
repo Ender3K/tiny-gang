@@ -363,6 +363,32 @@ input:focus{
 .toggle-switch input:checked + .toggle-track{background:var(--accent)}
 .toggle-switch input:checked + .toggle-track::after{transform:translateX(20px)}
 
+/* Smaller toggle variant for in-game sidebar */
+.toggle-switch-sm{
+  position:relative;
+  width:36px;height:20px;
+  flex-shrink:0;
+}
+.toggle-switch-sm input{opacity:0;width:0;height:0;position:absolute}
+.toggle-switch-sm .toggle-track{
+  position:absolute;inset:0;
+  background:var(--border);
+  border-radius:999px;
+  cursor:pointer;
+  transition:background .2s;
+}
+.toggle-switch-sm .toggle-track::after{
+  content:'';
+  position:absolute;
+  top:3px;left:3px;
+  width:14px;height:14px;
+  border-radius:50%;
+  background:#fff;
+  transition:transform .2s;
+}
+.toggle-switch-sm input:checked + .toggle-track{background:var(--accent)}
+.toggle-switch-sm input:checked + .toggle-track::after{transform:translateX(16px)}
+
 .timer-duration-row{
   display:flex;
   align-items:center;
@@ -1254,9 +1280,9 @@ input:focus{
               <div class="tsi-row">
                 <span class="tsi-label">Timer</span>
                 <div class="tsi-right">
-                  <label class="toggle-switch" style="width:36px;height:20px">
+                  <label class="toggle-switch-sm">
                     <input type="checkbox" id="timerGameEnabled" onchange="onGameTimerToggle()" />
-                    <span class="toggle-track" style="border-radius:999px"></span>
+                    <span class="toggle-track"></span>
                   </label>
                 </div>
               </div>
