@@ -738,8 +738,6 @@ input:focus{
 .slide-block.open .sbh-arrow{transform:rotate(180deg)}
 .slide-voters{display:none;padding:.55rem 1rem 1rem;border-top:1px solid var(--border)}
 .slide-block.open .slide-voters{display:block}
-.results-thumb-wrap:empty{display:none}
-.results-slide-thumb{width:100%;display:block;border-radius:12px;margin-bottom:.8rem;border:1px solid var(--border);background:#000}
 .sv-cols{display:grid;grid-template-columns:1fr 1fr;gap:.55rem 1rem}
 .sv-col-title{font-size:.62rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem;font-weight:700}
 .sv-col-title.sm{color:var(--smash)} .sv-col-title.pa{color:var(--pass)}
@@ -1393,7 +1391,7 @@ function renderGame(room){
     loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
 
     for (let offset = 0; offset < 5; offset++) {
-      const upcomingPageId = room.slidePageIds?.[s - 1 + offset];
+      const upcomingPageId = room.slidePageIds?.[s + offset];
       if (upcomingPageId) {
         prefetchSlide(room.slidesUrl, upcomingPageId);
       }
@@ -1535,21 +1533,17 @@ function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
 
-  votesData = votesData || {};
   const players = getPlayers(room);
   document.getElementById('resSub').textContent = `${players.length} player${players.length!==1?'s':''} · ${room.totalSlides} slides`;
 
   let totalSmash=0, totalPass=0;
   const accordion = document.getElementById('slidesAccordion');
   accordion.innerHTML = '';
-  const slideId = getSlideId(room.slidesUrl);
 
   for(let s=1; s<=room.totalSlides; s++){
     const sv = votesData[s]||{};
     const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
     const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
-    const pageId = room.slidePageIds?.[s - 1];
-    const thumbSrc = pageId && slideId ? (slideImageCache[`${slideId}::${pageId}`] || '') : '';
 
     totalSmash += smashers.length;
     totalPass  += passers.length;
@@ -1568,7 +1562,6 @@ function showResultsScreen(room, votesData){
         </div>
       </div>
       <div class="slide-voters">
-        <div class="results-thumb-wrap">${thumbSrc ? `<img src="${thumbSrc}" alt="Slide ${s}" class="results-slide-thumb" />` : ''}</div>
         <div class="sv-cols">
           <div>
             <div class="sv-col-title sm">🔥 SMASH (${smashers.length})</div>
@@ -1582,15 +1575,6 @@ function showResultsScreen(room, votesData){
       </div>
     `;
     accordion.appendChild(block);
-
-    if(pageId && slideId && !thumbSrc){
-      prefetchSlide(room.slidesUrl, pageId).then((dataUrl) => {
-        const wrap = block.querySelector('.results-thumb-wrap');
-        if(wrap && wrap.childElementCount===0){
-          wrap.innerHTML = `<img src="${dataUrl}" alt="Slide ${s}" class="results-slide-thumb" />`;
-        }
-      }).catch(err => console.warn(`Could not load results thumbnail for slide ${s}`, err));
-    }
   }
 
   document.getElementById('statRow').innerHTML = `
