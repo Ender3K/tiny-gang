@@ -1262,7 +1262,7 @@ function getSmashTotals(room, votesData){
   players.forEach(p => totals[safeKey(p.name)] = 0);
 
   for(let s=1; s<=room.totalSlides; s++){
-    const slideVotes = votesData[s] || {};
+    const slideVotes = votesData[s] || votesData[String(s)] || {};
     players.forEach(p => {
       const key = safeKey(p.name);
       if(slideVotes[key] === 'smash') totals[key]++;
@@ -1541,7 +1541,7 @@ function showResultsScreen(room, votesData){
   accordion.innerHTML = '';
 
   for(let s=1; s<=room.totalSlides; s++){
-    const sv = votesData[s]||{};
+    const sv = votesData[s] || votesData[String(s)] || {};
     const smashers = players.filter(p=>sv[safeKey(p.name)]==='smash');
     const passers  = players.filter(p=>sv[safeKey(p.name)]==='pass');
 
