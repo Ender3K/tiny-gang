@@ -52,6 +52,8 @@
   --muted:#7373a5;
   --accent:#ffdd00;
   --green:#00e887;
+  --supersmash:#ff9900;
+  --veto:#9b59b6;
   --maxw:1280px;
 }
 
@@ -363,7 +365,6 @@ input:focus{
 .toggle-switch input:checked + .toggle-track{background:var(--accent)}
 .toggle-switch input:checked + .toggle-track::after{transform:translateX(20px)}
 
-/* Smaller toggle variant for in-game sidebar */
 .toggle-switch-sm{
   position:relative;
   width:36px;height:20px;
@@ -455,6 +456,27 @@ input:focus{
   letter-spacing:2px;
   color:var(--muted)
 }
+
+/* ── VETO badge in top bar ── */
+.veto-badge-topbar{
+  background:rgba(155,89,182,.15);
+  border:1px solid rgba(155,89,182,.4);
+  border-radius:999px;
+  color:var(--veto);
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.85rem;
+  letter-spacing:2px;
+  padding:.35rem .75rem;
+  display:flex;
+  align-items:center;
+  gap:.3rem;
+  animation:vetoPulse 1.5s ease infinite alternate;
+}
+@keyframes vetoPulse{
+  from{box-shadow:0 0 0 rgba(155,89,182,0)}
+  to{box-shadow:0 0 14px rgba(155,89,182,.35)}
+}
+
 .prog-wrap{
   flex:1 1 340px;
   max-width:620px;
@@ -470,7 +492,6 @@ input:focus{
   transition:width .35s ease
 }
 
-/* ── Countdown timer widget ── */
 .timer-widget{
   display:flex;
   align-items:center;
@@ -570,6 +591,35 @@ input:focus{
   transition:border-color .3s;
 }
 .slide-wrap.timer-urgent{border-color:rgba(255,45,85,.4)}
+
+/* ── Vetoed slide overlay ── */
+.slide-wrap.vetoed{
+  border-color:rgba(155,89,182,.5) !important;
+}
+.veto-overlay{
+  position:absolute;
+  inset:0;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  background:rgba(7,7,15,.82);
+  backdrop-filter:blur(3px);
+  z-index:10;
+  pointer-events:none;
+}
+.veto-overlay.visible{display:flex}
+.veto-overlay-icon{font-size:3rem}
+.veto-overlay-text{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.8rem;
+  letter-spacing:4px;
+  color:var(--veto);
+  text-shadow:0 0 20px rgba(155,89,182,.6);
+}
+.veto-overlay-sub{font-size:.75rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+
 #slideImg{
   width:100%;
   height:100%;
@@ -657,11 +707,16 @@ input:focus{
 }
 .slide-error-link:hover{background:rgba(255,255,255,.11)}
 
+/* ── Vote zone ── */
 .vote-zone{
   background:rgba(20,20,42,.9);
   border:1px solid var(--border);
   border-radius:18px;
   padding:14px;
+}
+.vote-zone.vetoed-zone{
+  border-color:rgba(155,89,182,.3);
+  background:rgba(155,89,182,.04);
 }
 .vote-zone-head{
   text-align:center;
@@ -693,6 +748,55 @@ input:focus{
 .vbtn-pass{background:rgba(0,170,255,.08);border-color:rgba(0,170,255,.35);color:var(--pass)}
 .vbtn-pass:hover{background:rgba(0,170,255,.18);border-color:var(--pass);transform:scale(1.02)}
 .vbtn:disabled{pointer-events:none;opacity:.45}
+
+/* ── Double Down button ── */
+.vbtn-doubledown{
+  background:rgba(255,153,0,.08);
+  border-color:rgba(255,153,0,.35);
+  color:var(--supersmash);
+  grid-column:1 / -1;
+  flex-direction:row;
+  justify-content:center;
+  padding:.65rem 1rem;
+  font-size:1.1rem;
+  gap:.5rem;
+  position:relative;
+  overflow:hidden;
+}
+.vbtn-doubledown:not(:disabled):hover{
+  background:rgba(255,153,0,.18);
+  border-color:var(--supersmash);
+  transform:scale(1.01);
+}
+.vbtn-doubledown::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,153,0,.08),transparent);
+  transform:translateX(-100%);
+  transition:transform .4s ease;
+}
+.vbtn-doubledown:not(:disabled):hover::before{transform:translateX(100%)}
+.dd-badge{
+  background:var(--supersmash);
+  color:#000;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.62rem;
+  letter-spacing:1.5px;
+  padding:.1rem .38rem;
+  border-radius:999px;
+  font-weight:900;
+}
+.dd-used{
+  font-size:.68rem;
+  color:var(--muted);
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  text-align:center;
+  padding:.4rem;
+  font-family:'DM Sans',sans-serif;
+}
+
 .voted-banner{
   border-radius:14px;
   padding:1rem;
@@ -705,6 +809,7 @@ input:focus{
 }
 .voted-banner.smash{background:rgba(255,45,85,.13);border:2px solid rgba(255,45,85,.35);color:var(--smash);display:block}
 .voted-banner.pass{background:rgba(0,170,255,.13);border:2px solid rgba(0,170,255,.35);color:var(--pass);display:block}
+.voted-banner.supersmash{background:rgba(255,153,0,.13);border:2px solid rgba(255,153,0,.5);color:var(--supersmash);display:block}
 
 .panel{
   background:rgba(20,20,42,.9);
@@ -748,6 +853,7 @@ input:focus{
 .voter-badge{font-size:.62rem;letter-spacing:1.5px;padding:.14rem .46rem;border-radius:999px;font-weight:700}
 .badge-smash{background:rgba(255,45,85,.15);color:var(--smash);border:1px solid rgba(255,45,85,.3)}
 .badge-pass{background:rgba(0,170,255,.15);color:var(--pass);border:1px solid rgba(0,170,255,.3)}
+.badge-supersmash{background:rgba(255,153,0,.18);color:var(--supersmash);border:1px solid rgba(255,153,0,.4)}
 .pending-dot{width:7px;height:7px;background:var(--border);border-radius:50%}
 
 .smashboard{
@@ -793,7 +899,7 @@ input:focus{
   letter-spacing:1.5px;
 }
 
-/* ── Master controls with timer settings ── */
+/* ── Master controls ── */
 .master-controls .mc-title{
   font-family:'Bebas Neue',sans-serif;
   font-size:.82rem;
@@ -832,7 +938,33 @@ input:focus{
 }
 .btn-end:hover{border-color:var(--smash);background:rgba(255,45,85,.07)}
 
-/* In-game timer settings for host */
+/* ── Veto button ── */
+.btn-veto{
+  background:transparent;
+  border:1px solid rgba(155,89,182,.35);
+  border-radius:12px;
+  color:var(--veto);
+  cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.85rem;
+  letter-spacing:2px;
+  padding:.55rem;
+  width:100%;
+  margin-top:.5rem;
+  transition:all .2s;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:.4rem;
+}
+.btn-veto:hover{border-color:var(--veto);background:rgba(155,89,182,.08)}
+.btn-veto.active{
+  background:rgba(155,89,182,.15);
+  border-color:var(--veto);
+}
+.btn-veto.active:hover{background:rgba(155,89,182,.07)}
+
+/* ── In-game timer settings ── */
 .timer-settings-inline{
   background:var(--surface);
   border:1px solid var(--border);
@@ -849,7 +981,7 @@ input:focus{
 }
 .tsi-row:last-child{margin-bottom:0}
 .tsi-label{font-size:.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
-.tsi-right{display:flex;align-items:center;gap:.4rem}
+.tsi-right{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
 .tsi-presets{display:flex;gap:.3rem}
 .tsi-preset{
   background:var(--card);
@@ -875,6 +1007,37 @@ input:focus{
   text-align:center;
 }
 .tsi-custom:focus{border-color:var(--accent);outline:none}
+
+/* ── Timer extend buttons ── */
+.timer-extend-row{
+  display:flex;
+  align-items:center;
+  gap:.35rem;
+  flex-wrap:wrap;
+}
+.extend-label{font-size:.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.btn-extend{
+  background:rgba(255,221,0,.06);
+  border:1px solid rgba(255,221,0,.25);
+  border-radius:8px;
+  color:var(--accent);
+  cursor:pointer;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.82rem;
+  letter-spacing:1.5px;
+  padding:.25rem .55rem;
+  transition:all .15s;
+  white-space:nowrap;
+}
+.btn-extend:hover{background:rgba(255,221,0,.14);border-color:var(--accent)}
+.btn-extend:active{transform:scale(.95)}
+
+/* ── Extend flash animation on timer display ── */
+@keyframes extendFlash{
+  0%{color:var(--accent);transform:scale(1.2)}
+  100%{color:inherit;transform:scale(1)}
+}
+.timer-display.extend-flash{animation:extendFlash .4s ease-out forwards}
 
 #results .screen-inner{max-width:1080px}
 .res-header{text-align:center}
@@ -975,6 +1138,22 @@ input:focus{
 .dot-s{background:var(--smash)} .dot-p{background:var(--pass)}
 .no-votes{color:var(--muted);font-size:.74rem;font-style:italic}
 
+/* ── Vetoed slide in results ── */
+.slide-block.is-vetoed{
+  border-color:rgba(155,89,182,.3);
+  opacity:.6;
+}
+.veto-chip{
+  background:rgba(155,89,182,.15);
+  border:1px solid rgba(155,89,182,.3);
+  color:var(--veto);
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.68rem;
+  letter-spacing:1.5px;
+  padding:.1rem .38rem;
+  border-radius:999px;
+}
+
 .player-stats-list{
   display:flex;
   flex-direction:column;
@@ -1034,6 +1213,7 @@ input:focus{
 .pill-streak{background:rgba(255,221,0,.1);color:var(--accent);border:1px solid rgba(255,221,0,.22)}
 .pill-skipped{background:rgba(115,115,165,.1);color:var(--muted);border:1px solid rgba(115,115,165,.2)}
 .pill-chaos{background:rgba(191,95,255,.12);color:#bf5fff;border:1px solid rgba(191,95,255,.25)}
+.pill-supersmash{background:rgba(255,153,0,.12);color:var(--supersmash);border:1px solid rgba(255,153,0,.3)}
 .pstat-bar-wrap{
   margin-top:.55rem;
   height:5px;
@@ -1183,13 +1363,11 @@ input:focus{
 }
 .emoji-preview-group{display:flex;gap:.2rem;font-size:1.1rem}
 
-/* ── CFG screen ── */
 #cfgScreen .screen-inner{max-width:860px}
 </style>
 </head>
 <body>
 
-<!-- Reaction burst layer -->
 <div id="reactionLayer"></div>
 
 <div class="screen hidden" id="cfgScreen">
@@ -1248,7 +1426,6 @@ input:focus{
       <div class="section-label">Players in room</div>
       <div class="players-grid" id="playersGrid"></div>
 
-      <!-- Timer config — only visible to host -->
       <div class="timer-config" id="timerConfigPanel" style="display:none">
         <div class="timer-config-title">⏱ Countdown Timer</div>
         <div class="timer-toggle-row">
@@ -1273,7 +1450,6 @@ input:focus{
         </div>
       </div>
 
-      <!-- Emoji picker — only visible to host -->
       <div class="emoji-config" id="emojiConfigPanel" style="display:none">
         <div class="emoji-config-title">😍 Reaction Emojis</div>
         <div class="emoji-themes" id="emojiThemes">
@@ -1318,7 +1494,9 @@ input:focus{
         <div class="slide-counter" id="slideCounter">1 / 10</div>
         <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
 
-        <!-- Timer widget -->
+        <!-- Veto badge (shown to all when slide is vetoed) -->
+        <div class="veto-badge-topbar hidden" id="vetoBadgeTopbar">🚫 UNRATED SLIDE</div>
+
         <div class="timer-widget hidden" id="timerWidget">
           <div class="timer-arc" id="timerArc">
             <svg viewBox="0 0 28 28">
@@ -1328,7 +1506,6 @@ input:focus{
             </svg>
           </div>
           <div class="timer-display" id="timerDisplay">15</div>
-          <!-- Host-only controls inside widget -->
           <div class="timer-controls-inline" id="timerInlineControls" style="display:none">
             <button class="tci-btn" id="timerPauseBtn" onclick="toggleTimerPause()" title="Pause/Resume">⏸</button>
             <button class="tci-btn" onclick="toggleTimerEnabled()" title="Disable timer" id="timerDisableBtn">✕</button>
@@ -1348,14 +1525,20 @@ input:focus{
               <div class="slide-error-icon">⚠️</div>
               <div class="slide-error-title">Could not load slide</div>
               <div class="slide-error-hint">
-                Make sure the presentation is set to <strong>Anyone with the link can view</strong>. Also confirm your Apps Script web app URL is correct and deployed.
+                Make sure the presentation is set to <strong>Anyone with the link can view</strong>.
               </div>
               <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
+            </div>
+            <!-- Veto overlay on slide -->
+            <div class="veto-overlay" id="vetoOverlay">
+              <div class="veto-overlay-icon">🚫</div>
+              <div class="veto-overlay-text">UNRATED</div>
+              <div class="veto-overlay-sub">This slide is excluded from stats</div>
             </div>
             <div class="slide-badge" id="slideBadge">01</div>
           </div>
 
-          <div class="vote-zone">
+          <div class="vote-zone" id="voteZone">
             <div class="vote-zone-head" id="voteHead">Cast your vote</div>
             <div class="vote-btns" id="voteBtns">
               <button class="vbtn vbtn-smash" onclick="castVote('smash')">
@@ -1364,7 +1547,15 @@ input:focus{
               <button class="vbtn vbtn-pass" onclick="castVote('pass')">
                 <span class="vi" id="passBtnIcon">❄️</span>PASS<span class="vs">NOPE</span>
               </button>
+              <!-- Double Down button — spans both columns -->
+              <button class="vbtn vbtn-doubledown" id="doubleDownBtn" onclick="castDoubleDown()">
+                <span>💥</span>
+                <span>DOUBLE DOWN</span>
+                <span class="dd-badge">×2</span>
+                <span class="vs" style="margin-left:.25rem">ONE-TIME SUPER SMASH</span>
+              </button>
             </div>
+            <div class="dd-used hidden" id="ddUsedNote">💥 Double Down already used this game</div>
             <div class="voted-banner" id="votedBanner"></div>
           </div>
         </div>
@@ -1393,7 +1584,6 @@ input:focus{
           <div class="panel master-controls" id="masterControls" style="display:none">
             <div class="mc-title">⚡ HOST CONTROLS</div>
 
-            <!-- In-game timer settings -->
             <div class="timer-settings-inline" id="timerSettingsInline">
               <div class="tsi-row">
                 <span class="tsi-label">Timer</span>
@@ -1417,9 +1607,22 @@ input:focus{
                     onchange="onGameCustomTimerChange()" oninput="onGameCustomTimerChange()" />
                 </div>
               </div>
+              <!-- Per-slide timer extend (only shown when timer active) -->
+              <div class="tsi-row" id="timerExtendRow" style="display:none">
+                <span class="tsi-label">Extend</span>
+                <div class="tsi-right timer-extend-row">
+                  <button class="btn-extend" onclick="extendTimer(10)">+10s</button>
+                  <button class="btn-extend" onclick="extendTimer(15)">+15s</button>
+                  <button class="btn-extend" onclick="extendTimer(30)">+30s</button>
+                </div>
+              </div>
             </div>
 
             <button class="btn-next" id="nextBtn" onclick="masterNext()">NEXT SLIDE →</button>
+
+            <!-- Veto button -->
+            <button class="btn-veto" id="vetoBtn" onclick="toggleVeto()">🚫 MARK AS UNRATED</button>
+
             <button class="btn-end" onclick="masterEnd()">END GAME</button>
           </div>
         </div>
@@ -1474,23 +1677,25 @@ let dbReady = false;
 let slideLoadToken = 0;
 
 // ── Timer state ──────────────────────────────────────────────────────────────
-const TIMER_CIRCUMFERENCE = 2 * Math.PI * 11; // r=11 → ~69.1
+const TIMER_CIRCUMFERENCE = 2 * Math.PI * 11;
 let timerState = {
   enabled: false,
-  duration: 15,       // seconds, configurable
+  duration: 15,
   remaining: 15,
   paused: false,
   intervalId: null,
 };
-
-// Preset & config for waiting-room setup
 let timerCfg = { enabled: false, duration: 15 };
 
-document.addEventListener('fb-ready', () => {
-  dbReady = true;
-  console.log('✅ Firebase connected');
-});
+// ── Double Down state ────────────────────────────────────────────────────────
+// Track whether this player has used their double down this game
+let myDoubleDownUsed = false;
 
+// ── Veto state ───────────────────────────────────────────────────────────────
+// vetoedSlides: Set of slide numbers marked unrated — synced from Firebase room.vetoed
+let vetoedSlides = {};
+
+document.addEventListener('fb-ready', () => { dbReady = true; });
 document.addEventListener('fb-error', () => {
   const msg = window._fbError || 'Unknown error';
   const warn = document.getElementById('cfgWarn');
@@ -1502,7 +1707,6 @@ document.addEventListener('fb-error', () => {
 });
 
 const WORDS = ['FIRE','WOLF','NOVA','FUNK','VIBE','RAZE','HYPE','GLOW','FLEX','BOLT','ROAR','APEX','ZEST','FLUX'];
-
 function genCode(){ return WORDS[Math.floor(Math.random()*WORDS.length)] + (10+Math.floor(Math.random()*90)); }
 function avatarClass(name){ let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))&0xff; return 'av'+(h%8); }
 function initials(n){ return n.slice(0,2).toUpperCase(); }
@@ -1532,42 +1736,22 @@ function jsonp(url) {
     const script = document.createElement("script");
     const sep = url.includes("?") ? "&" : "?";
     let cleaned = false;
-
     function cleanup() {
-      if (cleaned) return;
-      cleaned = true;
+      if (cleaned) return; cleaned = true;
       try { delete window[cbName]; } catch (_) {}
       if (script.parentNode) script.parentNode.removeChild(script);
     }
-
-    window[cbName] = (data) => {
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      cleanup();
-      reject(new Error("Apps Script request failed."));
-    };
-
+    window[cbName] = (data) => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error("Apps Script request failed.")); };
     script.src = `${url}${sep}callback=${cbName}`;
     document.head.appendChild(script);
-
-    setTimeout(() => {
-      if (!cleaned) {
-        cleanup();
-        reject(new Error("Apps Script request timed out."));
-      }
-    }, 10000);
+    setTimeout(() => { if (!cleaned) { cleanup(); reject(new Error("Apps Script request timed out.")); } }, 10000);
   });
 }
 
 async function fetchSlidePageIdsViaAppsScript(rawUrl) {
   const presentationId = getSlideId(rawUrl);
   if (!presentationId) throw new Error("Invalid Google Slides URL.");
-  if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_WEB_APP_URL_HERE"))
-    throw new Error("Set APPS_SCRIPT_WEBAPP_URL in index.html first.");
-
   const data = await jsonp(`${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`);
   if (!data || !data.ok) throw new Error(data?.error || "Could not fetch slide IDs.");
   return data;
@@ -1576,11 +1760,9 @@ async function fetchSlidePageIdsViaAppsScript(rawUrl) {
 async function fetchSlideImageDataUrl(rawUrl, pageId) {
   const presentationId = getSlideId(rawUrl);
   if (!presentationId) throw new Error("Invalid Google Slides URL.");
-
   const cacheKey = `${presentationId}::${pageId}`;
   if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
   if (slideImagePromises[cacheKey]) return slideImagePromises[cacheKey];
-
   slideImagePromises[cacheKey] = jsonp(
     `${APPS_SCRIPT_WEBAPP_URL}?action=image&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}`
   ).then((data) => {
@@ -1588,7 +1770,6 @@ async function fetchSlideImageDataUrl(rawUrl, pageId) {
     slideImageCache[cacheKey] = data.dataUrl;
     return data.dataUrl;
   }).finally(() => { delete slideImagePromises[cacheKey]; });
-
   return slideImagePromises[cacheKey];
 }
 
@@ -1598,7 +1779,6 @@ async function prefetchSlide(rawUrl, pageId) {
   const cacheKey = `${presentationId}::${pageId}`;
   if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
   if (slidePreloadPromises[cacheKey]) return slidePreloadPromises[cacheKey];
-
   slidePreloadPromises[cacheKey] = fetchSlideImageDataUrl(rawUrl, pageId)
     .then((dataUrl) => {
       const img = new Image();
@@ -1606,11 +1786,10 @@ async function prefetchSlide(rawUrl, pageId) {
       if (img.decode) return img.decode().catch(() => {}).then(() => dataUrl);
       return dataUrl;
     }).finally(() => { delete slidePreloadPromises[cacheKey]; });
-
   return slidePreloadPromises[cacheKey];
 }
 
-// ── Waiting-room timer config (host only) ────────────────────────────────────
+// ── Timer config (waiting room) ──────────────────────────────────────────────
 function onTimerToggle(){
   const en = document.getElementById('timerEnabled').checked;
   timerCfg.enabled = en;
@@ -1631,11 +1810,12 @@ function onCustomTimerChange(){
   }
 }
 
-// ── In-game timer settings (host only) ───────────────────────────────────────
+// ── In-game timer settings (host) ────────────────────────────────────────────
 function onGameTimerToggle(){
   const en = document.getElementById('timerGameEnabled').checked;
   timerState.enabled = en;
   document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
+  document.getElementById('timerExtendRow').style.display = en ? 'flex' : 'none';
   if(en){
     startSlideTimer();
     document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
@@ -1661,7 +1841,24 @@ function onGameCustomTimerChange(){
   }
 }
 
-// Toggle pause from the widget button (host only)
+// ── ✨ NEW: Per-slide timer extend ────────────────────────────────────────────
+function extendTimer(seconds){
+  if(!timerState.enabled) return;
+  timerState.remaining = Math.min(timerState.remaining + seconds, timerState.duration + 60);
+  updateTimerUI();
+
+  // Flash the timer display to acknowledge
+  const disp = document.getElementById('timerDisplay');
+  if(disp){
+    disp.classList.remove('extend-flash');
+    // Force reflow to restart animation
+    void disp.offsetWidth;
+    disp.classList.add('extend-flash');
+    setTimeout(() => disp.classList.remove('extend-flash'), 450);
+  }
+  showToast(`⏱ +${seconds}s added`);
+}
+
 function toggleTimerPause(){
   timerState.paused = !timerState.paused;
   const btn = document.getElementById('timerPauseBtn');
@@ -1669,16 +1866,15 @@ function toggleTimerPause(){
   btn.title = timerState.paused ? 'Resume' : 'Pause';
 }
 
-// Toggle timer enabled from the widget ✕ button
 function toggleTimerEnabled(){
   const en = !timerState.enabled;
   timerState.enabled = en;
   document.getElementById('timerGameEnabled').checked = en;
   document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
+  document.getElementById('timerExtendRow').style.display = en ? 'flex' : 'none';
   if(!en){
     stopSlideTimer();
-    const w = document.getElementById('timerWidget');
-    w.classList.add('hidden');
+    document.getElementById('timerWidget').classList.add('hidden');
   } else {
     startSlideTimer();
     document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
@@ -1688,21 +1884,17 @@ function toggleTimerEnabled(){
 function startSlideTimer(){
   stopSlideTimer();
   if(!timerState.enabled) return;
-
   timerState.remaining = timerState.duration;
   timerState.paused = false;
   const btn = document.getElementById('timerPauseBtn');
   if(btn) { btn.textContent = '⏸'; btn.title = 'Pause'; }
-
   updateTimerUI();
-
   timerState.intervalId = setInterval(() => {
     if(timerState.paused) return;
     timerState.remaining -= 1;
     updateTimerUI();
     if(timerState.remaining <= 0){
       stopSlideTimer();
-      // Auto-advance (host only)
       if(me.isMaster) masterNext();
     }
   }, 1000);
@@ -1723,20 +1915,92 @@ function updateTimerUI(){
   const widget = document.getElementById('timerWidget');
   const slideWrap = document.getElementById('slideWrap');
 
-  if(disp){
-    disp.textContent = r;
-    disp.classList.toggle('urgent', urgent);
-  }
+  if(disp){ disp.textContent = r; disp.classList.toggle('urgent', urgent); }
   if(arcFill){
-    const offset = TIMER_CIRCUMFERENCE * (1 - frac);
-    arcFill.style.strokeDashoffset = offset;
+    arcFill.style.strokeDashoffset = TIMER_CIRCUMFERENCE * (1 - frac);
     arcFill.classList.toggle('urgent', urgent);
   }
   if(widget) widget.classList.toggle('timer-urgent', urgent);
   if(slideWrap) slideWrap.classList.toggle('timer-urgent', urgent);
 }
 
-// ── Reaction animations ───────────────────────────────────────────────────────
+// ── ✨ NEW: Veto Power ────────────────────────────────────────────────────────
+// vetoedSlides is synced from room.vetoed (object of {slideNum: true})
+async function toggleVeto(){
+  if(!me.isMaster) return;
+  const snap = await window._get(roomRef(me.code));
+  if(!snap.exists()) return;
+  const room = snap.val();
+  const s = room.currentSlide;
+  const already = (room.vetoed || {})[s] === true;
+  const update = {};
+  update[`vetoed/${s}`] = already ? null : true;
+  await window._update(roomRef(me.code), update);
+  showToast(already ? '✅ Veto removed' : '🚫 Slide marked unrated');
+}
+
+function applyVetoUI(isVetoed){
+  const overlay = document.getElementById('vetoOverlay');
+  const badge = document.getElementById('vetoBadgeTopbar');
+  const slideWrap = document.getElementById('slideWrap');
+  const voteZone = document.getElementById('voteZone');
+  const vetoBtn = document.getElementById('vetoBtn');
+  const voteBtns = document.getElementById('voteBtns');
+
+  if(overlay) overlay.classList.toggle('visible', isVetoed);
+  if(badge) badge.classList.toggle('hidden', !isVetoed);
+  if(slideWrap) slideWrap.classList.toggle('vetoed', isVetoed);
+  if(voteZone) voteZone.classList.toggle('vetoed-zone', isVetoed);
+  if(vetoBtn && me.isMaster){
+    vetoBtn.classList.toggle('active', isVetoed);
+    vetoBtn.textContent = isVetoed ? '✅ REMOVE VETO' : '🚫 MARK AS UNRATED';
+  }
+  // Disable voting buttons when vetoed
+  if(voteBtns){
+    voteBtns.querySelectorAll('.vbtn').forEach(b => {
+      if(isVetoed) b.disabled = true;
+      else if(!myVotedSlides[_latestRoom?.currentSlide]) b.disabled = false;
+    });
+  }
+}
+
+// ── ✨ NEW: Double Down ───────────────────────────────────────────────────────
+// castDoubleDown: cast a 'supersmash' vote — counts as 2 in tallies
+async function castDoubleDown(){
+  if(myDoubleDownUsed) return;
+  const snap = await window._get(roomRef(me.code));
+  if(!snap.exists()) return;
+  const room = snap.val();
+  const s = room.currentSlide;
+  if(myVotedSlides[s]) return;
+  // Check veto
+  if((room.vetoed || {})[s]) return;
+
+  myDoubleDownUsed = true;
+  myVotedSlides[s] = 'supersmash';
+  await window._set(voteRef(me.code, s, safeKey(me.name)), 'supersmash');
+  markVotedUI('supersmash');
+  showToast('💥 DOUBLE DOWN! ×2 SMASH!', 2600);
+  spawnReaction('smash', 8);
+
+  // Persist flag so if they re-join they can't double down again (best-effort)
+  await window._set(window._ref(window._db, `ddused/${me.code}/${safeKey(me.name)}`), true);
+}
+
+function updateDoubleDownUI(){
+  const btn = document.getElementById('doubleDownBtn');
+  const note = document.getElementById('ddUsedNote');
+  if(!btn) return;
+  if(myDoubleDownUsed){
+    btn.classList.add('hidden');
+    note.classList.remove('hidden');
+  } else {
+    btn.classList.remove('hidden');
+    note.classList.add('hidden');
+  }
+}
+
+// ── Emoji themes & reactions ─────────────────────────────────────────────────
 const EMOJI_THEMES = {
   classic: { smash:['🔥','💯','😍','🤩','❤️‍🔥','👀','😘','💘','🥵','✨'], pass:['❄️','🥶','💀','😬','🙅','🚫','😐','😑','💨','⛔'] },
   hearts:  { smash:['💘','💖','💗','❤️','😍','🥰','💓','💞','😻','💝'], pass:['💔','😢','🙁','😞','😔','💧','🫠','😒','🤧','😿'] },
@@ -1745,7 +2009,6 @@ const EMOJI_THEMES = {
   animals: { smash:['🐶','🐱','🦊','🐼','🐨','🦁','🐯','🦋','🐬','🦄'], pass:['🐍','🦂','🦟','🪲','🐛','🦗','🐀','🦞','🪳','🦖'] },
 };
 
-// Active emoji sets (mutable, synced from room)
 let activeSmashEmojis = [...EMOJI_THEMES.classic.smash];
 let activePassEmojis  = [...EMOJI_THEMES.classic.pass];
 let emojiCfg = { theme: 'classic', customSmash: '', customPass: '' };
@@ -1755,11 +2018,9 @@ function applyEmojiTheme(theme){
   document.querySelectorAll('#emojiThemes .theme-btn').forEach(b=>{
     b.classList.toggle('active', b.getAttribute('onclick').includes(`'${theme}'`));
   });
-
   const customRow = document.getElementById('emojiCustomRow');
   if(theme === 'custom'){
     customRow.style.display = 'grid';
-    // prefill inputs if empty
     if(!document.getElementById('smashEmojiInput').value)
       document.getElementById('smashEmojiInput').value = EMOJI_THEMES.classic.smash.join(' ');
     if(!document.getElementById('passEmojiInput').value)
@@ -1767,152 +2028,100 @@ function applyEmojiTheme(theme){
     onCustomEmojiChange();
   } else {
     customRow.style.display = 'none';
-    emojiCfg.customSmash = '';
-    emojiCfg.customPass  = '';
+    emojiCfg.customSmash = ''; emojiCfg.customPass = '';
     updateEmojiPreview(EMOJI_THEMES[theme].smash, EMOJI_THEMES[theme].pass);
   }
 }
-
 function onCustomEmojiChange(){
   const rawSmash = document.getElementById('smashEmojiInput').value;
   const rawPass  = document.getElementById('passEmojiInput').value;
-  // Parse emoji by splitting on whitespace and filtering non-empty
   const smashArr = parseEmojiInput(rawSmash);
   const passArr  = parseEmojiInput(rawPass);
-  emojiCfg.customSmash = rawSmash;
-  emojiCfg.customPass  = rawPass;
-  updateEmojiPreview(smashArr.length ? smashArr : EMOJI_THEMES.classic.smash,
-                     passArr.length  ? passArr  : EMOJI_THEMES.classic.pass);
+  emojiCfg.customSmash = rawSmash; emojiCfg.customPass = rawPass;
+  updateEmojiPreview(smashArr.length?smashArr:EMOJI_THEMES.classic.smash, passArr.length?passArr:EMOJI_THEMES.classic.pass);
 }
-
-function parseEmojiInput(str){
-  // Split on whitespace, filter empty strings
-  return str.trim().split(/\s+/).filter(s => s.length > 0);
-}
-
+function parseEmojiInput(str){ return str.trim().split(/\s+/).filter(s=>s.length>0); }
 function updateEmojiPreview(smashArr, passArr){
   const ps = document.getElementById('previewSmash');
   const pp = document.getElementById('previewPass');
   if(ps) ps.textContent = smashArr.slice(0,6).join(' ');
   if(pp) pp.textContent = passArr.slice(0,6).join(' ');
 }
-
 function resolveEmojiSets(){
-  // Returns the actual arrays to use, from emojiCfg
   if(emojiCfg.theme === 'custom'){
     const s = parseEmojiInput(emojiCfg.customSmash);
     const p = parseEmojiInput(emojiCfg.customPass);
-    return {
-      smash: s.length ? s : EMOJI_THEMES.classic.smash,
-      pass:  p.length ? p : EMOJI_THEMES.classic.pass,
-    };
+    return { smash:s.length?s:EMOJI_THEMES.classic.smash, pass:p.length?p:EMOJI_THEMES.classic.pass };
   }
   return EMOJI_THEMES[emojiCfg.theme] || EMOJI_THEMES.classic;
 }
-
-
 function updateVoteBtnIcons(){
   const si = document.getElementById('smashBtnIcon');
   const pi = document.getElementById('passBtnIcon');
   if(si) si.textContent = activeSmashEmojis[0] || '🔥';
   if(pi) pi.textContent = activePassEmojis[0]  || '❄️';
 }
-function spawnReaction(choice, count = 1){
+function spawnReaction(choice, count=1){
   const layer = document.getElementById('reactionLayer');
   const emojis = choice === 'smash' ? activeSmashEmojis : activePassEmojis;
-
-  for(let i = 0; i < count; i++){
+  for(let i=0;i<count;i++){
     const el = document.createElement('div');
     el.className = 'reaction-emoji';
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-    el.textContent = emoji;
-
-    // Random position near bottom of viewport
-    const x = 10 + Math.random() * 80; // % of viewport width
-    const y = 70 + Math.random() * 20; // % of viewport height (bottom zone)
-    const vx = (Math.random() - 0.5) * 120; // horizontal drift px
-    const vy = -(160 + Math.random() * 200); // upward distance px
-    const dur = 1.4 + Math.random() * 0.8;
-    const rotStart = (Math.random() - 0.5) * 20 + 'deg';
-    const rotMid   = (Math.random() - 0.5) * 30 + 'deg';
-    const rotEnd   = (Math.random() - 0.5) * 45 + 'deg';
-    const delay = i * (80 + Math.random() * 60);
-
-    el.style.cssText = `
-      left:${x}vw;
-      top:${y}vh;
-      --vy:${vy}px;
-      --vx:${vx}px;
-      --dur:${dur}s;
-      --rot-start:${rotStart};
-      --rot-mid:${rotMid};
-      --rot-end:${rotEnd};
-      animation-delay:${delay}ms;
-      font-size:${1.4 + Math.random() * 1.2}rem;
-    `;
-
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    const x = 10+Math.random()*80, y = 70+Math.random()*20;
+    const vx = (Math.random()-.5)*120, vy = -(160+Math.random()*200);
+    const dur = 1.4+Math.random()*.8;
+    el.style.cssText = `left:${x}vw;top:${y}vh;--vy:${vy}px;--vx:${vx}px;--dur:${dur}s;
+      --rot-start:${(Math.random()-.5)*20}deg;--rot-mid:${(Math.random()-.5)*30}deg;--rot-end:${(Math.random()-.5)*45}deg;
+      animation-delay:${i*(80+Math.random()*60)}ms;font-size:${1.4+Math.random()*1.2}rem;`;
     layer.appendChild(el);
-    setTimeout(() => el.remove(), (dur * 1000) + delay + 200);
+    setTimeout(()=>el.remove(),(dur*1000)+(i*140)+200);
   }
 }
 
-// Track previous vote counts to only react to *new* votes
-let prevVoteCounts = { smash: 0, pass: 0 };
-
+let prevVoteCounts = { smash:0, pass:0 };
 function triggerVoteReactions(smashCount, passCount){
-  const newSmashes = smashCount - prevVoteCounts.smash;
-  const newPasses  = passCount  - prevVoteCounts.pass;
-
-  if(newSmashes > 0) spawnReaction('smash', Math.min(newSmashes * 2, 6));
-  if(newPasses  > 0) spawnReaction('pass',  Math.min(newPasses  * 2, 6));
-
+  const ns = smashCount - prevVoteCounts.smash;
+  const np = passCount  - prevVoteCounts.pass;
+  if(ns>0) spawnReaction('smash', Math.min(ns*2,6));
+  if(np>0) spawnReaction('pass',  Math.min(np*2,6));
   prevVoteCounts.smash = smashCount;
   prevVoteCounts.pass  = passCount;
 }
 
-// ── Room / game logic (mostly unchanged) ─────────────────────────────────────
+// ── Room / game logic ─────────────────────────────────────────────────────────
 async function createRoom(){
   hideErr('createErr');
   if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
-
   const name = document.getElementById('hostName').value.trim();
   const url  = document.getElementById('slidesUrl').value.trim();
-
   if(!name) return showErr('createErr','Enter your name.');
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
 
   const btn = document.querySelector('#entry .btn-fire');
-  btn.textContent = 'LOADING SLIDES…';
-  btn.disabled = true;
+  btn.textContent = 'LOADING SLIDES…'; btn.disabled = true;
 
   try {
     const deck = await fetchSlidePageIdsViaAppsScript(url);
-    const count = deck.totalSlides;
     const code = genCode();
     const room = {
-      code,
-      hostName:name,
-      slidesUrl:url,
-      totalSlides:count,
-      slidePageIds: deck.slidePageIds,
-      state:'waiting',
-      currentSlide:1,
-      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } }
+      code, hostName:name, slidesUrl:url,
+      totalSlides:deck.totalSlides, slidePageIds:deck.slidePageIds,
+      state:'waiting', currentSlide:1,
+      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } },
+      vetoed: {}
     };
-
     await window._set(roomRef(code), room);
     me = { name, code, isMaster:true };
     enterWaiting();
   } catch(e) {
-    console.error("createRoom failed", e);
-    showErr('createErr','❌ ' + e.message);
+    showErr('createErr','❌ '+e.message);
   } finally {
-    btn.textContent = 'CREATE ROOM 🔥';
-    btn.disabled = false;
+    btn.textContent = 'CREATE ROOM 🔥'; btn.disabled = false;
   }
 }
 
-async function loadSlide(rawUrl, slideNumber, totalSlides = 50, slidePageIds = []) {
+async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[]) {
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
@@ -1925,34 +2134,26 @@ async function loadSlide(rawUrl, slideNumber, totalSlides = 50, slidePageIds = [
   errEl.classList.remove('visible');
   errLink.href = rawUrl;
 
-  const pageId = slidePageIds[slideNumber - 1];
-  if (!pageId) {
-    loader.classList.add('hidden');
-    img.style.display = 'none';
-    errEl.classList.add('visible');
-    return;
-  }
+  const pageId = slidePageIds[slideNumber-1];
+  if(!pageId){ loader.classList.add('hidden'); img.style.display='none'; errEl.classList.add('visible'); return; }
 
   try {
     const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId);
-    if (token !== slideLoadToken) return;
-
+    if(token!==slideLoadToken) return;
     const preImg = new Image();
     preImg.src = dataUrl;
-    if (preImg.decode) { try { await preImg.decode(); } catch (_) {} }
-    if (token !== slideLoadToken) return;
-
-    img.onload = null; img.onerror = null;
+    if(preImg.decode){ try{await preImg.decode();}catch(_){} }
+    if(token!==slideLoadToken) return;
+    img.onload=null; img.onerror=null;
     img.src = dataUrl;
     img.classList.remove('loading');
     loader.classList.add('hidden');
     errEl.classList.remove('visible');
-  } catch (e) {
-    if (token !== slideLoadToken) return;
+  } catch(e) {
+    if(token!==slideLoadToken) return;
     loader.classList.add('hidden');
-    img.style.display = 'none';
+    img.style.display='none';
     errEl.classList.add('visible');
-    console.error("Slide load failed:", e);
   }
 }
 
@@ -1967,25 +2168,29 @@ let _latestVotes = {};
 function roomRef(code){ return window._ref(window._db, `rooms/${code}`); }
 function votesRef(code){ return window._ref(window._db, `votes/${code}`); }
 function voteRef(code,slide,playerKey){ return window._ref(window._db, `votes/${code}/${slide}/${playerKey}`); }
+function getPlayers(room){ return Object.values(room.players||{}); }
 
-function getPlayers(room){ return Object.values(room.players || {}); }
-
+// ── Smash totals: supersmash counts as 2 ────────────────────────────────────
 function getSmashTotals(room, votesData){
   const players = getPlayers(room);
   const totals = {};
+  const vetoed = room.vetoed || {};
   players.forEach(p => totals[safeKey(p.name)] = 0);
 
   for(let s=1; s<=room.totalSlides; s++){
+    if(vetoed[s]) continue; // Skip vetoed slides in totals
     const slideVotes = votesData[s] || votesData[String(s)] || {};
     players.forEach(p => {
       const key = safeKey(p.name);
-      if(slideVotes[key] === 'smash') totals[key]++;
+      const v = slideVotes[key];
+      if(v === 'smash') totals[key] += 1;
+      if(v === 'supersmash') totals[key] += 2; // Double Down = 2 points
     });
   }
 
   return players
     .map(p => ({ name:p.name, color:p.color, key:safeKey(p.name), smashes:totals[safeKey(p.name)]||0 }))
-    .sort((a,b) => b.smashes - a.smashes || a.name.localeCompare(b.name));
+    .sort((a,b) => b.smashes-a.smashes || a.name.localeCompare(b.name));
 }
 
 function renderSmashBoard(targetId, room, votesData){
@@ -2006,29 +2211,30 @@ function renderSmashBoard(targetId, room, votesData){
 }
 
 function stopListeners(){
-  if(unsubRoom){ unsubRoom(); unsubRoom = null; }
-  if(unsubVotes){ unsubVotes(); unsubVotes = null; }
+  if(unsubRoom){ unsubRoom(); unsubRoom=null; }
+  if(unsubVotes){ unsubVotes(); unsubVotes=null; }
 }
 
 async function joinRoom(){
   hideErr('joinErr');
   if(!dbReady) return showErr('joinErr','Firebase not ready — check your config.');
-
   const name = document.getElementById('joinName').value.trim();
   const code = document.getElementById('joinCode').value.trim().toUpperCase();
-
   if(!name) return showErr('joinErr','Enter your name.');
   if(!code) return showErr('joinErr','Enter a room code.');
 
   const snap = await window._get(roomRef(code));
   if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
-
   const room = snap.val();
   if(room.state==='done') return showErr('joinErr','This game has already ended.');
 
   await window._update(window._ref(window._db,`rooms/${code}/players`),{
     [safeKey(name)]:{ name, color:avatarClass(name) }
   });
+
+  // Check if player already used double down in this room
+  const ddSnap = await window._get(window._ref(window._db, `ddused/${code}/${safeKey(name)}`));
+  if(ddSnap.exists() && ddSnap.val()) myDoubleDownUsed = true;
 
   me = { name, code, isMaster:false };
   if(room.state==='playing') enterGame();
@@ -2038,19 +2244,14 @@ async function joinRoom(){
 function enterWaiting(){
   show('waiting');
   document.getElementById('displayCode').textContent = me.code;
-
   if(me.isMaster){
     document.getElementById('timerConfigPanel').style.display = '';
-    // sync UI to current timerCfg
     document.getElementById('timerEnabled').checked = timerCfg.enabled;
     document.getElementById('timerDurationRow').style.display = timerCfg.enabled ? 'flex' : 'none';
     document.getElementById('timerCustom').value = timerCfg.duration;
-
-    // Show emoji picker
     document.getElementById('emojiConfigPanel').style.display = '';
     applyEmojiTheme(emojiCfg.theme);
   }
-
   listenRoom();
 }
 
@@ -2058,7 +2259,6 @@ function renderWaiting(room){
   const players = getPlayers(room);
   const grid = document.getElementById('playersGrid');
   grid.innerHTML = '';
-
   players.forEach(p => {
     const chip = document.createElement('div');
     chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
@@ -2069,31 +2269,25 @@ function renderWaiting(room){
     `;
     grid.appendChild(chip);
   });
-
   const n = players.length;
   document.getElementById('playerCountLabel').textContent = n+' player'+(n!==1?'s':'');
-
   if(me.isMaster){
     const btn = document.getElementById('startBtn');
-    btn.style.display = '';
+    btn.style.display='';
     btn.textContent = `START WITH ${n} PLAYER${n!==1?'S':''} 🚀`;
     document.getElementById('waitingNote').textContent = 'Share the code · Press start when ready';
   } else {
-    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('startBtn').style.display='none';
     document.getElementById('waitingNote').textContent = 'Waiting for the host to start…';
   }
 }
 
 async function startGame(){
   const sets = resolveEmojiSets();
-  // Persist timer + emoji config into the room so all clients know
   await window._update(roomRef(me.code),{
-    state:'playing',
-    currentSlide:1,
-    timerEnabled: timerCfg.enabled,
-    timerDuration: timerCfg.duration,
-    emojiSmash: sets.smash,
-    emojiPass:  sets.pass,
+    state:'playing', currentSlide:1,
+    timerEnabled:timerCfg.enabled, timerDuration:timerCfg.duration,
+    emojiSmash:sets.smash, emojiPass:sets.pass,
   });
 }
 
@@ -2102,10 +2296,8 @@ function enterGame(){
   const isHost = me.isMaster;
   document.getElementById('masterControls').style.display = isHost ? '' : 'none';
   document.getElementById('voteHead').textContent = isHost ? 'Host can vote too' : 'Cast your vote';
-
-  // Show host inline controls inside timer widget
   if(isHost) document.getElementById('timerInlineControls').style.display = '';
-
+  updateDoubleDownUI();
   listenRoom();
   listenVotes();
 }
@@ -2113,54 +2305,52 @@ function enterGame(){
 function renderGame(room){
   const s = room.currentSlide;
   const tot = room.totalSlides;
+  const vetoed = room.vetoed || {};
 
   document.getElementById('slideCounter').textContent = `${s} / ${tot}`;
   document.getElementById('progFill').style.width = (((s-1)/tot)*100)+'%';
   document.getElementById('slideBadge').textContent = String(s).padStart(2,'0');
 
-  // Sync timer state from room if it changed (first render or host changed settings)
   if(typeof room.timerEnabled !== 'undefined'){
     timerState.enabled = room.timerEnabled;
     timerState.duration = room.timerDuration || 15;
   }
-
-  // Sync emoji sets from room (set by host at game start)
   if(Array.isArray(room.emojiSmash) && room.emojiSmash.length) activeSmashEmojis = room.emojiSmash;
   if(Array.isArray(room.emojiPass)  && room.emojiPass.length)  activePassEmojis  = room.emojiPass;
   updateVoteBtnIcons();
 
-  // Sync in-game timer controls for host
   if(me.isMaster){
     document.getElementById('timerGameEnabled').checked = timerState.enabled;
     document.getElementById('timerGameDurationRow').style.display = timerState.enabled ? 'flex' : 'none';
+    document.getElementById('timerExtendRow').style.display = timerState.enabled ? 'flex' : 'none';
     document.getElementById('timerGameCustom').value = timerState.duration;
-    // sync presets
     document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>{
       b.classList.toggle('active', parseInt(b.textContent)===timerState.duration);
     });
   }
 
+  // Sync veto state for this slide
+  vetoedSlides = vetoed;
+  const isVetoed = !!vetoed[s];
+  applyVetoUI(isVetoed);
+
   if(s !== lastSlide){
     lastSlide = s;
-
-    // Reset reaction counters on new slide
-    prevVoteCounts = { smash: 0, pass: 0 };
-
-    loadSlide(room.slidesUrl, s, tot, room.slidePageIds || []);
-
-    for (let offset = 0; offset < 5; offset++) {
-      const upcomingPageId = room.slidePageIds?.[s + offset];
-      if (upcomingPageId) prefetchSlide(room.slidesUrl, upcomingPageId);
+    prevVoteCounts = { smash:0, pass:0 };
+    loadSlide(room.slidesUrl, s, tot, room.slidePageIds||[]);
+    for(let offset=0;offset<5;offset++){
+      const pid = room.slidePageIds?.[s+offset];
+      if(pid) prefetchSlide(room.slidesUrl, pid);
     }
 
-    if(!myVotedSlides[s]){
+    if(!myVotedSlides[s] && !isVetoed){
       document.getElementById('votedBanner').className = 'voted-banner';
       document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
-    } else {
+    } else if(myVotedSlides[s]){
       markVotedUI(myVotedSlides[s]);
     }
+    updateDoubleDownUI();
 
-    // Start/reset timer on new slide
     const widget = document.getElementById('timerWidget');
     if(timerState.enabled){
       widget.classList.remove('hidden','timer-disabled');
@@ -2174,12 +2364,13 @@ function renderGame(room){
   if(me.isMaster){
     const nb = document.getElementById('nextBtn');
     nb.disabled = false;
-    nb.textContent = s>=tot?'SHOW RESULTS':'NEXT SLIDE →';
+    nb.textContent = s>=tot ? 'SHOW RESULTS' : 'NEXT SLIDE →';
   }
 
   renderSmashBoard('smashBoard', room, _latestVotes);
 }
 
+// ── Vote rendering: supersmash shows as ×2 in tally ─────────────────────────
 function renderVoters(room, votesData){
   const s = room.currentSlide;
   const slideVotes = votesData[s]||{};
@@ -2188,12 +2379,17 @@ function renderVoters(room, votesData){
   let smashes=0, passes=0;
 
   list.innerHTML = '';
-
   players.forEach(p => {
     const key = safeKey(p.name);
     const choice = slideVotes[key];
-    if(choice==='smash') smashes++;
-    if(choice==='pass')  passes++;
+    if(choice==='smash') smashes += 1;
+    if(choice==='supersmash') smashes += 2; // Double Down counts as 2
+    if(choice==='pass')  passes  += 1;
+
+    let badgeHtml = `<span class="pending-dot"></span>`;
+    if(choice==='smash')      badgeHtml = `<span class="voter-badge badge-smash">🔥 SMASH</span>`;
+    if(choice==='supersmash') badgeHtml = `<span class="voter-badge badge-supersmash">💥 ×2</span>`;
+    if(choice==='pass')       badgeHtml = `<span class="voter-badge badge-pass">❄️ PASS</span>`;
 
     const row = document.createElement('div');
     row.className = 'voter-row';
@@ -2202,18 +2398,13 @@ function renderVoters(room, votesData){
         <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.58rem">${initials(p.name)}</div>
         ${p.name}
       </div>
-      ${choice
-        ?`<span class="voter-badge ${choice==='smash'?'badge-smash':'badge-pass'}">${choice==='smash'?'🔥':'❄️'}</span>`
-        :`<span class="pending-dot"></span>`
-      }
+      ${badgeHtml}
     `;
     list.appendChild(row);
   });
 
   document.getElementById('tallySmash').textContent = smashes;
   document.getElementById('tallyPass').textContent  = passes;
-
-  // Trigger reactions for newly arrived votes
   triggerVoteReactions(smashes, passes);
 
   const myChoice = slideVotes[safeKey(me.name)];
@@ -2221,32 +2412,38 @@ function renderVoters(room, votesData){
     myVotedSlides[s] = myChoice;
     markVotedUI(myChoice);
   }
-
   renderSmashBoard('smashBoard', room, votesData);
 }
 
 function markVotedUI(choice){
   const banner = document.getElementById('votedBanner');
-  banner.className = 'voted-banner '+choice;
-  const e = choice==='smash' ? activeSmashEmojis[0] : activePassEmojis[0];
-  banner.innerHTML = choice==='smash' ? e+' SMASHED!' : e+' PASSED';
+  if(choice === 'supersmash'){
+    banner.className = 'voted-banner supersmash';
+    banner.innerHTML = '💥 DOUBLE DOWN!';
+  } else if(choice === 'smash'){
+    banner.className = 'voted-banner smash';
+    const e = activeSmashEmojis[0] || '🔥';
+    banner.innerHTML = e+' SMASHED!';
+  } else {
+    banner.className = 'voted-banner pass';
+    const e = activePassEmojis[0] || '❄️';
+    banner.innerHTML = e+' PASSED';
+  }
   document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=true);
 }
 
 async function castVote(choice){
   const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
-
   const room = snap.val();
   const s = room.currentSlide;
   if(myVotedSlides[s]) return;
+  if((room.vetoed||{})[s]) return; // Can't vote on vetoed slide
 
   myVotedSlides[s] = choice;
   await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
   markVotedUI(choice);
   showToast(choice==='smash'?'🔥 SMASHED!':'❄️ Passed');
-
-  // Local burst for own vote
   spawnReaction(choice, 4);
 }
 
@@ -2254,7 +2451,6 @@ async function masterNext(){
   stopSlideTimer();
   const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
-
   const room = snap.val();
   if(room.currentSlide >= room.totalSlides){
     await window._update(roomRef(me.code),{ state:'done' });
@@ -2274,8 +2470,7 @@ async function masterEnd(){
 }
 
 function listenRoom(){
-  if(unsubRoom){ unsubRoom(); unsubRoom = null; }
-
+  if(unsubRoom){ unsubRoom(); unsubRoom=null; }
   unsubRoom = window._onValue(roomRef(me.code), snap => {
     if(!snap.exists()) return;
     const room = snap.val();
@@ -2285,12 +2480,10 @@ function listenRoom(){
       renderWaiting(room);
     } else if(room.state==='playing'){
       if(document.getElementById('game').classList.contains('hidden')){
-        // Sync timer config from room before entering game
         if(typeof room.timerEnabled !== 'undefined'){
           timerState.enabled = room.timerEnabled;
           timerState.duration = room.timerDuration || 15;
         }
-        // Sync emoji sets for all clients
         if(room.emojiSmash) activeSmashEmojis = room.emojiSmash;
         if(room.emojiPass)  activePassEmojis  = room.emojiPass;
         enterGame();
@@ -2302,17 +2495,14 @@ function listenRoom(){
       if(!document.getElementById('results').classList.contains('hidden')) return;
       stopSlideTimer();
       window._get(votesRef(me.code)).then(vSnap => {
-        showResultsScreen(room, vSnap.exists() ? vSnap.val() : _latestVotes);
-      }).catch(() => {
-        showResultsScreen(room, _latestVotes);
-      });
+        showResultsScreen(room, vSnap.exists()?vSnap.val():_latestVotes);
+      }).catch(()=>showResultsScreen(room, _latestVotes));
     }
   });
 }
 
 function listenVotes(){
-  if(unsubVotes){ unsubVotes(); unsubVotes = null; }
-
+  if(unsubVotes){ unsubVotes(); unsubVotes=null; }
   unsubVotes = window._onValue(votesRef(me.code), snap => {
     _latestVotes = snap.exists()?snap.val():{};
     if(_latestRoom && _latestRoom.state==='playing'){
@@ -2325,45 +2515,47 @@ function listenVotes(){
 function getPlayerStats(player, room, votesData){
   const key = safeKey(player.name);
   const tot = room.totalSlides;
-  let smashes = 0, passes = 0, skipped = 0;
-  let maxStreak = 0, currentStreak = 0;
-  let altCount = 0;
-  let lastVote = null;
+  const vetoed = room.vetoed || {};
+  let smashes=0, passes=0, skipped=0, supersmashes=0;
+  let maxStreak=0, currentStreak=0, altCount=0, lastVote=null;
 
-  for(let s = 1; s <= tot; s++){
-    const sv = votesData[s] || votesData[String(s)] || {};
+  for(let s=1; s<=tot; s++){
+    if(vetoed[s]){ skipped++; continue; } // Vetoed = skip from stats
+    const sv = votesData[s]||votesData[String(s)]||{};
     const v = sv[key];
-    if(v === 'smash') smashes++;
-    else if(v === 'pass') passes++;
-    else { skipped++; currentStreak = 0; lastVote = null; continue; }
+    if(v==='smash') smashes++;
+    else if(v==='supersmash'){ smashes += 2; supersmashes++; }
+    else if(v==='pass') passes++;
+    else { skipped++; currentStreak=0; lastVote=null; continue; }
 
-    if(v === 'smash'){
+    const normV = (v==='supersmash')?'smash':v;
+    if(normV==='smash'){
       currentStreak++;
-      if(lastVote === 'pass') altCount++;
+      if(lastVote==='pass') altCount++;
     } else {
-      currentStreak = 0;
-      if(lastVote === 'smash') altCount++;
+      currentStreak=0;
+      if(lastVote==='smash') altCount++;
     }
-    if(currentStreak > maxStreak) maxStreak = currentStreak;
-    lastVote = v;
+    if(currentStreak>maxStreak) maxStreak=currentStreak;
+    lastVote=normV;
   }
 
-  const voted = smashes + passes;
-  const smashPct = voted > 0 ? Math.round((smashes / voted) * 100) : 0;
+  const voted = smashes+passes;
+  const smashPct = voted>0?Math.round((smashes/voted)*100):0;
 
-  let title = '';
-  if(voted === 0) title = '👻 Ghost';
-  else if(skipped > tot * 0.4) title = '🦥 Selective';
-  else if(smashPct === 100) title = '🔥 All In';
-  else if(smashPct === 0) title = '❄️ Ice Cold';
-  else if(smashPct >= 80) title = '💘 Simp';
-  else if(smashPct <= 20) title = '😤 Picky';
-  else if(altCount >= voted * 0.7) title = '🎲 Chaotic';
-  else if(maxStreak >= 5) title = '🚀 On Fire';
-  else if(Math.abs(smashPct - 50) <= 10) title = '⚖️ Balanced';
-  else title = '😏 Player';
+  let title='';
+  if(voted===0) title='👻 Ghost';
+  else if(supersmashes>0 && smashPct>=80) title='💥 All In';
+  else if(smashPct===100) title='🔥 All In';
+  else if(smashPct===0) title='❄️ Ice Cold';
+  else if(smashPct>=80) title='💘 Simp';
+  else if(smashPct<=20) title='😤 Picky';
+  else if(altCount>=voted*.7) title='🎲 Chaotic';
+  else if(maxStreak>=5) title='🚀 On Fire';
+  else if(Math.abs(smashPct-50)<=10) title='⚖️ Balanced';
+  else title='😏 Player';
 
-  return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title };
+  return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title, supersmashes };
 }
 
 function showResultsScreen(room, votesData){
@@ -2371,15 +2563,22 @@ function showResultsScreen(room, votesData){
   show('results');
 
   const players = getPlayers(room);
-  document.getElementById('resSub').textContent = `${players.length} player${players.length!==1?'s':''} · ${room.totalSlides} slides`;
+  const vetoed = room.vetoed || {};
+  const vetoedCount = Object.keys(vetoed).filter(k=>vetoed[k]).length;
+  const ratedSlides = room.totalSlides - vetoedCount;
+
+  document.getElementById('resSub').textContent =
+    `${players.length} player${players.length!==1?'s':''} · ${ratedSlides} rated slide${ratedSlides!==1?'s':''}${vetoedCount>0?` · ${vetoedCount} unrated`:''}`;
 
   let totalSmash=0, totalPass=0;
   for(let s=1; s<=room.totalSlides; s++){
-    const sv = votesData[s] || votesData[String(s)] || {};
-    players.forEach(p => {
+    if(vetoed[s]) continue;
+    const sv = votesData[s]||votesData[String(s)]||{};
+    players.forEach(p=>{
       const v = sv[safeKey(p.name)];
-      if(v==='smash') totalSmash++;
-      if(v==='pass')  totalPass++;
+      if(v==='smash') totalSmash+=1;
+      if(v==='supersmash') totalSmash+=2;
+      if(v==='pass') totalPass+=1;
     });
   }
 
@@ -2391,24 +2590,22 @@ function showResultsScreen(room, votesData){
 
   const list = document.getElementById('playerStatsList');
   list.innerHTML = '';
-
-  const sorted = [...players].sort((a,b) => {
-    const sa = getPlayerStats(a, room, votesData);
-    const sb = getPlayerStats(b, room, votesData);
-    return sb.smashPct - sa.smashPct;
+  const sorted = [...players].sort((a,b)=>{
+    const sa=getPlayerStats(a,room,votesData), sb=getPlayerStats(b,room,votesData);
+    return sb.smashPct-sa.smashPct;
   });
 
-  sorted.forEach(p => {
+  sorted.forEach(p=>{
     const st = getPlayerStats(p, room, votesData);
     const card = document.createElement('div');
     card.className = 'pstat-card';
-
     const pills = [];
     pills.push(`<span class="pstat-pill pill-smash">🔥 ${st.smashes} smashed</span>`);
     pills.push(`<span class="pstat-pill pill-pass">❄️ ${st.passes} passed</span>`);
-    if(st.maxStreak >= 3) pills.push(`<span class="pstat-pill pill-streak">⚡ ${st.maxStreak}x streak</span>`);
-    if(st.skipped > 0)    pills.push(`<span class="pstat-pill pill-skipped">💤 ${st.skipped} skipped</span>`);
-    if(st.altCount >= 4)  pills.push(`<span class="pstat-pill pill-chaos">🎲 ${st.altCount} flips</span>`);
+    if(st.supersmashes>0) pills.push(`<span class="pstat-pill pill-supersmash">💥 ${st.supersmashes}× doubled</span>`);
+    if(st.maxStreak>=3) pills.push(`<span class="pstat-pill pill-streak">⚡ ${st.maxStreak}x streak</span>`);
+    if(st.skipped>0)   pills.push(`<span class="pstat-pill pill-skipped">💤 ${st.skipped} skipped</span>`);
+    if(st.altCount>=4) pills.push(`<span class="pstat-pill pill-chaos">🎲 ${st.altCount} flips</span>`);
 
     card.innerHTML = `
       <div class="pstat-top">
@@ -2431,54 +2628,46 @@ function showResultsScreen(room, votesData){
 }
 
 async function leaveRoom(){
-  stopListeners();
-  stopSlideTimer();
+  stopListeners(); stopSlideTimer();
   if(!me.isMaster && me.code && me.name){
-    try{
-      await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null);
-    }catch(e){}
+    try{ await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null); }catch(e){}
   }
   goHome();
 }
 
 function goHome(){
-  stopListeners();
-  stopSlideTimer();
+  stopListeners(); stopSlideTimer();
   me = { name:'', code:'', isMaster:false };
-  lastSlide = -1;
-  myVotedSlides = {};
-  _latestRoom = null;
-  _latestVotes = {};
-  slideImageCache = {};
-  slideImagePromises = {};
-  slidePreloadPromises = {};
-  slideLoadToken = 0;
-  timerCfg = { enabled: false, duration: 15 };
-  timerState = { enabled:false, duration:15, remaining:15, paused:false, intervalId:null };
-  prevVoteCounts = { smash:0, pass:0 };
-  emojiCfg = { theme: 'classic', customSmash: '', customPass: '' };
-  activeSmashEmojis = [...EMOJI_THEMES.classic.smash];
-  activePassEmojis  = [...EMOJI_THEMES.classic.pass];
+  lastSlide=-1; myVotedSlides={}; _latestRoom=null; _latestVotes={};
+  slideImageCache={}; slideImagePromises={}; slidePreloadPromises={}; slideLoadToken=0;
+  timerCfg={enabled:false,duration:15};
+  timerState={enabled:false,duration:15,remaining:15,paused:false,intervalId:null};
+  prevVoteCounts={smash:0,pass:0};
+  emojiCfg={theme:'classic',customSmash:'',customPass:''};
+  activeSmashEmojis=[...EMOJI_THEMES.classic.smash];
+  activePassEmojis=[...EMOJI_THEMES.classic.pass];
+  vetoedSlides={};
+  myDoubleDownUsed=false;
   updateVoteBtnIcons();
 
   const img = document.getElementById('slideImg');
-  img.onload = null; img.onerror = null;
-  img.src = '';
-  img.className = 'loading';
-  img.style.display = 'block';
-
+  img.onload=null; img.onerror=null; img.src=''; img.className='loading'; img.style.display='block';
   document.getElementById('slideLoader').classList.add('hidden');
   document.getElementById('slideError').classList.remove('visible');
   document.getElementById('timerWidget').classList.add('hidden');
-  document.getElementById('timerEnabled').checked = false;
-  document.getElementById('timerDurationRow').style.display = 'none';
+  document.getElementById('timerEnabled').checked=false;
+  document.getElementById('timerDurationRow').style.display='none';
+  document.getElementById('vetoOverlay').classList.remove('visible');
+  document.getElementById('vetoBadgeTopbar').classList.add('hidden');
+  document.getElementById('ddUsedNote').classList.add('hidden');
+  document.getElementById('doubleDownBtn').classList.remove('hidden');
 
   show('entry');
 }
 
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', e=>{
   if(e.key==='Enter' && !document.getElementById('entry').classList.contains('hidden')){
-    document.getElementById('joinCode').value.trim() ? joinRoom() : createRoom();
+    document.getElementById('joinCode').value.trim()?joinRoom():createRoom();
   }
   if(!document.getElementById('game').classList.contains('hidden')){
     if(e.key==='ArrowLeft') castVote('smash');
@@ -2488,7 +2677,7 @@ document.addEventListener('keydown', e => {
 });
 
 document.getElementById('joinCode').addEventListener('input',function(){
-  this.value = this.value.toUpperCase();
+  this.value=this.value.toUpperCase();
 });
 </script>
 </body>
