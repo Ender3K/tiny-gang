@@ -2119,7 +2119,7 @@ function applyVetoUI(isVetoed){
   const vetoBtn = document.getElementById('vetoBtn');
   const voteBtns = document.getElementById('voteBtns');
 
-  if(overlay) overlay.classList.toggle('visible');
+  if(overlay) overlay.classList.toggle('visible', false);
   if(badge) badge.classList.toggle('hidden', !isVetoed);
   if(slideWrap) slideWrap.classList.toggle('vetoed', isVetoed);
   if(voteZone) voteZone.classList.toggle('vetoed-zone', isVetoed);
