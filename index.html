@@ -3119,14 +3119,18 @@ function renderAgreementsTracker(players, room, votesData){
   }
 
   panel.style.display = '';
-  const playerNames = players.map(p => p.name);
+  const playerNames = players.map(p => p.name).filter(Boolean);
 
-  const optionsHtml = playerNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
-  selectA.innerHTML = optionsHtml;
-  selectB.innerHTML = optionsHtml;
+  selectA.innerHTML = '';
+  selectB.innerHTML = '';
 
-  let defaultA = playerNames[0];
-  let defaultB = playerNames[1] || playerNames[0];
+  playerNames.forEach(name => {
+    selectA.add(new Option(name, name));
+    selectB.add(new Option(name, name));
+  });
+
+  let defaultA = playerNames[0] || '';
+  let defaultB = playerNames[1] || playerNames[0] || '';
 
   outer:
   for(let i = 0; i < players.length; i++){
@@ -3137,6 +3141,11 @@ function renderAgreementsTracker(players, room, votesData){
         break outer;
       }
     }
+  }
+
+  if(playerNames.length < 2){
+    panel.style.display = 'none';
+    return;
   }
 
   selectA.value = defaultA;
