@@ -1364,6 +1364,143 @@ input:focus{
 .emoji-preview-group{display:flex;gap:.2rem;font-size:1.1rem}
 
 #cfgScreen .screen-inner{max-width:860px}
+
+/* ── Contrarian Badge ── */
+.contrarian-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:.3rem;
+  background:rgba(191,95,255,.13);
+  border:1px solid rgba(191,95,255,.35);
+  border-radius:999px;
+  color:#bf5fff;
+  font-size:.6rem;
+  letter-spacing:1.5px;
+  padding:.12rem .45rem;
+  text-transform:uppercase;
+  font-weight:700;
+  white-space:nowrap;
+  animation:contrarianGlow 2s ease infinite alternate;
+}
+@keyframes contrarianGlow{
+  from{box-shadow:0 0 0 rgba(191,95,255,0)}
+  to{box-shadow:0 0 10px rgba(191,95,255,.3)}
+}
+
+/* ── Hall of Fame / Shame cards ── */
+.hall-section{
+  width:100%;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+@media(max-width:640px){.hall-section{grid-template-columns:1fr}}
+.hall-card{
+  background:rgba(20,20,42,.9);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:1.1rem 1.25rem;
+  display:flex;
+  flex-direction:column;
+  gap:.55rem;
+}
+.hall-card.fame{border-color:rgba(255,221,0,.3);background:rgba(255,221,0,.04)}
+.hall-card.shame{border-color:rgba(0,170,255,.25);background:rgba(0,170,255,.03)}
+.hall-label{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.82rem;
+  letter-spacing:2.5px;
+  text-transform:uppercase;
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+}
+.hall-card.fame .hall-label{color:var(--accent)}
+.hall-card.shame .hall-label{color:var(--pass)}
+.hall-slide-num{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:2rem;
+  line-height:1;
+  letter-spacing:1px;
+}
+.hall-card.fame .hall-slide-num{color:var(--smash)}
+.hall-card.shame .hall-slide-num{color:var(--pass)}
+.hall-desc{font-size:.76rem;color:var(--muted);line-height:1.55}
+.hall-voters{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.2rem}
+.hall-voter-chip{
+  font-size:.66rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:.14rem .5rem;
+  color:var(--text);
+  font-weight:600;
+}
+
+/* ── Agreements Tracker ── */
+.agreements-panel{
+  width:100%;
+  background:rgba(20,20,42,.9);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:1.1rem 1.25rem;
+}
+.agreements-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:.9rem;
+  letter-spacing:2px;
+  color:var(--green);
+  margin-bottom:.85rem;
+  display:flex;
+  align-items:center;
+  gap:.4rem;
+}
+.agreements-list{
+  display:flex;
+  flex-direction:column;
+  gap:.55rem;
+}
+.agreement-row{
+  display:flex;
+  align-items:center;
+  gap:.7rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:.6rem .8rem;
+}
+.agreement-names{
+  flex:1;
+  font-size:.84rem;
+  font-weight:700;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.agreement-pct{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.2rem;
+  letter-spacing:1px;
+  color:var(--green);
+  flex-shrink:0;
+}
+.agreement-bar-wrap{
+  width:100%;
+  height:4px;
+  background:var(--border);
+  border-radius:99px;
+  overflow:hidden;
+  margin-top:.4rem;
+}
+.agreement-bar-fill{
+  height:100%;
+  border-radius:99px;
+  background:linear-gradient(90deg,var(--green),var(--pass));
+  transition:width .4s ease;
+}
+.agreement-note{font-size:.65rem;color:var(--muted);margin-top:.25rem;letter-spacing:.5px}
+
 </style>
 </head>
 <body>
@@ -1639,6 +1776,15 @@ input:focus{
     </div>
 
     <div class="stat-row" id="statRow"></div>
+
+    <!-- Hall of Fame / Shame -->
+    <div class="hall-section" id="hallSection"></div>
+
+    <!-- Agreements Tracker -->
+    <div class="agreements-panel" id="agreementsPanel" style="display:none">
+      <div class="agreements-title">👯 AGREEMENT TRACKER</div>
+      <div class="agreements-list" id="agreementsList"></div>
+    </div>
 
     <div class="results-grid">
       <div class="results-side">
@@ -2558,6 +2704,175 @@ function getPlayerStats(player, room, votesData){
   return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title, supersmashes };
 }
 
+// ── Contrarian: player who disagrees with majority most often ─────────────────
+function getContrarianPlayer(players, room, votesData){
+  if(players.length < 2) return null;
+  const vetoed = room.vetoed || {};
+  let best = null, bestCount = -1;
+
+  players.forEach(p => {
+    const key = safeKey(p.name);
+    let disagreeCount = 0, eligible = 0;
+
+    for(let s = 1; s <= room.totalSlides; s++){
+      if(vetoed[s]) continue;
+      const sv = votesData[s] || votesData[String(s)] || {};
+      const myVote = sv[key];
+      if(!myVote) continue;
+
+      // Count majority vote among ALL players for this slide
+      let smashCount = 0, passCount = 0;
+      players.forEach(op => {
+        const ov = sv[safeKey(op.name)];
+        if(ov === 'smash' || ov === 'supersmash') smashCount++;
+        else if(ov === 'pass') passCount++;
+      });
+
+      if(smashCount === 0 && passCount === 0) continue;
+      const majoritySmash = smashCount >= passCount;
+      const mySmash = (myVote === 'smash' || myVote === 'supersmash');
+
+      eligible++;
+      if(majoritySmash !== mySmash) disagreeCount++;
+    }
+
+    if(eligible >= 3 && disagreeCount > bestCount){
+      bestCount = disagreeCount;
+      best = { name: p.name, disagreeCount, eligible };
+    }
+  });
+
+  return best ? best.name : null;
+}
+
+// ── Hall of Fame (most unanimous smash) & Shame (most unanimous pass) ─────────
+function renderHallOfFameShame(room, votesData, players){
+  const section = document.getElementById('hallSection');
+  section.innerHTML = '';
+  if(players.length === 0 || room.totalSlides === 0){ section.style.display='none'; return; }
+
+  const vetoed = room.vetoed || {};
+  let bestSmash = null, bestSmashScore = -1;
+  let bestPass  = null, bestPassScore  = -1;
+
+  for(let s = 1; s <= room.totalSlides; s++){
+    if(vetoed[s]) continue;
+    const sv = votesData[s] || votesData[String(s)] || {};
+    let smashVoters = [], passVoters = [], totalVoted = 0;
+
+    players.forEach(p => {
+      const v = sv[safeKey(p.name)];
+      if(v === 'smash' || v === 'supersmash'){ smashVoters.push(p.name); totalVoted++; }
+      else if(v === 'pass'){ passVoters.push(p.name); totalVoted++; }
+    });
+
+    if(totalVoted === 0) continue;
+
+    const smashScore = smashVoters.length / totalVoted;
+    const passScore  = passVoters.length  / totalVoted;
+
+    if(smashScore > bestSmashScore || (smashScore === bestSmashScore && smashVoters.length > (bestSmash?.voters?.length||0))){
+      bestSmashScore = smashScore;
+      bestSmash = { slide: s, voters: smashVoters, total: totalVoted, pct: Math.round(smashScore*100) };
+    }
+    if(passScore > bestPassScore || (passScore === bestPassScore && passVoters.length > (bestPass?.voters?.length||0))){
+      bestPassScore = passScore;
+      bestPass = { slide: s, voters: passVoters, total: totalVoted, pct: Math.round(passScore*100) };
+    }
+  }
+
+  section.style.display = '';
+
+  if(bestSmash){
+    const isUnanimous = bestSmash.pct === 100;
+    const card = document.createElement('div');
+    card.className = 'hall-card fame';
+    card.innerHTML = `
+      <div class="hall-label">🏆 HALL OF FAME — Most Smashed</div>
+      <div class="hall-slide-num">Slide ${bestSmash.slide}</div>
+      <div class="hall-desc">${isUnanimous ? 'Unanimous 🔥 — everyone smashed it!' : `${bestSmash.pct}% smash rate (${bestSmash.voters.length}/${bestSmash.total})`}</div>
+      <div class="hall-voters">${bestSmash.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
+    `;
+    section.appendChild(card);
+  }
+
+  if(bestPass){
+    const isUnanimous = bestPass.pct === 100;
+    const card = document.createElement('div');
+    card.className = 'hall-card shame';
+    card.innerHTML = `
+      <div class="hall-label">💀 HALL OF SHAME — Most Passed</div>
+      <div class="hall-slide-num">Slide ${bestPass.slide}</div>
+      <div class="hall-desc">${isUnanimous ? 'Universal ❄️ — nobody wanted it!' : `${bestPass.pct}% pass rate (${bestPass.voters.length}/${bestPass.total})`}</div>
+      <div class="hall-voters">${bestPass.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
+    `;
+    section.appendChild(card);
+  }
+
+  if(!bestSmash && !bestPass) section.style.display = 'none';
+}
+
+// ── Agreements Tracker: top player pairs by vote agreement ───────────────────
+function renderAgreementsTracker(players, room, votesData){
+  const panel = document.getElementById('agreementsPanel');
+  const list  = document.getElementById('agreementsList');
+  list.innerHTML = '';
+
+  if(players.length < 2){ panel.style.display='none'; return; }
+
+  const vetoed = room.vetoed || {};
+  const pairs = [];
+
+  for(let i = 0; i < players.length; i++){
+    for(let j = i+1; j < players.length; j++){
+      const ka = safeKey(players[i].name);
+      const kb = safeKey(players[j].name);
+      let agree = 0, total = 0;
+
+      for(let s = 1; s <= room.totalSlides; s++){
+        if(vetoed[s]) continue;
+        const sv = votesData[s] || votesData[String(s)] || {};
+        const va = sv[ka], vb = sv[kb];
+        if(!va || !vb) continue;
+        total++;
+        const normA = (va === 'supersmash') ? 'smash' : va;
+        const normB = (vb === 'supersmash') ? 'smash' : vb;
+        if(normA === normB) agree++;
+      }
+
+      if(total >= 3){
+        pairs.push({
+          nameA: players[i].name,
+          nameB: players[j].name,
+          agree, total,
+          pct: Math.round((agree / total) * 100)
+        });
+      }
+    }
+  }
+
+  if(pairs.length === 0){ panel.style.display='none'; return; }
+  pairs.sort((a,b) => b.pct - a.pct);
+  const top = pairs.slice(0, Math.min(5, pairs.length));
+
+  panel.style.display = '';
+
+  top.forEach(pair => {
+    const row = document.createElement('div');
+    row.innerHTML = `
+      <div class="agreement-row">
+        <div style="flex:1;min-width:0">
+          <div class="agreement-names">👯 ${pair.nameA} &amp; ${pair.nameB}</div>
+          <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${pair.pct}%"></div></div>
+          <div class="agreement-note">Agreed on ${pair.agree} of ${pair.total} slides</div>
+        </div>
+        <div class="agreement-pct">${pair.pct}%</div>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
 function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
@@ -2595,8 +2910,12 @@ function showResultsScreen(room, votesData){
     return sb.smashPct-sa.smashPct;
   });
 
+  // ── Compute contrarian (disagrees with majority most) ──────────────────────
+  const contrarianName = getContrarianPlayer(players, room, votesData);
+
   sorted.forEach(p=>{
     const st = getPlayerStats(p, room, votesData);
+    const isContrarian = (p.name === contrarianName);
     const card = document.createElement('div');
     card.className = 'pstat-card';
     const pills = [];
@@ -2612,6 +2931,7 @@ function showResultsScreen(room, votesData){
         <div class="player-avatar ${p.color}" style="width:28px;height:28px;font-size:.62rem">${initials(p.name)}</div>
         <div class="pstat-name">${p.name}</div>
         <div class="pstat-title">${st.title}</div>
+        ${isContrarian ? '<span class="contrarian-badge">🤡 Contrarian</span>' : ''}
       </div>
       <div class="pstat-pills">${pills.join('')}</div>
       <div class="pstat-bar-wrap">
@@ -2625,6 +2945,8 @@ function showResultsScreen(room, votesData){
   });
 
   renderSmashBoard('resultsSmashBoard', room, votesData);
+  renderHallOfFameShame(room, votesData, players);
+  renderAgreementsTracker(players, room, votesData);
 }
 
 async function leaveRoom(){
