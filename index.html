@@ -1463,7 +1463,7 @@ input:focus{
 }
 .hall-thumb-spinner .spinner{width:22px;height:22px;border-width:2px}
 
-/* ── Agreements Tracker ── */
+/* ── Head-to-Head Comparison ── */
 .agreements-panel{
   width:100%;
   background:rgba(20,20,42,.9);
@@ -1476,56 +1476,195 @@ input:focus{
   font-size:.9rem;
   letter-spacing:2px;
   color:var(--green);
-  margin-bottom:.85rem;
+  margin-bottom:.9rem;
   display:flex;
   align-items:center;
   gap:.4rem;
 }
-.agreements-list{
-  display:flex;
-  flex-direction:column;
-  gap:.55rem;
+.h2h-controls{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  gap:.8rem;
+  align-items:end;
+  margin-bottom:.95rem;
 }
-.agreement-row{
-  display:flex;
-  align-items:center;
+.h2h-select-wrap{display:flex;flex-direction:column;gap:.35rem}
+.h2h-label{
+  font-size:.68rem;
+  letter-spacing:1.2px;
+  text-transform:uppercase;
+  color:var(--muted);
+  font-weight:800;
+}
+.h2h-select{
+  width:100%;
+  appearance:none;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  border-radius:12px;
+  padding:.78rem .9rem;
+  font-weight:800;
+  outline:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+}
+.h2h-select:focus{
+  border-color:rgba(111,230,173,.45);
+  box-shadow:0 0 0 3px rgba(111,230,173,.14);
+}
+.h2h-vs{
+  align-self:center;
+  justify-self:center;
+  font-family:'Bebas Neue',sans-serif;
+  font-size:1.15rem;
+  letter-spacing:2px;
+  color:var(--muted);
+  padding-bottom:.1rem;
+}
+.h2h-summary{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:.7rem;
+  margin-bottom:.95rem;
+}
+.h2h-stat{
   background:var(--surface);
   border:1px solid var(--border);
-  border-radius:12px;
-  padding:.6rem .8rem;
+  border-radius:14px;
+  padding:.8rem .9rem;
 }
-.agreement-names{
-  flex:1;
-  font-size:.84rem;
-  font-weight:700;
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+.h2h-stat-label{
+  font-size:.66rem;
+  letter-spacing:1.2px;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:.35rem;
+  font-weight:800;
 }
-.agreement-pct{
+.h2h-stat-value{
   font-family:'Bebas Neue',sans-serif;
-  font-size:1.2rem;
+  font-size:1.35rem;
   letter-spacing:1px;
-  color:var(--green);
-  flex-shrink:0;
+  line-height:1;
 }
-.agreement-bar-wrap{
-  width:100%;
-  height:4px;
-  background:var(--border);
-  border-radius:99px;
+.h2h-stat-sub{
+  margin-top:.35rem;
+  font-size:.72rem;
+  color:var(--muted);
+}
+.h2h-table-wrap{
+  border:1px solid var(--border);
+  border-radius:16px;
   overflow:hidden;
-  margin-top:.4rem;
+  background:rgba(255,255,255,.03);
 }
-.agreement-bar-fill{
-  height:100%;
-  border-radius:99px;
-  background:linear-gradient(90deg,var(--green),var(--pass));
-  transition:width .4s ease;
+.h2h-table-head,.h2h-table-row{
+  display:grid;
+  grid-template-columns:100px minmax(0,1fr) 110px 110px 120px;
+  gap:.75rem;
+  align-items:center;
 }
-.agreement-note{font-size:.65rem;color:var(--muted);margin-top:.25rem;letter-spacing:.5px}
+.h2h-table-head{
+  padding:.8rem .95rem;
+  background:rgba(255,255,255,.04);
+  border-bottom:1px solid var(--border);
+  font-size:.68rem;
+  letter-spacing:1.2px;
+  text-transform:uppercase;
+  color:var(--muted);
+  font-weight:800;
+}
+.h2h-table-row{
+  padding:.82rem .95rem;
+  border-left:4px solid transparent;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.h2h-table-row:last-child{border-bottom:none}
+.h2h-table-row.is-agree{
+  background:rgba(111,230,173,.06);
+  border-left-color:rgba(111,230,173,.9);
+}
+.h2h-table-row.is-clash{
+  background:rgba(255,107,129,.07);
+  border-left-color:rgba(255,107,129,.92);
+}
+.h2h-table-row.is-veto{
+  background:rgba(255,209,102,.08);
+  border-left-color:rgba(255,209,102,.92);
+}
+.h2h-slide-name{
+  font-weight:900;
+  letter-spacing:.02em;
+}
+.h2h-result{
+  display:inline-flex;
+  align-items:center;
+  gap:.38rem;
+  font-weight:900;
+}
+.h2h-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:74px;
+  padding:.36rem .55rem;
+  border-radius:999px;
+  font-size:.72rem;
+  font-weight:900;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  border:1px solid rgba(255,255,255,.08);
+  background:rgba(255,255,255,.05);
+}
+.h2h-pill.vote-smash,.h2h-pill.vote-supersmash{
+  color:#ffd7df;
+  background:rgba(255,107,129,.12);
+  border-color:rgba(255,107,129,.26);
+}
+.h2h-pill.vote-pass{
+  color:#d9f7ff;
+  background:rgba(92,205,255,.10);
+  border-color:rgba(92,205,255,.22);
+}
+.h2h-pill.vote-veto{
+  color:#fff1ba;
+  background:rgba(255,209,102,.11);
+  border-color:rgba(255,209,102,.28);
+}
+.h2h-empty{
+  padding:1rem;
+  color:var(--muted);
+  font-size:.82rem;
+}
+@media (max-width: 860px){
+  .h2h-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .h2h-table-head,.h2h-table-row{
+    grid-template-columns:82px minmax(0,1fr) 90px 90px 100px;
+    gap:.55rem;
+  }
+}
+@media (max-width: 680px){
+  .h2h-controls{grid-template-columns:1fr;gap:.65rem}
+  .h2h-vs{display:none}
+  .h2h-table-head{
+    display:none;
+  }
+  .h2h-table-row{
+    grid-template-columns:1fr;
+    gap:.45rem;
+    padding:.85rem .85rem;
+  }
+  .h2h-cell::before{
+    content:attr(data-label);
+    display:block;
+    font-size:.62rem;
+    letter-spacing:1.1px;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:.18rem;
+    font-weight:800;
+  }
+}
 
 
 .kick-btn{
@@ -1852,10 +1991,27 @@ input:focus{
     <!-- Hall of Fame / Shame -->
     <div class="hall-section" id="hallSection"></div>
 
-    <!-- Agreements Tracker -->
+    <!-- Head-to-Head Comparison -->
     <div class="agreements-panel" id="agreementsPanel" style="display:none">
       <div class="agreements-title">⚔️ HEAD-TO-HEAD COMPARISON</div>
-      <div class="agreements-list" id="agreementsList"></div>
+
+      <div class="h2h-controls">
+        <div class="h2h-select-wrap">
+          <label class="h2h-label" for="h2hPlayerA">Player A</label>
+          <select id="h2hPlayerA" class="h2h-select"></select>
+        </div>
+        <div class="h2h-vs">VS</div>
+        <div class="h2h-select-wrap">
+          <label class="h2h-label" for="h2hPlayerB">Player B</label>
+          <select id="h2hPlayerB" class="h2h-select"></select>
+        </div>
+      </div>
+
+      <div class="h2h-summary" id="h2hSummary"></div>
+
+      <div class="h2h-table-wrap">
+        <div class="h2h-table" id="h2hTable"></div>
+      </div>
     </div>
 
     <div class="results-grid">
@@ -2948,113 +3104,191 @@ function renderHallOfFameShame(room, votesData, players){
   if(!bestSmash && !bestPass) section.style.display = 'none';
 }
 
-// ── Agreements Tracker: top player pairs by vote agreement ───────────────────
+// ── Head-to-Head Comparison ───────────────────────────────────────────────────
 function renderAgreementsTracker(players, room, votesData){
   const panel = document.getElementById('agreementsPanel');
-  const list  = document.getElementById('agreementsList');
-  list.innerHTML = '';
+  const selectA = document.getElementById('h2hPlayerA');
+  const selectB = document.getElementById('h2hPlayerB');
+  const summary = document.getElementById('h2hSummary');
+  const table = document.getElementById('h2hTable');
 
-  if(players.length < 2){ panel.style.display='none'; return; }
+  if(!panel || !selectA || !selectB || !summary || !table) return;
+  if(players.length < 2){
+    panel.style.display = 'none';
+    return;
+  }
 
-  const vetoed = room.vetoed || {};
-  const pairs = [];
+  panel.style.display = '';
+  const playerNames = players.map(p => p.name);
 
+  const optionsHtml = playerNames.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+  selectA.innerHTML = optionsHtml;
+  selectB.innerHTML = optionsHtml;
+
+  let defaultA = playerNames[0];
+  let defaultB = playerNames[1] || playerNames[0];
+
+  outer:
   for(let i = 0; i < players.length; i++){
-    for(let j = i+1; j < players.length; j++){
-      const ka = safeKey(players[i].name);
-      const kb = safeKey(players[j].name);
-      let agree = 0, disagree = 0, total = 0;
-
-      for(let s = 1; s <= room.totalSlides; s++){
-        if(vetoed[s]) continue;
-        const sv = votesData[s] || votesData[String(s)] || {};
-        const va = sv[ka], vb = sv[kb];
-        if(!va || !vb) continue;
-        total++;
-        const normA = (va === 'supersmash') ? 'smash' : va;
-        const normB = (vb === 'supersmash') ? 'smash' : vb;
-        if(normA === normB) agree++;
-        else disagree++;
-      }
-
-      if(total >= 2){
-        pairs.push({
-          nameA: players[i].name,
-          nameB: players[j].name,
-          agree, disagree, total,
-          pct: Math.round((agree / total) * 100),
-          disagreePct: Math.round((disagree / total) * 100)
-        });
+    for(let j = i + 1; j < players.length; j++){
+      if(players[i].name !== players[j].name){
+        defaultA = players[i].name;
+        defaultB = players[j].name;
+        break outer;
       }
     }
   }
 
-  if(pairs.length === 0){ panel.style.display='none'; return; }
+  selectA.value = defaultA;
+  selectB.value = defaultB;
 
-  const mostAligned = [...pairs].sort((a,b) => {
-    if(b.pct !== a.pct) return b.pct - a.pct;
-    return b.total - a.total;
-  })[0];
+  const vetoed = room.vetoed || {};
+  const voteLabel = (vote) => {
+    if(vote === 'supersmash') return 'SUPER';
+    if(vote === 'smash') return 'SMASH';
+    if(vote === 'pass') return 'PASS';
+    if(vote === 'veto') return 'VETO';
+    return '—';
+  };
+  const voteClass = (vote) => {
+    if(vote === 'supersmash') return 'vote-supersmash';
+    if(vote === 'smash') return 'vote-smash';
+    if(vote === 'pass') return 'vote-pass';
+    return 'vote-veto';
+  };
+  const normalizeVote = (vote) => vote === 'supersmash' ? 'smash' : vote;
 
-  const biggestClash = [...pairs].sort((a,b) => {
-    if(b.disagreePct !== a.disagreePct) return b.disagreePct - a.disagreePct;
-    return b.total - a.total;
-  })[0];
+  function buildComparison(nameA, nameB){
+    const keyA = safeKey(nameA);
+    const keyB = safeKey(nameB);
+    const rows = [];
+    let compared = 0;
+    let agreements = 0;
+    let smashA = 0;
+    let smashB = 0;
+    let passA = 0;
+    let passB = 0;
 
-  panel.style.display = '';
+    for(let s = 1; s <= room.totalSlides; s++){
+      const isVetoed = !!(vetoed[s] || vetoed[String(s)]);
+      const sv = votesData[s] || votesData[String(s)] || {};
+      const rawA = sv[keyA] || '';
+      const rawB = sv[keyB] || '';
 
-  if(mostAligned){
-    const row = document.createElement('div');
-    row.innerHTML = `
-      <div class="agreement-row">
-        <div style="flex:1;min-width:0">
-          <div class="agreement-names">🤝 ${mostAligned.nameA} &amp; ${mostAligned.nameB}</div>
-          <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${mostAligned.pct}%"></div></div>
-          <div class="agreement-note">Matched on ${mostAligned.agree} of ${mostAligned.total} rated slides</div>
-        </div>
-        <div class="agreement-pct">${mostAligned.pct}%</div>
-      </div>
-    `;
-    list.appendChild(row);
+      if(rawA === 'smash') smashA += 1;
+      if(rawA === 'supersmash') smashA += 2;
+      if(rawA === 'pass') passA += 1;
+
+      if(rawB === 'smash') smashB += 1;
+      if(rawB === 'supersmash') smashB += 2;
+      if(rawB === 'pass') passB += 1;
+
+      let status = 'clash';
+      let statusIcon = '💥';
+      let statusLabel = 'Clash';
+
+      if(isVetoed){
+        status = 'veto';
+        statusIcon = '🚫';
+        statusLabel = 'Vetoed';
+      } else {
+        const normA = normalizeVote(rawA);
+        const normB = normalizeVote(rawB);
+        if(normA && normB){
+          compared++;
+          if(normA === normB){
+            agreements++;
+            status = 'agree';
+            statusIcon = '✅';
+            statusLabel = 'Agreement';
+          }
+        }
+      }
+
+      rows.push({
+        slide: s,
+        voteA: isVetoed ? 'veto' : (rawA || '—'),
+        voteB: isVetoed ? 'veto' : (rawB || '—'),
+        status,
+        statusIcon,
+        statusLabel
+      });
+    }
+
+    const agreementPct = compared ? Math.round((agreements / compared) * 100) : 0;
+    const smashesMore = smashA === smashB ? 'Tie' : (smashA > smashB ? nameA : nameB);
+
+    return { rows, compared, agreements, agreementPct, smashA, smashB, passA, passB, smashesMore };
   }
 
-  if(biggestClash){
-    const row = document.createElement('div');
-    row.innerHTML = `
-      <div class="agreement-row">
-        <div style="flex:1;min-width:0">
-          <div class="agreement-names">⚡ ${biggestClash.nameA} vs ${biggestClash.nameB}</div>
-          <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${biggestClash.disagreePct}%;background:linear-gradient(90deg,#ff8a8a,#ff6b81)"></div></div>
-          <div class="agreement-note">Disagreed on ${biggestClash.disagree} of ${biggestClash.total} rated slides</div>
-        </div>
-        <div class="agreement-pct">${biggestClash.disagreePct}%</div>
+  function renderComparison(){
+    let nameA = selectA.value;
+    let nameB = selectB.value;
+
+    if(nameA === nameB){
+      const alt = playerNames.find(n => n !== nameA);
+      if(alt){
+        if(document.activeElement === selectA) selectB.value = alt;
+        else selectA.value = alt;
+        nameA = selectA.value;
+        nameB = selectB.value;
+      }
+    }
+
+    const data = buildComparison(nameA, nameB);
+
+    summary.innerHTML = `
+      <div class="h2h-stat">
+        <div class="h2h-stat-label">${escapeHtml(nameA)}</div>
+        <div class="h2h-stat-value">${data.smashA}🔥 / ${data.passA}❄️</div>
+        <div class="h2h-stat-sub">Smashes / Passes</div>
+      </div>
+      <div class="h2h-stat">
+        <div class="h2h-stat-label">${escapeHtml(nameB)}</div>
+        <div class="h2h-stat-value">${data.smashB}🔥 / ${data.passB}❄️</div>
+        <div class="h2h-stat-sub">Smashes / Passes</div>
+      </div>
+      <div class="h2h-stat">
+        <div class="h2h-stat-label">Overall agreement</div>
+        <div class="h2h-stat-value">${data.agreementPct}%</div>
+        <div class="h2h-stat-sub">${data.agreements} of ${data.compared} compared slides matched</div>
+      </div>
+      <div class="h2h-stat">
+        <div class="h2h-stat-label">Who smashes more</div>
+        <div class="h2h-stat-value">${data.smashesMore === 'Tie' ? 'Tie' : escapeHtml(data.smashesMore)}</div>
+        <div class="h2h-stat-sub">${data.smashesMore === 'Tie' ? 'Both players match' : 'Higher smash total overall'}</div>
       </div>
     `;
-    list.appendChild(row);
+
+    table.innerHTML = `
+      <div class="h2h-table-head">
+        <div>Slide</div>
+        <div>Result</div>
+        <div>${escapeHtml(nameA)}</div>
+        <div>${escapeHtml(nameB)}</div>
+        <div>Status</div>
+      </div>
+      ${data.rows.map(row => `
+        <div class="h2h-table-row is-${row.status}">
+          <div class="h2h-cell h2h-slide-name" data-label="Slide">Slide ${row.slide}</div>
+          <div class="h2h-cell" data-label="Result">
+            <span class="h2h-result">${row.statusIcon} <span>${row.statusLabel}</span></span>
+          </div>
+          <div class="h2h-cell" data-label="${escapeHtml(nameA)}">
+            <span class="h2h-pill ${voteClass(row.voteA)}">${voteLabel(row.voteA)}</span>
+          </div>
+          <div class="h2h-cell" data-label="${escapeHtml(nameB)}">
+            <span class="h2h-pill ${voteClass(row.voteB)}">${voteLabel(row.voteB)}</span>
+          </div>
+          <div class="h2h-cell" data-label="Status">${row.status === 'agree' ? 'Matched' : row.status === 'veto' ? 'Unrated' : 'Different picks'}</div>
+        </div>
+      `).join('') || '<div class="h2h-empty">No comparison data yet.</div>'}
+    `;
   }
 
-  const remaining = pairs
-    .filter(p => p !== mostAligned && p !== biggestClash)
-    .sort((a,b) => {
-      if(b.pct !== a.pct) return b.pct - a.pct;
-      return b.total - a.total;
-    })
-    .slice(0, 3);
-
-  remaining.forEach(pair => {
-    const row = document.createElement('div');
-    row.innerHTML = `
-      <div class="agreement-row">
-        <div style="flex:1;min-width:0">
-          <div class="agreement-names">👯 ${pair.nameA} &amp; ${pair.nameB}</div>
-          <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${pair.pct}%"></div></div>
-          <div class="agreement-note">Agreed on ${pair.agree} of ${pair.total} rated slides</div>
-        </div>
-        <div class="agreement-pct">${pair.pct}%</div>
-      </div>
-    `;
-    list.appendChild(row);
-  });
+  selectA.onchange = renderComparison;
+  selectB.onchange = renderComparison;
+  renderComparison();
 }
 
 function showResultsScreen(room, votesData){
