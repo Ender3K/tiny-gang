@@ -3178,11 +3178,33 @@ function renderAgreementsTracker(players, room, votesData){
     let passA = 0;
     let passB = 0;
 
+    const getVoteForPlayer = (slideVotes, playerName, safeName) => {
+      if(!slideVotes || typeof slideVotes !== 'object') return '';
+      if(slideVotes[safeName] != null) return slideVotes[safeName];
+      if(slideVotes[playerName] != null) return slideVotes[playerName];
+
+      const directMatch = Object.entries(slideVotes).find(([k]) => safeKey(k) === safeName);
+      if(directMatch) return directMatch[1];
+
+      for(const value of Object.values(slideVotes)){
+        if(value && typeof value === 'object'){
+          if(value.vote != null){
+            if(value.name === playerName || value.playerName === playerName || safeKey(value.name || value.playerName || '') === safeName){
+              return value.vote;
+            }
+          }
+          if(value[safeName] != null) return value[safeName];
+          if(value[playerName] != null) return value[playerName];
+        }
+      }
+      return '';
+    };
+
     for(let s = 1; s <= room.totalSlides; s++){
       const isVetoed = !!(vetoed[s] || vetoed[String(s)]);
       const sv = votesData[s] || votesData[String(s)] || {};
-      const rawA = sv[keyA] || '';
-      const rawB = sv[keyB] || '';
+      const rawA = getVoteForPlayer(sv, nameA, keyA);
+      const rawB = getVoteForPlayer(sv, nameB, keyB);
 
       if(rawA === 'smash') smashA += 1;
       if(rawA === 'supersmash') smashA += 2;
@@ -3211,6 +3233,10 @@ function renderAgreementsTracker(players, room, votesData){
             statusIcon = '✅';
             statusLabel = 'Agreement';
           }
+        } else if(!normA && !normB){
+          status = 'veto';
+          statusIcon = '🚫';
+          statusLabel = 'No votes';
         }
       }
 
