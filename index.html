@@ -2460,6 +2460,8 @@ async function kickPlayer(playerName){
     showToast('Could not kick player');
   }
 }
+window.kickPlayer = kickPlayer;
+
 
 function renderWaiting(room){
   const players = getPlayers(room);
@@ -2480,6 +2482,14 @@ function renderWaiting(room){
       ${crown}
       ${kick}
     `;
+    const kickBtn = chip.querySelector('[data-kick-player]');
+    if(kickBtn){
+      kickBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        kickPlayer(decodeURIComponent(kickBtn.dataset.kickPlayer));
+      });
+    }
     grid.appendChild(chip);
   });
   const n = players.length;
@@ -2614,9 +2624,17 @@ function renderVoters(room, votesData){
       </div>
       <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">
         ${badgeHtml}
-        ${canKick ? `<button class="kick-btn" onclick="kickPlayer(${JSON.stringify(p.name)})">KICK</button>` : ``}
+        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(p.name)}">KICK</button>` : ``}
       </div>
     `;
+    const kickBtn = row.querySelector('[data-kick-player]');
+    if(kickBtn){
+      kickBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        kickPlayer(decodeURIComponent(kickBtn.dataset.kickPlayer));
+      });
+    }
     list.appendChild(row);
   });
 
