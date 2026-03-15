@@ -1436,6 +1436,32 @@ input:focus{
   color:var(--text);
   font-weight:600;
 }
+.hall-thumb-wrap{
+  width:100%;
+  aspect-ratio:16/9;
+  border-radius:10px;
+  overflow:hidden;
+  background:#000;
+  border:1px solid var(--border);
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.hall-thumb{
+  width:100%;height:100%;
+  object-fit:contain;
+  display:block;
+  transition:opacity .3s;
+}
+.hall-thumb.loading{opacity:0}
+.hall-thumb-spinner{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:.7rem;letter-spacing:1.5px;text-transform:uppercase;
+  gap:8px;flex-direction:column;
+}
+.hall-thumb-spinner .spinner{width:22px;height:22px;border-width:2px}
 
 /* ── Agreements Tracker ── */
 .agreements-panel{
@@ -2783,32 +2809,57 @@ function renderHallOfFameShame(room, votesData, players){
 
   section.style.display = '';
 
-  if(bestSmash){
-    const isUnanimous = bestSmash.pct === 100;
+  function buildHallCard(data, type){
+    const isFame = type === 'fame';
+    const isUnanimous = data.pct === 100;
     const card = document.createElement('div');
-    card.className = 'hall-card fame';
+    card.className = `hall-card ${type}`;
+
+    const thumbId = `hall-thumb-${type}`;
+    const spinnerId = `hall-spinner-${type}`;
+
     card.innerHTML = `
-      <div class="hall-label">🏆 HALL OF FAME — Most Smashed</div>
-      <div class="hall-slide-num">Slide ${bestSmash.slide}</div>
-      <div class="hall-desc">${isUnanimous ? 'Unanimous 🔥 — everyone smashed it!' : `${bestSmash.pct}% smash rate (${bestSmash.voters.length}/${bestSmash.total})`}</div>
-      <div class="hall-voters">${bestSmash.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
+      <div class="hall-label">${isFame ? '🏆 HALL OF FAME — Most Smashed' : '💀 HALL OF SHAME — Most Passed'}</div>
+      <div class="hall-thumb-wrap">
+        <img class="hall-thumb loading" id="${thumbId}" alt="Slide ${data.slide}" />
+        <div class="hall-thumb-spinner" id="${spinnerId}">
+          <div class="spinner"></div>
+          <span>Loading slide…</span>
+        </div>
+      </div>
+      <div class="hall-slide-num">Slide ${data.slide}</div>
+      <div class="hall-desc">${isFame
+        ? (isUnanimous ? 'Unanimous 🔥 — everyone smashed it!' : `${data.pct}% smash rate (${data.voters.length}/${data.total})`)
+        : (isUnanimous ? 'Universal ❄️ — nobody wanted it!'    : `${data.pct}% pass rate (${data.voters.length}/${data.total})`)
+      }</div>
+      <div class="hall-voters">${data.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
     `;
-    section.appendChild(card);
+
+    // Async-load the thumbnail after card is in DOM
+    if(room.slidesUrl && room.slidePageIds){
+      const pageId = room.slidePageIds[data.slide - 1];
+      if(pageId){
+        fetchSlideImageDataUrl(room.slidesUrl, pageId).then(dataUrl => {
+          const img = document.getElementById(thumbId);
+          const spinner = document.getElementById(spinnerId);
+          if(!img) return;
+          img.onload = () => {
+            img.classList.remove('loading');
+            if(spinner) spinner.style.display = 'none';
+          };
+          img.src = dataUrl;
+        }).catch(() => {
+          const spinner = document.getElementById(spinnerId);
+          if(spinner) spinner.innerHTML = '<span style="color:var(--muted);font-size:.7rem">Could not load slide</span>';
+        });
+      }
+    }
+
+    return card;
   }
 
-  if(bestPass){
-    const isUnanimous = bestPass.pct === 100;
-    const card = document.createElement('div');
-    card.className = 'hall-card shame';
-    card.innerHTML = `
-      <div class="hall-label">💀 HALL OF SHAME — Most Passed</div>
-      <div class="hall-slide-num">Slide ${bestPass.slide}</div>
-      <div class="hall-desc">${isUnanimous ? 'Universal ❄️ — nobody wanted it!' : `${bestPass.pct}% pass rate (${bestPass.voters.length}/${bestPass.total})`}</div>
-      <div class="hall-voters">${bestPass.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
-    `;
-    section.appendChild(card);
-  }
-
+  if(bestSmash) section.appendChild(buildHallCard(bestSmash, 'fame'));
+  if(bestPass)  section.appendChild(buildHallCard(bestPass,  'shame'));
   if(!bestSmash && !bestPass) section.style.display = 'none';
 }
 
