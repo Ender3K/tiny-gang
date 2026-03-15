@@ -2084,6 +2084,15 @@ const WORDS = ['FIRE','WOLF','NOVA','FUNK','VIBE','RAZE','HYPE','GLOW','FLEX','B
 function genCode(){ return WORDS[Math.floor(Math.random()*WORDS.length)] + (10+Math.floor(Math.random()*90)); }
 function avatarClass(name){ let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))&0xff; return 'av'+(h%8); }
 function initials(n){ return n.slice(0,2).toUpperCase(); }
+function escapeHtml(str=''){
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
 function safeKey(n){ return n.replace(/[.#$/\[\]]/g,'_'); }
 
 function show(id){
@@ -2981,7 +2990,13 @@ function getContrarianPlayer(players, room, votesData){
     const key = safeKey(p.name);
     let disagreeCount = 0, eligible = 0;
 
-    for(let s = 1; s <= room.totalSlides; s++){
+    const maxSlides = Number(room.totalSlides) || Math.max(
+      0,
+      ...Object.keys(votesData||{}).map(k => Number(k) || 0),
+      ...Object.keys(vetoed||{}).map(k => Number(k) || 0)
+    );
+
+    for(let s = 1; s <= maxSlides; s++){
       if(vetoed[s]) continue;
       const sv = votesData[s] || votesData[String(s)] || {};
       const myVote = sv[key];
@@ -3200,7 +3215,13 @@ function renderAgreementsTracker(players, room, votesData){
       return '';
     };
 
-    for(let s = 1; s <= room.totalSlides; s++){
+    const maxSlides = Number(room.totalSlides) || Math.max(
+      0,
+      ...Object.keys(votesData||{}).map(k => Number(k) || 0),
+      ...Object.keys(vetoed||{}).map(k => Number(k) || 0)
+    );
+
+    for(let s = 1; s <= maxSlides; s++){
       const isVetoed = !!(vetoed[s] || vetoed[String(s)]);
       const sv = votesData[s] || votesData[String(s)] || {};
       const rawA = getVoteForPlayer(sv, nameA, keyA);
