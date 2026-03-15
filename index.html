@@ -1548,6 +1548,52 @@ input:focus{
 }
 .agreement-note{font-size:.65rem;color:var(--muted);margin-top:.25rem;letter-spacing:.5px}
 
+
+.kick-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:.42rem;
+  margin-left:.35rem;
+  padding:.48rem .72rem;
+  border-radius:999px;
+  border:1px solid rgba(255,107,129,.34);
+  background:linear-gradient(180deg, rgba(255,107,129,.18), rgba(255,107,129,.10));
+  color:#ffd5dc;
+  font-size:.74rem;
+  font-weight:900;
+  letter-spacing:.02em;
+  text-transform:uppercase;
+  cursor:pointer;
+  box-shadow:0 8px 18px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.06);
+  transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease, color .16s ease;
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+}
+.kick-btn span:first-child{
+  display:inline-grid;
+  place-items:center;
+  width:1.05rem;
+  height:1.05rem;
+  border-radius:999px;
+  background:rgba(255,107,129,.18);
+  border:1px solid rgba(255,107,129,.26);
+  font-size:.72rem;
+  line-height:1;
+}
+.kick-btn:hover{
+  transform:translateY(-1px);
+  border-color:rgba(255,107,129,.52);
+  background:linear-gradient(180deg, rgba(255,107,129,.26), rgba(255,107,129,.14));
+  box-shadow:0 12px 24px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.kick-btn:active{
+  transform:translateY(0);
+  box-shadow:0 6px 14px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.kick-btn:focus-visible{
+  outline:none;
+  box-shadow:0 0 0 3px rgba(255,107,129,.22), 0 10px 22px rgba(0,0,0,.22);
+}
 </style>
 </head>
 <body>
@@ -2482,14 +2528,6 @@ function renderWaiting(room){
       ${crown}
       ${kick}
     `;
-    const kickBtn = chip.querySelector('[data-kick-player]');
-    if(kickBtn){
-      kickBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        kickPlayer(decodeURIComponent(kickBtn.dataset.kickPlayer));
-      });
-    }
     grid.appendChild(chip);
   });
   const n = players.length;
@@ -2624,7 +2662,7 @@ function renderVoters(room, votesData){
       </div>
       <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">
         ${badgeHtml}
-        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(p.name)}">KICK</button>` : ``}
+        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(p.name)}" aria-label="Kick ${p.name}" title="Remove ${p.name} from the game"><span>✕</span><span>Kick</span></button>` : ``}
       </div>
     `;
     const kickBtn = row.querySelector('[data-kick-player]');
