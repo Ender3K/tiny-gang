@@ -300,7 +300,6 @@ input:focus{
   gap:.5rem;
   font-size:.86rem;
   font-weight:600;
-  position:relative;
 }
 .player-avatar{
   width:30px;height:30px;border-radius:50%;
@@ -311,67 +310,27 @@ input:focus{
   border-color:rgba(255,221,0,.4);
   background:rgba(255,221,0,.06)
 }
-
-/* ── Kick button on player chip ── */
-.kick-btn{
+.player-chip .kick-btn{
   margin-left:auto;
-  background:none;
-  border:none;
-  color:var(--muted);
-  cursor:pointer;
-  font-size:.75rem;
-  padding:.15rem .3rem;
-  border-radius:6px;
-  transition:color .15s,background .15s;
-  line-height:1;
-  flex-shrink:0;
-}
-.kick-btn:hover{color:var(--smash);background:rgba(255,45,85,.1)}
-
-/* ── In-game kick dropdown ── */
-.kick-panel{
-  background:var(--surface);
-  border:1px solid rgba(255,45,85,.25);
-  border-radius:12px;
-  padding:.65rem .75rem;
-  margin-bottom:.5rem;
-}
-.kick-panel-title{
-  font-family:'Bebas Neue',sans-serif;
-  font-size:.78rem;
-  letter-spacing:2px;
-  color:var(--smash);
-  margin-bottom:.5rem;
-}
-.kick-player-list{
-  display:flex;
-  flex-direction:column;
-  gap:.3rem;
-}
-.kick-player-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:.5rem;
-  background:var(--card);
-  border-radius:9px;
-  padding:.35rem .6rem;
-}
-.kick-player-name{font-size:.8rem;font-weight:600}
-.kick-player-btn{
-  background:rgba(255,45,85,.1);
-  border:1px solid rgba(255,45,85,.3);
-  border-radius:7px;
-  color:var(--smash);
-  cursor:pointer;
-  font-family:'Bebas Neue',sans-serif;
+  background:#2a1020;
+  color:#ff8ea1;
+  border:1px solid rgba(255,107,129,.55);
+  border-radius:10px;
+  padding:.34rem .62rem;
   font-size:.72rem;
-  letter-spacing:1.5px;
-  padding:.2rem .5rem;
-  transition:all .15s;
+  font-weight:700;
+  letter-spacing:.6px;
+  cursor:pointer;
+  transition:transform .12s ease, background .12s ease, border-color .12s ease;
 }
-.kick-player-btn:hover{background:rgba(255,45,85,.22);border-color:var(--smash)}
-
+.player-chip .kick-btn:hover{
+  background:#3a152a;
+  border-color:#ff6b81;
+  transform:translateY(-1px);
+}
+.player-chip .kick-btn:active{
+  transform:translateY(0);
+}
 .waiting-note{
   color:var(--muted);
   font-size:.82rem;
@@ -969,59 +928,6 @@ input:focus{
   color:var(--accent);
   margin-bottom:.6rem;
 }
-
-/* ── Jump to slide ── */
-.jump-row{
-  display:flex;
-  align-items:center;
-  gap:.5rem;
-  margin-bottom:.6rem;
-}
-.jump-label{
-  font-size:.7rem;
-  letter-spacing:1.5px;
-  text-transform:uppercase;
-  color:var(--muted);
-  white-space:nowrap;
-  flex-shrink:0;
-}
-.jump-input{
-  width:62px;
-  background:#07070f;
-  border:1px solid var(--border);
-  border-radius:9px;
-  color:var(--text);
-  font-family:'Bebas Neue',sans-serif;
-  font-size:1rem;
-  letter-spacing:1px;
-  padding:.3rem .5rem;
-  text-align:center;
-  outline:none;
-  transition:border-color .2s;
-}
-.jump-input:focus{border-color:var(--accent)}
-.jump-of{
-  font-size:.7rem;
-  color:var(--muted);
-  white-space:nowrap;
-  flex-shrink:0;
-}
-.btn-jump{
-  background:rgba(255,221,0,.08);
-  border:1px solid rgba(255,221,0,.3);
-  border-radius:9px;
-  color:var(--accent);
-  cursor:pointer;
-  font-family:'Bebas Neue',sans-serif;
-  font-size:.82rem;
-  letter-spacing:1.5px;
-  padding:.3rem .7rem;
-  transition:all .15s;
-  white-space:nowrap;
-  flex-shrink:0;
-}
-.btn-jump:hover{background:rgba(255,221,0,.16);border-color:var(--accent)}
-
 .btn-next{
   background:linear-gradient(135deg,#1a1a2e,#252545);
   border:1px solid var(--accent);
@@ -1642,199 +1548,6 @@ input:focus{
 }
 .agreement-note{font-size:.65rem;color:var(--muted);margin-top:.25rem;letter-spacing:.5px}
 
-/* ══════════════════════════════════════════════════════
-   ── HEAD-TO-HEAD ────────────────────────────────────
-   ══════════════════════════════════════════════════════ */
-.h2h-panel{
-  width:100%;
-  background:rgba(20,20,42,.9);
-  border:1px solid var(--border);
-  border-radius:18px;
-  padding:1.1rem 1.25rem;
-}
-.h2h-title{
-  font-family:'Bebas Neue',sans-serif;
-  font-size:.9rem;
-  letter-spacing:2px;
-  color:var(--accent);
-  margin-bottom:.85rem;
-  display:flex;
-  align-items:center;
-  gap:.4rem;
-}
-.h2h-selectors{
-  display:flex;
-  align-items:center;
-  gap:.55rem;
-  flex-wrap:wrap;
-  margin-bottom:1rem;
-}
-.h2h-select{
-  flex:1;
-  min-width:120px;
-  background:#07070f;
-  border:1px solid var(--border);
-  border-radius:10px;
-  color:var(--text);
-  font-family:'DM Sans',sans-serif;
-  font-size:.88rem;
-  padding:.55rem .8rem;
-  outline:none;
-  cursor:pointer;
-  transition:border-color .2s;
-}
-.h2h-select:focus{border-color:var(--accent)}
-.h2h-vs{
-  font-family:'Bebas Neue',sans-serif;
-  font-size:1.1rem;
-  letter-spacing:2px;
-  color:var(--muted);
-}
-.h2h-go{
-  background:linear-gradient(135deg,var(--smash),#ff6a00);
-  border:none;
-  border-radius:10px;
-  color:#fff;
-  cursor:pointer;
-  font-family:'Bebas Neue',sans-serif;
-  font-size:1rem;
-  letter-spacing:2px;
-  padding:.5rem 1.1rem;
-  transition:all .15s;
-  white-space:nowrap;
-}
-.h2h-go:hover{opacity:.9;transform:translateY(-1px)}
-
-/* Summary bar */
-.h2h-summary{
-  display:grid;
-  grid-template-columns:1fr auto 1fr;
-  align-items:center;
-  gap:.5rem;
-  padding:.75rem;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:14px;
-  margin-bottom:.85rem;
-}
-.h2h-sum-player{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:.25rem;
-}
-.h2h-sum-name{
-  font-weight:700;
-  font-size:.84rem;
-  text-align:center;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  max-width:130px;
-}
-.h2h-sum-pills{
-  display:flex;
-  gap:.3rem;
-  flex-wrap:wrap;
-  justify-content:center;
-}
-.h2h-sum-pill{
-  font-size:.64rem;
-  font-weight:700;
-  border-radius:999px;
-  padding:.15rem .5rem;
-  letter-spacing:.5px;
-}
-.h2h-sum-mid{
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  gap:.3rem;
-}
-.h2h-sum-agree{
-  font-family:'Bebas Neue',sans-serif;
-  font-size:1.6rem;
-  letter-spacing:2px;
-  color:var(--green);
-  line-height:1;
-}
-.h2h-sum-agree-label{
-  font-size:.6rem;
-  letter-spacing:2px;
-  text-transform:uppercase;
-  color:var(--muted);
-}
-.h2h-sum-disagree{
-  font-size:.7rem;
-  color:var(--smash);
-  font-weight:700;
-}
-
-/* Slide-by-slide table */
-.h2h-table-wrap{
-  max-height:380px;
-  overflow-y:auto;
-  display:flex;
-  flex-direction:column;
-  gap:.35rem;
-}
-.h2h-row{
-  display:grid;
-  grid-template-columns:2rem 1fr auto auto auto;
-  align-items:center;
-  gap:.5rem;
-  padding:.45rem .65rem;
-  border-radius:10px;
-  background:var(--surface);
-  border:1px solid var(--border);
-  font-size:.8rem;
-  transition:background .15s;
-}
-.h2h-row:hover{background:rgba(255,255,255,.03)}
-.h2h-row.agree{border-left:3px solid var(--green)}
-.h2h-row.disagree{border-left:3px solid var(--smash)}
-.h2h-row.vetoed-row{opacity:.45;border-left:3px solid var(--veto)}
-.h2h-slide-num{
-  font-family:'Bebas Neue',sans-serif;
-  font-size:.78rem;
-  letter-spacing:1px;
-  color:var(--muted);
-  text-align:center;
-}
-.h2h-slide-label{
-  font-size:.74rem;
-  color:var(--muted);
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.h2h-vote-chip{
-  font-size:.62rem;
-  font-weight:700;
-  border-radius:999px;
-  padding:.13rem .45rem;
-  letter-spacing:.5px;
-  white-space:nowrap;
-  text-align:center;
-  min-width:54px;
-}
-.h2h-chip-smash{background:rgba(255,45,85,.15);color:var(--smash);border:1px solid rgba(255,45,85,.3)}
-.h2h-chip-pass{background:rgba(0,170,255,.15);color:var(--pass);border:1px solid rgba(0,170,255,.3)}
-.h2h-chip-supersmash{background:rgba(255,153,0,.18);color:var(--supersmash);border:1px solid rgba(255,153,0,.4)}
-.h2h-chip-none{background:rgba(115,115,165,.1);color:var(--muted);border:1px solid rgba(115,115,165,.2)}
-.h2h-chip-veto{background:rgba(155,89,182,.12);color:var(--veto);border:1px solid rgba(155,89,182,.25)}
-.h2h-result-icon{
-  font-size:.9rem;
-  text-align:center;
-  width:1.2rem;
-}
-.h2h-empty{
-  color:var(--muted);
-  font-size:.82rem;
-  font-style:italic;
-  text-align:center;
-  padding:1rem 0;
-}
 </style>
 </head>
 <body>
@@ -1965,6 +1678,7 @@ input:focus{
         <div class="slide-counter" id="slideCounter">1 / 10</div>
         <div class="prog-wrap"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
 
+        <!-- Veto badge (shown to all when slide is vetoed) -->
         <div class="veto-badge-topbar hidden" id="vetoBadgeTopbar">🚫 UNRATED SLIDE</div>
 
         <div class="timer-widget hidden" id="timerWidget">
@@ -1999,6 +1713,7 @@ input:focus{
               </div>
               <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
             </div>
+            <!-- Veto overlay on slide -->
             <div class="veto-overlay" id="vetoOverlay">
               <div class="veto-overlay-icon">🚫</div>
               <div class="veto-overlay-text">UNRATED</div>
@@ -2016,6 +1731,7 @@ input:focus{
               <button class="vbtn vbtn-pass" onclick="castVote('pass')">
                 <span class="vi" id="passBtnIcon">❄️</span>PASS<span class="vs">NOPE</span>
               </button>
+              <!-- Double Down button — spans both columns -->
               <button class="vbtn vbtn-doubledown" id="doubleDownBtn" onclick="castDoubleDown()">
                 <span>💥</span>
                 <span>DOUBLE DOWN</span>
@@ -2052,12 +1768,6 @@ input:focus{
           <div class="panel master-controls" id="masterControls" style="display:none">
             <div class="mc-title">⚡ HOST CONTROLS</div>
 
-            <!-- ── Kick players (in-game) ── -->
-            <div class="kick-panel" id="kickPanel">
-              <div class="kick-panel-title">👟 KICK PLAYER</div>
-              <div class="kick-player-list" id="kickPlayerList"></div>
-            </div>
-
             <div class="timer-settings-inline" id="timerSettingsInline">
               <div class="tsi-row">
                 <span class="tsi-label">Timer</span>
@@ -2081,6 +1791,7 @@ input:focus{
                     onchange="onGameCustomTimerChange()" oninput="onGameCustomTimerChange()" />
                 </div>
               </div>
+              <!-- Per-slide timer extend (only shown when timer active) -->
               <div class="tsi-row" id="timerExtendRow" style="display:none">
                 <span class="tsi-label">Extend</span>
                 <div class="tsi-right timer-extend-row">
@@ -2091,16 +1802,11 @@ input:focus{
               </div>
             </div>
 
-            <!-- ── Jump to slide ── -->
-            <div class="jump-row">
-              <span class="jump-label">Jump to</span>
-              <input class="jump-input" type="number" id="jumpInput" min="1" value="1" placeholder="#" />
-              <span class="jump-of" id="jumpOf">/ ?</span>
-              <button class="btn-jump" onclick="masterJump()">GO →</button>
-            </div>
-
             <button class="btn-next" id="nextBtn" onclick="masterNext()">NEXT SLIDE →</button>
+
+            <!-- Veto button -->
             <button class="btn-veto" id="vetoBtn" onclick="toggleVeto()">🚫 MARK AS UNRATED</button>
+
             <button class="btn-end" onclick="masterEnd()">END GAME</button>
           </div>
         </div>
@@ -2118,20 +1824,10 @@ input:focus{
 
     <div class="stat-row" id="statRow"></div>
 
+    <!-- Hall of Fame / Shame -->
     <div class="hall-section" id="hallSection"></div>
 
-    <!-- ── HEAD-TO-HEAD ── -->
-    <div class="h2h-panel" id="h2hPanel" style="display:none">
-      <div class="h2h-title">⚔️ HEAD-TO-HEAD COMPARISON</div>
-      <div class="h2h-selectors">
-        <select class="h2h-select" id="h2hSelectA"></select>
-        <span class="h2h-vs">VS</span>
-        <select class="h2h-select" id="h2hSelectB"></select>
-        <button class="h2h-go" onclick="renderH2H()">COMPARE</button>
-      </div>
-      <div id="h2hResult"></div>
-    </div>
-
+    <!-- Agreements Tracker -->
     <div class="agreements-panel" id="agreementsPanel" style="display:none">
       <div class="agreements-title">👯 AGREEMENT TRACKER</div>
       <div class="agreements-list" id="agreementsList"></div>
@@ -2173,16 +1869,24 @@ let slidePreloadPromises = {};
 let dbReady = false;
 let slideLoadToken = 0;
 
+// ── Timer state ──────────────────────────────────────────────────────────────
 const TIMER_CIRCUMFERENCE = 2 * Math.PI * 11;
-let timerState = { enabled:false, duration:15, remaining:15, paused:false, intervalId:null };
-let timerCfg = { enabled:false, duration:15 };
-let myDoubleDownUsed = false;
-let vetoedSlides = {};
+let timerState = {
+  enabled: false,
+  duration: 15,
+  remaining: 15,
+  paused: false,
+  intervalId: null,
+};
+let timerCfg = { enabled: false, duration: 15 };
 
-// ── H2H state (stored so we can re-render without re-fetching) ────────────────
-let _h2hRoom = null;
-let _h2hVotes = null;
-let _h2hPlayers = null;
+// ── Double Down state ────────────────────────────────────────────────────────
+// Track whether this player has used their double down this game
+let myDoubleDownUsed = false;
+
+// ── Veto state ───────────────────────────────────────────────────────────────
+// vetoedSlides: Set of slide numbers marked unrated — synced from Firebase room.vetoed
+let vetoedSlides = {};
 
 document.addEventListener('fb-ready', () => { dbReady = true; });
 document.addEventListener('fb-error', () => {
@@ -2209,7 +1913,8 @@ function showErr(id,msg){ const el=document.getElementById(id); el.textContent=m
 function hideErr(id){ document.getElementById(id).style.display='none'; }
 function showToast(msg,dur=2200){
   const t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
+  t.textContent=msg;
+  t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),dur);
 }
 
@@ -2304,8 +2009,13 @@ function onGameTimerToggle(){
   timerState.enabled = en;
   document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
   document.getElementById('timerExtendRow').style.display = en ? 'flex' : 'none';
-  if(en){ startSlideTimer(); document.getElementById('timerWidget').classList.remove('hidden','timer-disabled'); }
-  else  { stopSlideTimer();  document.getElementById('timerWidget').classList.add('hidden'); }
+  if(en){
+    startSlideTimer();
+    document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
+  } else {
+    stopSlideTimer();
+    document.getElementById('timerWidget').classList.add('hidden');
+  }
 }
 function setGameTimerPreset(secs){
   timerState.duration = secs;
@@ -2324,152 +2034,166 @@ function onGameCustomTimerChange(){
   }
 }
 
+// ── ✨ NEW: Per-slide timer extend ────────────────────────────────────────────
 function extendTimer(seconds){
   if(!timerState.enabled) return;
   timerState.remaining = Math.min(timerState.remaining + seconds, timerState.duration + 60);
   updateTimerUI();
+
+  // Flash the timer display to acknowledge
   const disp = document.getElementById('timerDisplay');
-  if(disp){ disp.classList.remove('extend-flash'); void disp.offsetWidth; disp.classList.add('extend-flash'); setTimeout(()=>disp.classList.remove('extend-flash'),450); }
+  if(disp){
+    disp.classList.remove('extend-flash');
+    // Force reflow to restart animation
+    void disp.offsetWidth;
+    disp.classList.add('extend-flash');
+    setTimeout(() => disp.classList.remove('extend-flash'), 450);
+  }
   showToast(`⏱ +${seconds}s added`);
 }
+
 function toggleTimerPause(){
   timerState.paused = !timerState.paused;
   const btn = document.getElementById('timerPauseBtn');
   btn.textContent = timerState.paused ? '▶' : '⏸';
   btn.title = timerState.paused ? 'Resume' : 'Pause';
 }
+
 function toggleTimerEnabled(){
   const en = !timerState.enabled;
   timerState.enabled = en;
   document.getElementById('timerGameEnabled').checked = en;
   document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
   document.getElementById('timerExtendRow').style.display = en ? 'flex' : 'none';
-  if(!en){ stopSlideTimer(); document.getElementById('timerWidget').classList.add('hidden'); }
-  else   { startSlideTimer(); document.getElementById('timerWidget').classList.remove('hidden','timer-disabled'); }
+  if(!en){
+    stopSlideTimer();
+    document.getElementById('timerWidget').classList.add('hidden');
+  } else {
+    startSlideTimer();
+    document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
+  }
 }
+
 function startSlideTimer(){
   stopSlideTimer();
   if(!timerState.enabled) return;
   timerState.remaining = timerState.duration;
   timerState.paused = false;
   const btn = document.getElementById('timerPauseBtn');
-  if(btn){ btn.textContent='⏸'; btn.title='Pause'; }
+  if(btn) { btn.textContent = '⏸'; btn.title = 'Pause'; }
   updateTimerUI();
   timerState.intervalId = setInterval(() => {
     if(timerState.paused) return;
     timerState.remaining -= 1;
     updateTimerUI();
-    if(timerState.remaining <= 0){ stopSlideTimer(); if(me.isMaster) masterNext(); }
+    if(timerState.remaining <= 0){
+      stopSlideTimer();
+      if(me.isMaster) masterNext();
+    }
   }, 1000);
 }
+
 function stopSlideTimer(){
-  if(timerState.intervalId){ clearInterval(timerState.intervalId); timerState.intervalId=null; }
-}
-function updateTimerUI(){
-  const r=Math.max(0,timerState.remaining), total=timerState.duration;
-  const frac=total>0?r/total:0;
-  const urgent=r<=Math.min(5,Math.floor(total*.25));
-  const disp=document.getElementById('timerDisplay');
-  const arcFill=document.getElementById('timerArcFill');
-  const widget=document.getElementById('timerWidget');
-  const slideWrap=document.getElementById('slideWrap');
-  if(disp){ disp.textContent=r; disp.classList.toggle('urgent',urgent); }
-  if(arcFill){ arcFill.style.strokeDashoffset=TIMER_CIRCUMFERENCE*(1-frac); arcFill.classList.toggle('urgent',urgent); }
-  if(widget) widget.classList.toggle('timer-urgent',urgent);
-  if(slideWrap) slideWrap.classList.toggle('timer-urgent',urgent);
+  if(timerState.intervalId){ clearInterval(timerState.intervalId); timerState.intervalId = null; }
 }
 
-// ── Veto ─────────────────────────────────────────────────────────────────────
+function updateTimerUI(){
+  const r = Math.max(0, timerState.remaining);
+  const total = timerState.duration;
+  const frac = total > 0 ? r / total : 0;
+  const urgent = r <= Math.min(5, Math.floor(total * 0.25));
+
+  const disp = document.getElementById('timerDisplay');
+  const arcFill = document.getElementById('timerArcFill');
+  const widget = document.getElementById('timerWidget');
+  const slideWrap = document.getElementById('slideWrap');
+
+  if(disp){ disp.textContent = r; disp.classList.toggle('urgent', urgent); }
+  if(arcFill){
+    arcFill.style.strokeDashoffset = TIMER_CIRCUMFERENCE * (1 - frac);
+    arcFill.classList.toggle('urgent', urgent);
+  }
+  if(widget) widget.classList.toggle('timer-urgent', urgent);
+  if(slideWrap) slideWrap.classList.toggle('timer-urgent', urgent);
+}
+
+// ── ✨ NEW: Veto Power ────────────────────────────────────────────────────────
+// vetoedSlides is synced from room.vetoed (object of {slideNum: true})
 async function toggleVeto(){
   if(!me.isMaster) return;
-  const snap=await window._get(roomRef(me.code));
+  const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
-  const room=snap.val();
-  const s=room.currentSlide;
-  const already=(room.vetoed||{})[s]===true;
-  const update={};
-  update[`vetoed/${s}`]=already?null:true;
-  await window._update(roomRef(me.code),update);
-  showToast(already?'✅ Veto removed':'🚫 Slide marked unrated');
+  const room = snap.val();
+  const s = room.currentSlide;
+  const already = (room.vetoed || {})[s] === true;
+  const update = {};
+  update[`vetoed/${s}`] = already ? null : true;
+  await window._update(roomRef(me.code), update);
+  showToast(already ? '✅ Veto removed' : '🚫 Slide marked unrated');
 }
+
 function applyVetoUI(isVetoed){
-  const overlay=document.getElementById('vetoOverlay');
-  const badge=document.getElementById('vetoBadgeTopbar');
-  const slideWrap=document.getElementById('slideWrap');
-  const voteZone=document.getElementById('voteZone');
-  const vetoBtn=document.getElementById('vetoBtn');
-  const voteBtns=document.getElementById('voteBtns');
-  if(overlay) overlay.classList.toggle('visible',false);
-  if(badge) badge.classList.toggle('hidden',!isVetoed);
-  if(slideWrap) slideWrap.classList.toggle('vetoed',isVetoed);
-  if(voteZone) voteZone.classList.toggle('vetoed-zone',isVetoed);
-  if(vetoBtn&&me.isMaster){
-    vetoBtn.classList.toggle('active',isVetoed);
-    vetoBtn.textContent=isVetoed?'✅ REMOVE VETO':'🚫 MARK AS UNRATED';
+  const overlay = document.getElementById('vetoOverlay');
+  const badge = document.getElementById('vetoBadgeTopbar');
+  const slideWrap = document.getElementById('slideWrap');
+  const voteZone = document.getElementById('voteZone');
+  const vetoBtn = document.getElementById('vetoBtn');
+  const voteBtns = document.getElementById('voteBtns');
+
+  if(overlay) overlay.classList.toggle('visible', false);
+  if(badge) badge.classList.toggle('hidden', !isVetoed);
+  if(slideWrap) slideWrap.classList.toggle('vetoed', isVetoed);
+  if(voteZone) voteZone.classList.toggle('vetoed-zone', isVetoed);
+  if(vetoBtn && me.isMaster){
+    vetoBtn.classList.toggle('active', isVetoed);
+    vetoBtn.textContent = isVetoed ? '✅ REMOVE VETO' : '🚫 MARK AS UNRATED';
   }
+  // Disable voting buttons when vetoed
   if(voteBtns){
-    voteBtns.querySelectorAll('.vbtn').forEach(b=>{
-      if(isVetoed) b.disabled=true;
-      else if(!myVotedSlides[_latestRoom?.currentSlide]) b.disabled=false;
+    voteBtns.querySelectorAll('.vbtn').forEach(b => {
+      if(isVetoed) b.disabled = true;
+      else if(!myVotedSlides[_latestRoom?.currentSlide]) b.disabled = false;
     });
   }
 }
 
-// ── Double Down ───────────────────────────────────────────────────────────────
+// ── ✨ NEW: Double Down ───────────────────────────────────────────────────────
+// castDoubleDown: cast a 'supersmash' vote — counts as 2 in tallies
 async function castDoubleDown(){
   if(myDoubleDownUsed) return;
-  const snap=await window._get(roomRef(me.code));
+  const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
-  const room=snap.val();
-  const s=room.currentSlide;
+  const room = snap.val();
+  const s = room.currentSlide;
   if(myVotedSlides[s]) return;
-  if((room.vetoed||{})[s]) return;
-  myDoubleDownUsed=true;
-  myVotedSlides[s]='supersmash';
-  await window._set(voteRef(me.code,s,safeKey(me.name)),'supersmash');
+  // Check veto
+  if((room.vetoed || {})[s]) return;
+
+  myDoubleDownUsed = true;
+  myVotedSlides[s] = 'supersmash';
+  await window._set(voteRef(me.code, s, safeKey(me.name)), 'supersmash');
   markVotedUI('supersmash');
-  showToast('💥 DOUBLE DOWN! ×2 SMASH!',2600);
-  spawnReaction('smash',8);
-  await window._set(window._ref(window._db,`ddused/${me.code}/${safeKey(me.name)}`),true);
+  showToast('💥 DOUBLE DOWN! ×2 SMASH!', 2600);
+  spawnReaction('smash', 8);
+
+  // Persist flag so if they re-join they can't double down again (best-effort)
+  await window._set(window._ref(window._db, `ddused/${me.code}/${safeKey(me.name)}`), true);
 }
+
 function updateDoubleDownUI(){
-  const btn=document.getElementById('doubleDownBtn');
-  const note=document.getElementById('ddUsedNote');
+  const btn = document.getElementById('doubleDownBtn');
+  const note = document.getElementById('ddUsedNote');
   if(!btn) return;
-  if(myDoubleDownUsed){ btn.classList.add('hidden'); note.classList.remove('hidden'); }
-  else { btn.classList.remove('hidden'); note.classList.add('hidden'); }
-}
-
-// ── Kick player ───────────────────────────────────────────────────────────────
-async function kickPlayer(playerName){
-  if(!me.isMaster) return;
-  if(!confirm(`Kick ${playerName} from the room?`)) return;
-  const key = safeKey(playerName);
-  // Remove from players list in Firebase
-  await window._set(window._ref(window._db,`rooms/${me.code}/players/${key}`),null);
-  showToast(`👟 ${playerName} was kicked`);
-}
-
-function renderKickPanel(room){
-  const list = document.getElementById('kickPlayerList');
-  if(!list) return;
-  const players = getPlayers(room).filter(p => p.name !== me.name); // can't kick yourself
-  if(players.length === 0){
-    list.innerHTML = '<div style="font-size:.74rem;color:var(--muted);text-align:center;padding:.25rem 0">No other players</div>';
-    return;
+  if(myDoubleDownUsed){
+    btn.classList.add('hidden');
+    note.classList.remove('hidden');
+  } else {
+    btn.classList.remove('hidden');
+    note.classList.add('hidden');
   }
-  list.innerHTML = players.map(p => `
-    <div class="kick-player-row">
-      <div style="display:flex;align-items:center;gap:.4rem">
-        <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.55rem">${initials(p.name)}</div>
-        <span class="kick-player-name">${p.name}</span>
-      </div>
-      <button class="kick-player-btn" onclick="kickPlayer(${JSON.stringify(p.name)})">KICK</button>
-    </div>
-  `).join('');
 }
 
-// ── Emoji themes & reactions ──────────────────────────────────────────────────
+// ── Emoji themes & reactions ─────────────────────────────────────────────────
 const EMOJI_THEMES = {
   classic: { smash:['🔥','💯','😍','🤩','❤️‍🔥','👀','😘','💘','🥵','✨'], pass:['❄️','🥶','💀','😬','🙅','🚫','😐','😑','💨','⛔'] },
   hearts:  { smash:['💘','💖','💗','❤️','😍','🥰','💓','💞','😻','💝'], pass:['💔','😢','🙁','😞','😔','💧','🫠','😒','🤧','😿'] },
@@ -2480,61 +2204,67 @@ const EMOJI_THEMES = {
 
 let activeSmashEmojis = [...EMOJI_THEMES.classic.smash];
 let activePassEmojis  = [...EMOJI_THEMES.classic.pass];
-let emojiCfg = { theme:'classic', customSmash:'', customPass:'' };
+let emojiCfg = { theme: 'classic', customSmash: '', customPass: '' };
 
 function applyEmojiTheme(theme){
   emojiCfg.theme = theme;
   document.querySelectorAll('#emojiThemes .theme-btn').forEach(b=>{
-    b.classList.toggle('active',b.getAttribute('onclick').includes(`'${theme}'`));
+    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${theme}'`));
   });
-  const customRow=document.getElementById('emojiCustomRow');
-  if(theme==='custom'){
-    customRow.style.display='grid';
-    if(!document.getElementById('smashEmojiInput').value) document.getElementById('smashEmojiInput').value=EMOJI_THEMES.classic.smash.join(' ');
-    if(!document.getElementById('passEmojiInput').value)  document.getElementById('passEmojiInput').value=EMOJI_THEMES.classic.pass.join(' ');
+  const customRow = document.getElementById('emojiCustomRow');
+  if(theme === 'custom'){
+    customRow.style.display = 'grid';
+    if(!document.getElementById('smashEmojiInput').value)
+      document.getElementById('smashEmojiInput').value = EMOJI_THEMES.classic.smash.join(' ');
+    if(!document.getElementById('passEmojiInput').value)
+      document.getElementById('passEmojiInput').value = EMOJI_THEMES.classic.pass.join(' ');
     onCustomEmojiChange();
   } else {
-    customRow.style.display='none';
-    emojiCfg.customSmash=''; emojiCfg.customPass='';
+    customRow.style.display = 'none';
+    emojiCfg.customSmash = ''; emojiCfg.customPass = '';
     updateEmojiPreview(EMOJI_THEMES[theme].smash, EMOJI_THEMES[theme].pass);
   }
 }
 function onCustomEmojiChange(){
-  const rawSmash=document.getElementById('smashEmojiInput').value;
-  const rawPass=document.getElementById('passEmojiInput').value;
-  const smashArr=parseEmojiInput(rawSmash), passArr=parseEmojiInput(rawPass);
-  emojiCfg.customSmash=rawSmash; emojiCfg.customPass=rawPass;
+  const rawSmash = document.getElementById('smashEmojiInput').value;
+  const rawPass  = document.getElementById('passEmojiInput').value;
+  const smashArr = parseEmojiInput(rawSmash);
+  const passArr  = parseEmojiInput(rawPass);
+  emojiCfg.customSmash = rawSmash; emojiCfg.customPass = rawPass;
   updateEmojiPreview(smashArr.length?smashArr:EMOJI_THEMES.classic.smash, passArr.length?passArr:EMOJI_THEMES.classic.pass);
 }
 function parseEmojiInput(str){ return str.trim().split(/\s+/).filter(s=>s.length>0); }
-function updateEmojiPreview(smashArr,passArr){
-  const ps=document.getElementById('previewSmash'), pp=document.getElementById('previewPass');
-  if(ps) ps.textContent=smashArr.slice(0,6).join(' ');
-  if(pp) pp.textContent=passArr.slice(0,6).join(' ');
+function updateEmojiPreview(smashArr, passArr){
+  const ps = document.getElementById('previewSmash');
+  const pp = document.getElementById('previewPass');
+  if(ps) ps.textContent = smashArr.slice(0,6).join(' ');
+  if(pp) pp.textContent = passArr.slice(0,6).join(' ');
 }
 function resolveEmojiSets(){
-  if(emojiCfg.theme==='custom'){
-    const s=parseEmojiInput(emojiCfg.customSmash), p=parseEmojiInput(emojiCfg.customPass);
+  if(emojiCfg.theme === 'custom'){
+    const s = parseEmojiInput(emojiCfg.customSmash);
+    const p = parseEmojiInput(emojiCfg.customPass);
     return { smash:s.length?s:EMOJI_THEMES.classic.smash, pass:p.length?p:EMOJI_THEMES.classic.pass };
   }
-  return EMOJI_THEMES[emojiCfg.theme]||EMOJI_THEMES.classic;
+  return EMOJI_THEMES[emojiCfg.theme] || EMOJI_THEMES.classic;
 }
 function updateVoteBtnIcons(){
-  const si=document.getElementById('smashBtnIcon'), pi=document.getElementById('passBtnIcon');
-  if(si) si.textContent=activeSmashEmojis[0]||'🔥';
-  if(pi) pi.textContent=activePassEmojis[0] ||'❄️';
+  const si = document.getElementById('smashBtnIcon');
+  const pi = document.getElementById('passBtnIcon');
+  if(si) si.textContent = activeSmashEmojis[0] || '🔥';
+  if(pi) pi.textContent = activePassEmojis[0]  || '❄️';
 }
-function spawnReaction(choice,count=1){
-  const layer=document.getElementById('reactionLayer');
-  const emojis=choice==='smash'?activeSmashEmojis:activePassEmojis;
+function spawnReaction(choice, count=1){
+  const layer = document.getElementById('reactionLayer');
+  const emojis = choice === 'smash' ? activeSmashEmojis : activePassEmojis;
   for(let i=0;i<count;i++){
-    const el=document.createElement('div');
-    el.className='reaction-emoji';
-    el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
-    const x=10+Math.random()*80, y=70+Math.random()*20;
-    const vx=(Math.random()-.5)*120, vy=-(160+Math.random()*200);
-    const dur=1.4+Math.random()*.8;
-    el.style.cssText=`left:${x}vw;top:${y}vh;--vy:${vy}px;--vx:${vx}px;--dur:${dur}s;
+    const el = document.createElement('div');
+    el.className = 'reaction-emoji';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    const x = 10+Math.random()*80, y = 70+Math.random()*20;
+    const vx = (Math.random()-.5)*120, vy = -(160+Math.random()*200);
+    const dur = 1.4+Math.random()*.8;
+    el.style.cssText = `left:${x}vw;top:${y}vh;--vy:${vy}px;--vx:${vx}px;--dur:${dur}s;
       --rot-start:${(Math.random()-.5)*20}deg;--rot-mid:${(Math.random()-.5)*30}deg;--rot-end:${(Math.random()-.5)*45}deg;
       animation-delay:${i*(80+Math.random()*60)}ms;font-size:${1.4+Math.random()*1.2}rem;`;
     layer.appendChild(el);
@@ -2543,69 +2273,72 @@ function spawnReaction(choice,count=1){
 }
 
 let prevVoteCounts = { smash:0, pass:0 };
-function triggerVoteReactions(smashCount,passCount){
-  const ns=smashCount-prevVoteCounts.smash, np=passCount-prevVoteCounts.pass;
-  if(ns>0) spawnReaction('smash',Math.min(ns*2,6));
-  if(np>0) spawnReaction('pass', Math.min(np*2,6));
-  prevVoteCounts.smash=smashCount; prevVoteCounts.pass=passCount;
+function triggerVoteReactions(smashCount, passCount){
+  const ns = smashCount - prevVoteCounts.smash;
+  const np = passCount  - prevVoteCounts.pass;
+  if(ns>0) spawnReaction('smash', Math.min(ns*2,6));
+  if(np>0) spawnReaction('pass',  Math.min(np*2,6));
+  prevVoteCounts.smash = smashCount;
+  prevVoteCounts.pass  = passCount;
 }
 
 // ── Room / game logic ─────────────────────────────────────────────────────────
 async function createRoom(){
   hideErr('createErr');
   if(!dbReady) return showErr('createErr','Firebase not ready — check your config.');
-  const name=document.getElementById('hostName').value.trim();
-  const url=document.getElementById('slidesUrl').value.trim();
+  const name = document.getElementById('hostName').value.trim();
+  const url  = document.getElementById('slidesUrl').value.trim();
   if(!name) return showErr('createErr','Enter your name.');
   if(!url.includes('docs.google.com/presentation')) return showErr('createErr','Enter a valid Google Slides URL.');
 
-  const btn=document.querySelector('#entry .btn-fire');
-  btn.textContent='LOADING SLIDES…'; btn.disabled=true;
+  const btn = document.querySelector('#entry .btn-fire');
+  btn.textContent = 'LOADING SLIDES…'; btn.disabled = true;
 
   try {
-    const deck=await fetchSlidePageIdsViaAppsScript(url);
-    const code=genCode();
-    const room={
-      code,hostName:name,slidesUrl:url,
-      totalSlides:deck.totalSlides,slidePageIds:deck.slidePageIds,
-      state:'waiting',currentSlide:1,
-      players:{ [safeKey(name)]:{ name,color:avatarClass(name) } },
-      vetoed:{}
+    const deck = await fetchSlidePageIdsViaAppsScript(url);
+    const code = genCode();
+    const room = {
+      code, hostName:name, slidesUrl:url,
+      totalSlides:deck.totalSlides, slidePageIds:deck.slidePageIds,
+      state:'waiting', currentSlide:1,
+      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } },
+      vetoed: {}
     };
-    await window._set(roomRef(code),room);
-    me={ name,code,isMaster:true };
+    await window._set(roomRef(code), room);
+    me = { name, code, isMaster:true };
     enterWaiting();
   } catch(e) {
     showErr('createErr','❌ '+e.message);
   } finally {
-    btn.textContent='CREATE ROOM 🔥'; btn.disabled=false;
+    btn.textContent = 'CREATE ROOM 🔥'; btn.disabled = false;
   }
 }
 
-async function loadSlide(rawUrl,slideNumber,totalSlides=50,slidePageIds=[]) {
-  const img=document.getElementById('slideImg');
-  const loader=document.getElementById('slideLoader');
-  const errEl=document.getElementById('slideError');
-  const errLink=document.getElementById('slideErrorLink');
-  const token=++slideLoadToken;
+async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[]) {
+  const img = document.getElementById('slideImg');
+  const loader = document.getElementById('slideLoader');
+  const errEl = document.getElementById('slideError');
+  const errLink = document.getElementById('slideErrorLink');
+  const token = ++slideLoadToken;
 
-  img.style.display='block';
+  img.style.display = 'block';
   img.classList.add('loading');
   loader.classList.remove('hidden');
   errEl.classList.remove('visible');
-  errLink.href=rawUrl;
+  errLink.href = rawUrl;
 
-  const pageId=slidePageIds[slideNumber-1];
+  const pageId = slidePageIds[slideNumber-1];
   if(!pageId){ loader.classList.add('hidden'); img.style.display='none'; errEl.classList.add('visible'); return; }
 
   try {
-    const dataUrl=await fetchSlideImageDataUrl(rawUrl,pageId);
+    const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId);
     if(token!==slideLoadToken) return;
-    const preImg=new Image(); preImg.src=dataUrl;
+    const preImg = new Image();
+    preImg.src = dataUrl;
     if(preImg.decode){ try{await preImg.decode();}catch(_){} }
     if(token!==slideLoadToken) return;
     img.onload=null; img.onerror=null;
-    img.src=dataUrl;
+    img.src = dataUrl;
     img.classList.remove('loading');
     loader.classList.add('hidden');
     errEl.classList.remove('visible');
@@ -2617,40 +2350,46 @@ async function loadSlide(rawUrl,slideNumber,totalSlides=50,slidePageIds=[]) {
   }
 }
 
-let me={ name:'', code:'', isMaster:false };
-let unsubRoom=null, unsubVotes=null;
-let lastSlide=-1;
-let myVotedSlides={};
-let _latestRoom=null, _latestVotes={};
+let me = { name:'', code:'', isMaster:false };
+let unsubRoom = null;
+let unsubVotes = null;
+let lastSlide = -1;
+let myVotedSlides = {};
+let _latestRoom = null;
+let _latestVotes = {};
 
-function roomRef(code){ return window._ref(window._db,`rooms/${code}`); }
-function votesRef(code){ return window._ref(window._db,`votes/${code}`); }
-function voteRef(code,slide,playerKey){ return window._ref(window._db,`votes/${code}/${slide}/${playerKey}`); }
+function roomRef(code){ return window._ref(window._db, `rooms/${code}`); }
+function votesRef(code){ return window._ref(window._db, `votes/${code}`); }
+function voteRef(code,slide,playerKey){ return window._ref(window._db, `votes/${code}/${slide}/${playerKey}`); }
 function getPlayers(room){ return Object.values(room.players||{}); }
 
-function getSmashTotals(room,votesData){
-  const players=getPlayers(room);
-  const totals={};
-  const vetoed=room.vetoed||{};
-  players.forEach(p=>totals[safeKey(p.name)]=0);
-  for(let s=1;s<=room.totalSlides;s++){
-    if(vetoed[s]) continue;
-    const sv=votesData[s]||votesData[String(s)]||{};
-    players.forEach(p=>{
-      const key=safeKey(p.name), v=sv[key];
-      if(v==='smash')      totals[key]+=1;
-      if(v==='supersmash') totals[key]+=2;
+// ── Smash totals: supersmash counts as 2 ────────────────────────────────────
+function getSmashTotals(room, votesData){
+  const players = getPlayers(room);
+  const totals = {};
+  const vetoed = room.vetoed || {};
+  players.forEach(p => totals[safeKey(p.name)] = 0);
+
+  for(let s=1; s<=room.totalSlides; s++){
+    if(vetoed[s]) continue; // Skip vetoed slides in totals
+    const slideVotes = votesData[s] || votesData[String(s)] || {};
+    players.forEach(p => {
+      const key = safeKey(p.name);
+      const v = slideVotes[key];
+      if(v === 'smash') totals[key] += 1;
+      if(v === 'supersmash') totals[key] += 2; // Double Down = 2 points
     });
   }
+
   return players
-    .map(p=>({name:p.name,color:p.color,key:safeKey(p.name),smashes:totals[safeKey(p.name)]||0}))
-    .sort((a,b)=>b.smashes-a.smashes||a.name.localeCompare(b.name));
+    .map(p => ({ name:p.name, color:p.color, key:safeKey(p.name), smashes:totals[safeKey(p.name)]||0 }))
+    .sort((a,b) => b.smashes-a.smashes || a.name.localeCompare(b.name));
 }
 
-function renderSmashBoard(targetId,room,votesData){
-  const el=document.getElementById(targetId);
-  const totals=getSmashTotals(room,votesData);
-  el.innerHTML=totals.map((p,i)=>`
+function renderSmashBoard(targetId, room, votesData){
+  const el = document.getElementById(targetId);
+  const totals = getSmashTotals(room, votesData);
+  el.innerHTML = totals.map((p,i) => `
     <div class="smash-row">
       <div class="smash-left">
         <div class="player-avatar ${p.color}" style="width:26px;height:26px;font-size:.62rem">${initials(p.name)}</div>
@@ -2661,7 +2400,7 @@ function renderSmashBoard(targetId,room,votesData){
       </div>
       <div class="smash-count">${p.smashes}🔥</div>
     </div>
-  `).join('')||`<div class="no-votes">No players yet.</div>`;
+  `).join('') || `<div class="no-votes">No players yet.</div>`;
 }
 
 function stopListeners(){
@@ -2672,202 +2411,202 @@ function stopListeners(){
 async function joinRoom(){
   hideErr('joinErr');
   if(!dbReady) return showErr('joinErr','Firebase not ready — check your config.');
-  const name=document.getElementById('joinName').value.trim();
-  const code=document.getElementById('joinCode').value.trim().toUpperCase();
+  const name = document.getElementById('joinName').value.trim();
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
   if(!name) return showErr('joinErr','Enter your name.');
   if(!code) return showErr('joinErr','Enter a room code.');
 
-  const snap=await window._get(roomRef(code));
+  const snap = await window._get(roomRef(code));
   if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
-  const room=snap.val();
+  const room = snap.val();
   if(room.state==='done') return showErr('joinErr','This game has already ended.');
 
   await window._update(window._ref(window._db,`rooms/${code}/players`),{
-    [safeKey(name)]:{ name,color:avatarClass(name) }
+    [safeKey(name)]:{ name, color:avatarClass(name) }
   });
 
-  const ddSnap=await window._get(window._ref(window._db,`ddused/${code}/${safeKey(name)}`));
-  if(ddSnap.exists()&&ddSnap.val()) myDoubleDownUsed=true;
+  // Check if player already used double down in this room
+  const ddSnap = await window._get(window._ref(window._db, `ddused/${code}/${safeKey(name)}`));
+  if(ddSnap.exists() && ddSnap.val()) myDoubleDownUsed = true;
 
-  me={ name,code,isMaster:false };
+  me = { name, code, isMaster:false };
   if(room.state==='playing') enterGame();
   else enterWaiting();
 }
 
-// ── Kicked-player detection ───────────────────────────────────────────────────
-// When the room listener fires and our player entry is gone, we were kicked.
-function checkIfKicked(room){
-  if(me.isMaster) return false; // host can't be kicked
-  const players = room.players || {};
-  if(!players[safeKey(me.name)]){
-    stopListeners(); stopSlideTimer();
-    me={ name:'', code:'', isMaster:false };
-    lastSlide=-1; myVotedSlides={}; _latestRoom=null; _latestVotes={};
-    alert('👟 You were kicked from the room by the host.');
-    goHome();
-    return true;
-  }
-  return false;
-}
-
 function enterWaiting(){
   show('waiting');
-  document.getElementById('displayCode').textContent=me.code;
+  document.getElementById('displayCode').textContent = me.code;
   if(me.isMaster){
-    document.getElementById('timerConfigPanel').style.display='';
-    document.getElementById('timerEnabled').checked=timerCfg.enabled;
-    document.getElementById('timerDurationRow').style.display=timerCfg.enabled?'flex':'none';
-    document.getElementById('timerCustom').value=timerCfg.duration;
-    document.getElementById('emojiConfigPanel').style.display='';
+    document.getElementById('timerConfigPanel').style.display = '';
+    document.getElementById('timerEnabled').checked = timerCfg.enabled;
+    document.getElementById('timerDurationRow').style.display = timerCfg.enabled ? 'flex' : 'none';
+    document.getElementById('timerCustom').value = timerCfg.duration;
+    document.getElementById('emojiConfigPanel').style.display = '';
     applyEmojiTheme(emojiCfg.theme);
   }
   listenRoom();
 }
 
+async function kickPlayer(playerName){
+  if(!me.isMaster || !me.code) return;
+  if(!playerName || playerName===me.name) return;
+
+  const playerKey = safeKey(playerName);
+  try {
+    await window._set(window._ref(window._db, `rooms/${me.code}/players/${playerKey}`), null);
+    showToast(`👢 ${playerName} was kicked`);
+  } catch(e) {
+    showToast('Could not kick player');
+  }
+}
+
 function renderWaiting(room){
-  const players=getPlayers(room);
-  const grid=document.getElementById('playersGrid');
-  grid.innerHTML='';
-  players.forEach(p=>{
-    const chip=document.createElement('div');
-    chip.className='player-chip'+(p.name===room.hostName?' is-master':'');
-    const isMe = p.name===me.name;
-    const isHost = p.name===room.hostName;
-    // Kick button shown on non-host, non-self chips when viewing as host
-    const kickHtml = (me.isMaster && !isMe && !isHost)
-      ? `<button class="kick-btn" onclick="kickPlayer(${JSON.stringify(p.name)})" title="Kick ${p.name}">✕</button>`
+  const players = getPlayers(room);
+  const grid = document.getElementById('playersGrid');
+  grid.innerHTML = '';
+  players.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
+
+    const crown = p.name===room.hostName ? '<span style="font-size:.72rem">👑</span>' : '';
+    const kick = (me.isMaster && p.name!==room.hostName)
+      ? `<button class="kick-btn" onclick="kickPlayer(${JSON.stringify(p.name)})">KICK</button>`
       : '';
-    chip.innerHTML=`
+
+    chip.innerHTML = `
       <div class="player-avatar ${p.color}">${initials(p.name)}</div>
       <span>${p.name}</span>
-      ${isHost?'<span style="font-size:.72rem">👑</span>':''}
-      ${kickHtml}
+      ${crown}
+      ${kick}
     `;
     grid.appendChild(chip);
   });
-  const n=players.length;
-  document.getElementById('playerCountLabel').textContent=n+' player'+(n!==1?'s':'');
+  const n = players.length;
+  document.getElementById('playerCountLabel').textContent = n+' player'+(n!==1?'s':'');
   if(me.isMaster){
-    const btn=document.getElementById('startBtn');
+    const btn = document.getElementById('startBtn');
     btn.style.display='';
-    btn.textContent=`START WITH ${n} PLAYER${n!==1?'S':''} 🚀`;
-    document.getElementById('waitingNote').textContent='Share the code · Press start when ready';
+    btn.textContent = `START WITH ${n} PLAYER${n!==1?'S':''} 🚀`;
+    document.getElementById('waitingNote').textContent = 'Share the code · Press start when ready';
   } else {
     document.getElementById('startBtn').style.display='none';
-    document.getElementById('waitingNote').textContent='Waiting for the host to start…';
+    document.getElementById('waitingNote').textContent = 'Waiting for the host to start…';
   }
 }
 
 async function startGame(){
-  const sets=resolveEmojiSets();
+  const sets = resolveEmojiSets();
   await window._update(roomRef(me.code),{
-    state:'playing',currentSlide:1,
-    timerEnabled:timerCfg.enabled,timerDuration:timerCfg.duration,
-    emojiSmash:sets.smash,emojiPass:sets.pass,
+    state:'playing', currentSlide:1,
+    timerEnabled:timerCfg.enabled, timerDuration:timerCfg.duration,
+    emojiSmash:sets.smash, emojiPass:sets.pass,
   });
 }
 
 function enterGame(){
   show('game');
-  const isHost=me.isMaster;
-  document.getElementById('masterControls').style.display=isHost?'':'none';
-  document.getElementById('voteHead').textContent=isHost?'Host can vote too':'Cast your vote';
-  if(isHost) document.getElementById('timerInlineControls').style.display='';
+  const isHost = me.isMaster;
+  document.getElementById('masterControls').style.display = isHost ? '' : 'none';
+  document.getElementById('voteHead').textContent = isHost ? 'Host can vote too' : 'Cast your vote';
+  if(isHost) document.getElementById('timerInlineControls').style.display = '';
   updateDoubleDownUI();
   listenRoom();
   listenVotes();
 }
 
 function renderGame(room){
-  const s=room.currentSlide, tot=room.totalSlides;
-  const vetoed=room.vetoed||{};
+  const s = room.currentSlide;
+  const tot = room.totalSlides;
+  const vetoed = room.vetoed || {};
 
-  document.getElementById('slideCounter').textContent=`${s} / ${tot}`;
-  document.getElementById('progFill').style.width=(((s-1)/tot)*100)+'%';
-  document.getElementById('slideBadge').textContent=String(s).padStart(2,'0');
+  document.getElementById('slideCounter').textContent = `${s} / ${tot}`;
+  document.getElementById('progFill').style.width = (((s-1)/tot)*100)+'%';
+  document.getElementById('slideBadge').textContent = String(s).padStart(2,'0');
 
-  // Update jump field
-  const jumpInput=document.getElementById('jumpInput');
-  const jumpOf=document.getElementById('jumpOf');
-  if(jumpInput) jumpInput.max=tot;
-  if(jumpOf) jumpOf.textContent=`/ ${tot}`;
-
-  if(typeof room.timerEnabled!=='undefined'){
-    timerState.enabled=room.timerEnabled;
-    timerState.duration=room.timerDuration||15;
+  if(typeof room.timerEnabled !== 'undefined'){
+    timerState.enabled = room.timerEnabled;
+    timerState.duration = room.timerDuration || 15;
   }
-  if(Array.isArray(room.emojiSmash)&&room.emojiSmash.length) activeSmashEmojis=room.emojiSmash;
-  if(Array.isArray(room.emojiPass) &&room.emojiPass.length)  activePassEmojis =room.emojiPass;
+  if(Array.isArray(room.emojiSmash) && room.emojiSmash.length) activeSmashEmojis = room.emojiSmash;
+  if(Array.isArray(room.emojiPass)  && room.emojiPass.length)  activePassEmojis  = room.emojiPass;
   updateVoteBtnIcons();
 
   if(me.isMaster){
-    document.getElementById('timerGameEnabled').checked=timerState.enabled;
-    document.getElementById('timerGameDurationRow').style.display=timerState.enabled?'flex':'none';
-    document.getElementById('timerExtendRow').style.display=timerState.enabled?'flex':'none';
-    document.getElementById('timerGameCustom').value=timerState.duration;
+    document.getElementById('timerGameEnabled').checked = timerState.enabled;
+    document.getElementById('timerGameDurationRow').style.display = timerState.enabled ? 'flex' : 'none';
+    document.getElementById('timerExtendRow').style.display = timerState.enabled ? 'flex' : 'none';
+    document.getElementById('timerGameCustom').value = timerState.duration;
     document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>{
-      b.classList.toggle('active',parseInt(b.textContent)===timerState.duration);
+      b.classList.toggle('active', parseInt(b.textContent)===timerState.duration);
     });
-    renderKickPanel(room);
   }
 
-  vetoedSlides=vetoed;
-  const isVetoed=!!vetoed[s];
+  // Sync veto state for this slide
+  vetoedSlides = vetoed;
+  const isVetoed = !!vetoed[s];
   applyVetoUI(isVetoed);
 
-  if(s!==lastSlide){
-    lastSlide=s;
-    prevVoteCounts={smash:0,pass:0};
-    loadSlide(room.slidesUrl,s,tot,room.slidePageIds||[]);
+  if(s !== lastSlide){
+    lastSlide = s;
+    prevVoteCounts = { smash:0, pass:0 };
+    loadSlide(room.slidesUrl, s, tot, room.slidePageIds||[]);
     for(let offset=0;offset<5;offset++){
-      const pid=room.slidePageIds?.[s+offset];
-      if(pid) prefetchSlide(room.slidesUrl,pid);
+      const pid = room.slidePageIds?.[s+offset];
+      if(pid) prefetchSlide(room.slidesUrl, pid);
     }
 
-    if(!myVotedSlides[s]&&!isVetoed){
-      document.getElementById('votedBanner').className='voted-banner';
+    if(!myVotedSlides[s] && !isVetoed){
+      document.getElementById('votedBanner').className = 'voted-banner';
       document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
     } else if(myVotedSlides[s]){
       markVotedUI(myVotedSlides[s]);
     }
     updateDoubleDownUI();
 
-    const widget=document.getElementById('timerWidget');
-    if(timerState.enabled){ widget.classList.remove('hidden','timer-disabled'); startSlideTimer(); }
-    else { widget.classList.add('hidden'); stopSlideTimer(); }
+    const widget = document.getElementById('timerWidget');
+    if(timerState.enabled){
+      widget.classList.remove('hidden','timer-disabled');
+      startSlideTimer();
+    } else {
+      widget.classList.add('hidden');
+      stopSlideTimer();
+    }
   }
 
   if(me.isMaster){
-    const nb=document.getElementById('nextBtn');
-    nb.disabled=false;
-    nb.textContent=s>=tot?'SHOW RESULTS':'NEXT SLIDE →';
+    const nb = document.getElementById('nextBtn');
+    nb.disabled = false;
+    nb.textContent = s>=tot ? 'SHOW RESULTS' : 'NEXT SLIDE →';
   }
 
-  renderSmashBoard('smashBoard',room,_latestVotes);
+  renderSmashBoard('smashBoard', room, _latestVotes);
 }
 
-function renderVoters(room,votesData){
-  const s=room.currentSlide;
-  const slideVotes=votesData[s]||{};
-  const players=getPlayers(room);
-  const list=document.getElementById('voterList');
-  let smashes=0,passes=0;
+// ── Vote rendering: supersmash shows as ×2 in tally ─────────────────────────
+function renderVoters(room, votesData){
+  const s = room.currentSlide;
+  const slideVotes = votesData[s]||{};
+  const players = getPlayers(room);
+  const list = document.getElementById('voterList');
+  let smashes=0, passes=0;
 
-  list.innerHTML='';
-  players.forEach(p=>{
-    const key=safeKey(p.name), choice=slideVotes[key];
-    if(choice==='smash')      smashes+=1;
-    if(choice==='supersmash') smashes+=2;
-    if(choice==='pass')       passes+=1;
+  list.innerHTML = '';
+  players.forEach(p => {
+    const key = safeKey(p.name);
+    const choice = slideVotes[key];
+    if(choice==='smash') smashes += 1;
+    if(choice==='supersmash') smashes += 2; // Double Down counts as 2
+    if(choice==='pass')  passes  += 1;
 
-    let badgeHtml=`<span class="pending-dot"></span>`;
-    if(choice==='smash')      badgeHtml=`<span class="voter-badge badge-smash">🔥 SMASH</span>`;
-    if(choice==='supersmash') badgeHtml=`<span class="voter-badge badge-supersmash">💥 ×2</span>`;
-    if(choice==='pass')       badgeHtml=`<span class="voter-badge badge-pass">❄️ PASS</span>`;
+    let badgeHtml = `<span class="pending-dot"></span>`;
+    if(choice==='smash')      badgeHtml = `<span class="voter-badge badge-smash">🔥 SMASH</span>`;
+    if(choice==='supersmash') badgeHtml = `<span class="voter-badge badge-supersmash">💥 ×2</span>`;
+    if(choice==='pass')       badgeHtml = `<span class="voter-badge badge-pass">❄️ PASS</span>`;
 
-    const row=document.createElement('div');
-    row.className='voter-row';
-    row.innerHTML=`
+    const row = document.createElement('div');
+    row.className = 'voter-row';
+    row.innerHTML = `
       <div class="voter-name-wrap">
         <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.58rem">${initials(p.name)}</div>
         ${p.name}
@@ -2877,148 +2616,156 @@ function renderVoters(room,votesData){
     list.appendChild(row);
   });
 
-  document.getElementById('tallySmash').textContent=smashes;
-  document.getElementById('tallyPass').textContent=passes;
-  triggerVoteReactions(smashes,passes);
+  document.getElementById('tallySmash').textContent = smashes;
+  document.getElementById('tallyPass').textContent  = passes;
+  triggerVoteReactions(smashes, passes);
 
-  const myChoice=slideVotes[safeKey(me.name)];
-  if(myChoice&&!myVotedSlides[s]){ myVotedSlides[s]=myChoice; markVotedUI(myChoice); }
-  renderSmashBoard('smashBoard',room,votesData);
+  const myChoice = slideVotes[safeKey(me.name)];
+  if(myChoice && !myVotedSlides[s]){
+    myVotedSlides[s] = myChoice;
+    markVotedUI(myChoice);
+  }
+  renderSmashBoard('smashBoard', room, votesData);
 }
 
 function markVotedUI(choice){
-  const banner=document.getElementById('votedBanner');
-  if(choice==='supersmash'){ banner.className='voted-banner supersmash'; banner.innerHTML='💥 DOUBLE DOWN!'; }
-  else if(choice==='smash'){ banner.className='voted-banner smash'; banner.innerHTML=(activeSmashEmojis[0]||'🔥')+' SMASHED!'; }
-  else { banner.className='voted-banner pass'; banner.innerHTML=(activePassEmojis[0]||'❄️')+' PASSED'; }
+  const banner = document.getElementById('votedBanner');
+  if(choice === 'supersmash'){
+    banner.className = 'voted-banner supersmash';
+    banner.innerHTML = '💥 DOUBLE DOWN!';
+  } else if(choice === 'smash'){
+    banner.className = 'voted-banner smash';
+    const e = activeSmashEmojis[0] || '🔥';
+    banner.innerHTML = e+' SMASHED!';
+  } else {
+    banner.className = 'voted-banner pass';
+    const e = activePassEmojis[0] || '❄️';
+    banner.innerHTML = e+' PASSED';
+  }
   document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=true);
 }
 
 async function castVote(choice){
-  const snap=await window._get(roomRef(me.code));
+  const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
-  const room=snap.val();
-  const s=room.currentSlide;
+  const room = snap.val();
+  const s = room.currentSlide;
   if(myVotedSlides[s]) return;
-  if((room.vetoed||{})[s]) return;
-  myVotedSlides[s]=choice;
-  await window._set(voteRef(me.code,s,safeKey(me.name)),choice);
+  if((room.vetoed||{})[s]) return; // Can't vote on vetoed slide
+
+  myVotedSlides[s] = choice;
+  await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
   markVotedUI(choice);
   showToast(choice==='smash'?'🔥 SMASHED!':'❄️ Passed');
-  spawnReaction(choice,4);
+  spawnReaction(choice, 4);
 }
 
 async function masterNext(){
   stopSlideTimer();
-  const snap=await window._get(roomRef(me.code));
+  const snap = await window._get(roomRef(me.code));
   if(!snap.exists()) return;
-  const room=snap.val();
-  if(room.currentSlide>=room.totalSlides){
-    await window._update(roomRef(me.code),{state:'done'});
+  const room = snap.val();
+  if(room.currentSlide >= room.totalSlides){
+    await window._update(roomRef(me.code),{ state:'done' });
   } else {
     await window._update(roomRef(me.code),{
-      currentSlide:room.currentSlide+1,
-      timerEnabled:timerState.enabled,
-      timerDuration:timerState.duration,
+      currentSlide: room.currentSlide+1,
+      timerEnabled: timerState.enabled,
+      timerDuration: timerState.duration,
     });
   }
-}
-
-// ── NEW: Jump to any slide ────────────────────────────────────────────────────
-async function masterJump(){
-  if(!me.isMaster) return;
-  const snap=await window._get(roomRef(me.code));
-  if(!snap.exists()) return;
-  const room=snap.val();
-  const raw=parseInt(document.getElementById('jumpInput').value);
-  const target=Math.max(1,Math.min(raw,room.totalSlides));
-  if(isNaN(target)) return showToast('⚠️ Enter a valid slide number');
-  if(target===room.currentSlide) return showToast(`Already on slide ${target}`);
-  stopSlideTimer();
-  await window._update(roomRef(me.code),{
-    currentSlide:target,
-    timerEnabled:timerState.enabled,
-    timerDuration:timerState.duration,
-  });
-  showToast(`⏩ Jumped to slide ${target}`);
 }
 
 async function masterEnd(){
   if(!confirm('End the game and show results?')) return;
   stopSlideTimer();
-  await window._update(roomRef(me.code),{state:'done'});
+  await window._update(roomRef(me.code),{ state:'done' });
 }
 
 function listenRoom(){
   if(unsubRoom){ unsubRoom(); unsubRoom=null; }
-  unsubRoom=window._onValue(roomRef(me.code),snap=>{
+  unsubRoom = window._onValue(roomRef(me.code), snap => {
     if(!snap.exists()) return;
-    const room=snap.val();
+    const room = snap.val();
+    _latestRoom = room;
 
-    // Kicked check
-    if(checkIfKicked(room)) return;
-
-    _latestRoom=room;
+    const myKey = safeKey(me.name);
+    if(!me.isMaster && me.name && !(room.players||{})[myKey]){
+      showToast('You were removed from the room');
+      goHome();
+      return;
+    }
 
     if(room.state==='waiting'){
       renderWaiting(room);
     } else if(room.state==='playing'){
       if(document.getElementById('game').classList.contains('hidden')){
-        if(typeof room.timerEnabled!=='undefined'){ timerState.enabled=room.timerEnabled; timerState.duration=room.timerDuration||15; }
-        if(room.emojiSmash) activeSmashEmojis=room.emojiSmash;
-        if(room.emojiPass)  activePassEmojis=room.emojiPass;
-        enterGame(); return;
+        if(typeof room.timerEnabled !== 'undefined'){
+          timerState.enabled = room.timerEnabled;
+          timerState.duration = room.timerDuration || 15;
+        }
+        if(room.emojiSmash) activeSmashEmojis = room.emojiSmash;
+        if(room.emojiPass)  activePassEmojis  = room.emojiPass;
+        enterGame();
+        return;
       }
       renderGame(room);
-      renderVoters(room,_latestVotes);
+      renderVoters(room, _latestVotes);
     } else if(room.state==='done'){
       if(!document.getElementById('results').classList.contains('hidden')) return;
       stopSlideTimer();
-      window._get(votesRef(me.code)).then(vSnap=>{
-        showResultsScreen(room,vSnap.exists()?vSnap.val():_latestVotes);
-      }).catch(()=>showResultsScreen(room,_latestVotes));
+      window._get(votesRef(me.code)).then(vSnap => {
+        showResultsScreen(room, vSnap.exists()?vSnap.val():_latestVotes);
+      }).catch(()=>showResultsScreen(room, _latestVotes));
     }
   });
 }
 
 function listenVotes(){
   if(unsubVotes){ unsubVotes(); unsubVotes=null; }
-  unsubVotes=window._onValue(votesRef(me.code),snap=>{
-    _latestVotes=snap.exists()?snap.val():{};
-    if(_latestRoom&&_latestRoom.state==='playing'){
-      renderVoters(_latestRoom,_latestVotes);
-      renderSmashBoard('smashBoard',_latestRoom,_latestVotes);
+  unsubVotes = window._onValue(votesRef(me.code), snap => {
+    _latestVotes = snap.exists()?snap.val():{};
+    if(_latestRoom && _latestRoom.state==='playing'){
+      renderVoters(_latestRoom, _latestVotes);
+      renderSmashBoard('smashBoard', _latestRoom, _latestVotes);
     }
   });
 }
 
-function getPlayerStats(player,room,votesData){
-  const key=safeKey(player.name), tot=room.totalSlides;
-  const vetoed=room.vetoed||{};
-  let smashes=0,passes=0,skipped=0,supersmashes=0;
-  let maxStreak=0,currentStreak=0,altCount=0,lastVote=null;
+function getPlayerStats(player, room, votesData){
+  const key = safeKey(player.name);
+  const tot = room.totalSlides;
+  const vetoed = room.vetoed || {};
+  let smashes=0, passes=0, skipped=0, supersmashes=0;
+  let maxStreak=0, currentStreak=0, altCount=0, lastVote=null;
 
-  for(let s=1;s<=tot;s++){
-    if(vetoed[s]){ skipped++; continue; }
-    const sv=votesData[s]||votesData[String(s)]||{};
-    const v=sv[key];
+  for(let s=1; s<=tot; s++){
+    if(vetoed[s]){ skipped++; continue; } // Vetoed = skip from stats
+    const sv = votesData[s]||votesData[String(s)]||{};
+    const v = sv[key];
     if(v==='smash') smashes++;
-    else if(v==='supersmash'){ smashes+=2; supersmashes++; }
+    else if(v==='supersmash'){ smashes += 2; supersmashes++; }
     else if(v==='pass') passes++;
     else { skipped++; currentStreak=0; lastVote=null; continue; }
 
-    const normV=(v==='supersmash')?'smash':v;
-    if(normV==='smash'){ currentStreak++; if(lastVote==='pass') altCount++; }
-    else { currentStreak=0; if(lastVote==='smash') altCount++; }
+    const normV = (v==='supersmash')?'smash':v;
+    if(normV==='smash'){
+      currentStreak++;
+      if(lastVote==='pass') altCount++;
+    } else {
+      currentStreak=0;
+      if(lastVote==='smash') altCount++;
+    }
     if(currentStreak>maxStreak) maxStreak=currentStreak;
     lastVote=normV;
   }
 
-  const voted=smashes+passes;
-  const smashPct=voted>0?Math.round((smashes/voted)*100):0;
+  const voted = smashes+passes;
+  const smashPct = voted>0?Math.round((smashes/voted)*100):0;
+
   let title='';
   if(voted===0) title='👻 Ghost';
-  else if(supersmashes>0&&smashPct>=80) title='💥 All In';
+  else if(supersmashes>0 && smashPct>=80) title='💥 All In';
   else if(smashPct===100) title='🔥 All In';
   else if(smashPct===0) title='❄️ Ice Cold';
   else if(smashPct>=80) title='💘 Simp';
@@ -3028,131 +2775,190 @@ function getPlayerStats(player,room,votesData){
   else if(Math.abs(smashPct-50)<=10) title='⚖️ Balanced';
   else title='😏 Player';
 
-  return { smashes,passes,skipped,smashPct,maxStreak,altCount,voted,title,supersmashes };
+  return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title, supersmashes };
 }
 
-function getContrarianPlayer(players,room,votesData){
-  if(players.length<2) return null;
-  const vetoed=room.vetoed||{};
-  let best=null, bestCount=-1;
-  players.forEach(p=>{
-    const key=safeKey(p.name);
-    let disagreeCount=0, eligible=0;
-    for(let s=1;s<=room.totalSlides;s++){
+// ── Contrarian: player who disagrees with majority most often ─────────────────
+function getContrarianPlayer(players, room, votesData){
+  if(players.length < 2) return null;
+  const vetoed = room.vetoed || {};
+  let best = null, bestCount = -1;
+
+  players.forEach(p => {
+    const key = safeKey(p.name);
+    let disagreeCount = 0, eligible = 0;
+
+    for(let s = 1; s <= room.totalSlides; s++){
       if(vetoed[s]) continue;
-      const sv=votesData[s]||votesData[String(s)]||{};
-      const myVote=sv[key];
+      const sv = votesData[s] || votesData[String(s)] || {};
+      const myVote = sv[key];
       if(!myVote) continue;
-      let smashCount=0,passCount=0;
-      players.forEach(op=>{
-        const ov=sv[safeKey(op.name)];
-        if(ov==='smash'||ov==='supersmash') smashCount++;
-        else if(ov==='pass') passCount++;
+
+      // Count majority vote among ALL players for this slide
+      let smashCount = 0, passCount = 0;
+      players.forEach(op => {
+        const ov = sv[safeKey(op.name)];
+        if(ov === 'smash' || ov === 'supersmash') smashCount++;
+        else if(ov === 'pass') passCount++;
       });
-      if(smashCount===0&&passCount===0) continue;
-      const majoritySmash=smashCount>=passCount;
-      const mySmash=(myVote==='smash'||myVote==='supersmash');
+
+      if(smashCount === 0 && passCount === 0) continue;
+      const majoritySmash = smashCount >= passCount;
+      const mySmash = (myVote === 'smash' || myVote === 'supersmash');
+
       eligible++;
-      if(majoritySmash!==mySmash) disagreeCount++;
+      if(majoritySmash !== mySmash) disagreeCount++;
     }
-    if(eligible>=3&&disagreeCount>bestCount){ bestCount=disagreeCount; best={ name:p.name,disagreeCount,eligible }; }
+
+    if(eligible >= 3 && disagreeCount > bestCount){
+      bestCount = disagreeCount;
+      best = { name: p.name, disagreeCount, eligible };
+    }
   });
-  return best?best.name:null;
+
+  return best ? best.name : null;
 }
 
-function renderHallOfFameShame(room,votesData,players){
-  const section=document.getElementById('hallSection');
-  section.innerHTML='';
-  if(players.length===0||room.totalSlides===0){ section.style.display='none'; return; }
+// ── Hall of Fame (most unanimous smash) & Shame (most unanimous pass) ─────────
+function renderHallOfFameShame(room, votesData, players){
+  const section = document.getElementById('hallSection');
+  section.innerHTML = '';
+  if(players.length === 0 || room.totalSlides === 0){ section.style.display='none'; return; }
 
-  const vetoed=room.vetoed||{};
-  let bestSmash=null,bestSmashScore=-1,bestPass=null,bestPassScore=-1;
+  const vetoed = room.vetoed || {};
+  let bestSmash = null, bestSmashScore = -1;
+  let bestPass  = null, bestPassScore  = -1;
 
-  for(let s=1;s<=room.totalSlides;s++){
+  for(let s = 1; s <= room.totalSlides; s++){
     if(vetoed[s]) continue;
-    const sv=votesData[s]||votesData[String(s)]||{};
-    let smashVoters=[],passVoters=[],totalVoted=0;
-    players.forEach(p=>{
-      const v=sv[safeKey(p.name)];
-      if(v==='smash'||v==='supersmash'){ smashVoters.push(p.name); totalVoted++; }
-      else if(v==='pass'){ passVoters.push(p.name); totalVoted++; }
+    const sv = votesData[s] || votesData[String(s)] || {};
+    let smashVoters = [], passVoters = [], totalVoted = 0;
+
+    players.forEach(p => {
+      const v = sv[safeKey(p.name)];
+      if(v === 'smash' || v === 'supersmash'){ smashVoters.push(p.name); totalVoted++; }
+      else if(v === 'pass'){ passVoters.push(p.name); totalVoted++; }
     });
-    if(totalVoted===0) continue;
-    const smashScore=smashVoters.length/totalVoted;
-    const passScore=passVoters.length/totalVoted;
-    if(smashScore>bestSmashScore||(smashScore===bestSmashScore&&smashVoters.length>(bestSmash?.voters?.length||0))){ bestSmashScore=smashScore; bestSmash={slide:s,voters:smashVoters,total:totalVoted,pct:Math.round(smashScore*100)}; }
-    if(passScore>bestPassScore||(passScore===bestPassScore&&passVoters.length>(bestPass?.voters?.length||0))){ bestPassScore=passScore; bestPass={slide:s,voters:passVoters,total:totalVoted,pct:Math.round(passScore*100)}; }
+
+    if(totalVoted === 0) continue;
+
+    const smashScore = smashVoters.length / totalVoted;
+    const passScore  = passVoters.length  / totalVoted;
+
+    if(smashScore > bestSmashScore || (smashScore === bestSmashScore && smashVoters.length > (bestSmash?.voters?.length||0))){
+      bestSmashScore = smashScore;
+      bestSmash = { slide: s, voters: smashVoters, total: totalVoted, pct: Math.round(smashScore*100) };
+    }
+    if(passScore > bestPassScore || (passScore === bestPassScore && passVoters.length > (bestPass?.voters?.length||0))){
+      bestPassScore = passScore;
+      bestPass = { slide: s, voters: passVoters, total: totalVoted, pct: Math.round(passScore*100) };
+    }
   }
 
-  section.style.display='';
+  section.style.display = '';
 
-  function buildHallCard(data,type){
-    const isFame=type==='fame';
-    const isUnanimous=data.pct===100;
-    const card=document.createElement('div');
-    card.className=`hall-card ${type}`;
-    const thumbId=`hall-thumb-${type}`, spinnerId=`hall-spinner-${type}`;
-    card.innerHTML=`
-      <div class="hall-label">${isFame?'🏆 HALL OF FAME — Most Smashed':'💀 HALL OF SHAME — Most Passed'}</div>
+  function buildHallCard(data, type){
+    const isFame = type === 'fame';
+    const isUnanimous = data.pct === 100;
+    const card = document.createElement('div');
+    card.className = `hall-card ${type}`;
+
+    const thumbId = `hall-thumb-${type}`;
+    const spinnerId = `hall-spinner-${type}`;
+
+    card.innerHTML = `
+      <div class="hall-label">${isFame ? '🏆 HALL OF FAME — Most Smashed' : '💀 HALL OF SHAME — Most Passed'}</div>
       <div class="hall-thumb-wrap">
         <img class="hall-thumb loading" id="${thumbId}" alt="Slide ${data.slide}" />
-        <div class="hall-thumb-spinner" id="${spinnerId}"><div class="spinner"></div><span>Loading slide…</span></div>
+        <div class="hall-thumb-spinner" id="${spinnerId}">
+          <div class="spinner"></div>
+          <span>Loading slide…</span>
+        </div>
       </div>
       <div class="hall-slide-num">Slide ${data.slide}</div>
-      <div class="hall-desc">${isFame?(isUnanimous?'Unanimous 🔥 — everyone smashed it!':`${data.pct}% smash rate (${data.voters.length}/${data.total})`):(isUnanimous?'Universal ❄️ — nobody wanted it!':`${data.pct}% pass rate (${data.voters.length}/${data.total})`)}</div>
+      <div class="hall-desc">${isFame
+        ? (isUnanimous ? 'Unanimous 🔥 — everyone smashed it!' : `${data.pct}% smash rate (${data.voters.length}/${data.total})`)
+        : (isUnanimous ? 'Universal ❄️ — nobody wanted it!'    : `${data.pct}% pass rate (${data.voters.length}/${data.total})`)
+      }</div>
       <div class="hall-voters">${data.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
     `;
-    if(room.slidesUrl&&room.slidePageIds){
-      const pageId=room.slidePageIds[data.slide-1];
+
+    // Async-load the thumbnail after card is in DOM
+    if(room.slidesUrl && room.slidePageIds){
+      const pageId = room.slidePageIds[data.slide - 1];
       if(pageId){
-        fetchSlideImageDataUrl(room.slidesUrl,pageId).then(dataUrl=>{
-          const img=document.getElementById(thumbId);
-          const spinner=document.getElementById(spinnerId);
+        fetchSlideImageDataUrl(room.slidesUrl, pageId).then(dataUrl => {
+          const img = document.getElementById(thumbId);
+          const spinner = document.getElementById(spinnerId);
           if(!img) return;
-          img.onload=()=>{ img.classList.remove('loading'); if(spinner) spinner.style.display='none'; };
-          img.src=dataUrl;
-        }).catch(()=>{ const spinner=document.getElementById(spinnerId); if(spinner) spinner.innerHTML='<span style="color:var(--muted);font-size:.7rem">Could not load slide</span>'; });
+          img.onload = () => {
+            img.classList.remove('loading');
+            if(spinner) spinner.style.display = 'none';
+          };
+          img.src = dataUrl;
+        }).catch(() => {
+          const spinner = document.getElementById(spinnerId);
+          if(spinner) spinner.innerHTML = '<span style="color:var(--muted);font-size:.7rem">Could not load slide</span>';
+        });
       }
     }
+
     return card;
   }
 
-  if(bestSmash) section.appendChild(buildHallCard(bestSmash,'fame'));
-  if(bestPass)  section.appendChild(buildHallCard(bestPass,'shame'));
-  if(!bestSmash&&!bestPass) section.style.display='none';
+  if(bestSmash) section.appendChild(buildHallCard(bestSmash, 'fame'));
+  if(bestPass)  section.appendChild(buildHallCard(bestPass,  'shame'));
+  if(!bestSmash && !bestPass) section.style.display = 'none';
 }
 
-function renderAgreementsTracker(players,room,votesData){
-  const panel=document.getElementById('agreementsPanel');
-  const list=document.getElementById('agreementsList');
-  list.innerHTML='';
-  if(players.length<2){ panel.style.display='none'; return; }
+// ── Agreements Tracker: top player pairs by vote agreement ───────────────────
+function renderAgreementsTracker(players, room, votesData){
+  const panel = document.getElementById('agreementsPanel');
+  const list  = document.getElementById('agreementsList');
+  list.innerHTML = '';
 
-  const vetoed=room.vetoed||{};
-  const pairs=[];
-  for(let i=0;i<players.length;i++){
-    for(let j=i+1;j<players.length;j++){
-      const ka=safeKey(players[i].name), kb=safeKey(players[j].name);
-      let agree=0, total=0;
-      for(let s=1;s<=room.totalSlides;s++){
+  if(players.length < 2){ panel.style.display='none'; return; }
+
+  const vetoed = room.vetoed || {};
+  const pairs = [];
+
+  for(let i = 0; i < players.length; i++){
+    for(let j = i+1; j < players.length; j++){
+      const ka = safeKey(players[i].name);
+      const kb = safeKey(players[j].name);
+      let agree = 0, total = 0;
+
+      for(let s = 1; s <= room.totalSlides; s++){
         if(vetoed[s]) continue;
-        const sv=votesData[s]||votesData[String(s)]||{};
-        const va=sv[ka], vb=sv[kb];
-        if(!va||!vb) continue;
+        const sv = votesData[s] || votesData[String(s)] || {};
+        const va = sv[ka], vb = sv[kb];
+        if(!va || !vb) continue;
         total++;
-        const normA=(va==='supersmash')?'smash':va, normB=(vb==='supersmash')?'smash':vb;
-        if(normA===normB) agree++;
+        const normA = (va === 'supersmash') ? 'smash' : va;
+        const normB = (vb === 'supersmash') ? 'smash' : vb;
+        if(normA === normB) agree++;
       }
-      if(total>=3) pairs.push({ nameA:players[i].name, nameB:players[j].name, agree, total, pct:Math.round((agree/total)*100) });
+
+      if(total >= 3){
+        pairs.push({
+          nameA: players[i].name,
+          nameB: players[j].name,
+          agree, total,
+          pct: Math.round((agree / total) * 100)
+        });
+      }
     }
   }
 
-  if(pairs.length===0){ panel.style.display='none'; return; }
-  pairs.sort((a,b)=>b.pct-a.pct);
-  panel.style.display='';
-  pairs.slice(0,Math.min(5,pairs.length)).forEach(pair=>{
-    const row=document.createElement('div');
-    row.innerHTML=`
+  if(pairs.length === 0){ panel.style.display='none'; return; }
+  pairs.sort((a,b) => b.pct - a.pct);
+  const top = pairs.slice(0, Math.min(5, pairs.length));
+
+  panel.style.display = '';
+
+  top.forEach(pair => {
+    const row = document.createElement('div');
+    row.innerHTML = `
       <div class="agreement-row">
         <div style="flex:1;min-width:0">
           <div class="agreement-names">👯 ${pair.nameA} &amp; ${pair.nameB}</div>
@@ -3166,224 +2972,70 @@ function renderAgreementsTracker(players,room,votesData){
   });
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ── HEAD-TO-HEAD ─────────────────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════════
-function setupH2H(players, room, votesData){
-  const panel = document.getElementById('h2hPanel');
-  if(players.length < 2){ panel.style.display='none'; return; }
-  panel.style.display='';
-
-  _h2hRoom = room;
-  _h2hVotes = votesData;
-  _h2hPlayers = players;
-
-  const selA = document.getElementById('h2hSelectA');
-  const selB = document.getElementById('h2hSelectB');
-  selA.innerHTML = '';
-  selB.innerHTML = '';
-
-  players.forEach((p,i) => {
-    selA.innerHTML += `<option value="${p.name}">${p.name}</option>`;
-    selB.innerHTML += `<option value="${p.name}">${p.name}</option>`;
-  });
-
-  // Default to first two distinct players
-  if(players.length >= 2){
-    selA.value = players[0].name;
-    selB.value = players[1].name;
-  }
-
-  // Auto-render initial comparison
-  renderH2H();
-}
-
-function voteChipHtml(vote){
-  if(!vote) return `<span class="h2h-vote-chip h2h-chip-none">–</span>`;
-  if(vote==='smash')      return `<span class="h2h-vote-chip h2h-chip-smash">🔥 SMASH</span>`;
-  if(vote==='supersmash') return `<span class="h2h-vote-chip h2h-chip-supersmash">💥 ×2</span>`;
-  if(vote==='pass')       return `<span class="h2h-vote-chip h2h-chip-pass">❄️ PASS</span>`;
-  return `<span class="h2h-vote-chip h2h-chip-none">–</span>`;
-}
-
-function renderH2H(){
-  const room = _h2hRoom, votesData = _h2hVotes;
-  if(!room || !votesData) return;
-
-  const nameA = document.getElementById('h2hSelectA').value;
-  const nameB = document.getElementById('h2hSelectB').value;
-  const result = document.getElementById('h2hResult');
-
-  if(nameA === nameB){
-    result.innerHTML = `<div class="h2h-empty">Select two different players to compare.</div>`;
-    return;
-  }
-
-  const keyA = safeKey(nameA), keyB = safeKey(nameB);
-  const vetoed = room.vetoed || {};
-  const playerA = (_h2hPlayers||[]).find(p=>p.name===nameA) || { name:nameA, color:'av0' };
-  const playerB = (_h2hPlayers||[]).find(p=>p.name===nameB) || { name:nameB, color:'av1' };
-
-  let agree=0, disagree=0, total=0;
-  let smashesA=0, passesA=0, smashesB=0, passesB=0;
-  const rows = [];
-
-  for(let s=1; s<=room.totalSlides; s++){
-    const isVetoed = !!vetoed[s];
-    const sv = votesData[s] || votesData[String(s)] || {};
-    const vA = sv[keyA] || null;
-    const vB = sv[keyB] || null;
-
-    if(isVetoed){
-      rows.push({ s, vA, vB, isVetoed, status:'veto' });
-      continue;
-    }
-
-    if(vA) { if(vA==='smash'||vA==='supersmash') smashesA++; else passesA++; }
-    if(vB) { if(vB==='smash'||vB==='supersmash') smashesB++; else passesB++; }
-
-    let status = 'skipped';
-    if(vA && vB){
-      total++;
-      const normA = (vA==='supersmash')?'smash':vA;
-      const normB = (vB==='supersmash')?'smash':vB;
-      if(normA===normB){ agree++; status='agree'; }
-      else { disagree++; status='disagree'; }
-    }
-    rows.push({ s, vA, vB, isVetoed:false, status });
-  }
-
-  const agreePct = total>0 ? Math.round((agree/total)*100) : 0;
-  const smashPctA = (smashesA+passesA)>0 ? Math.round((smashesA/(smashesA+passesA))*100) : 0;
-  const smashPctB = (smashesB+passesB)>0 ? Math.round((smashesB/(smashesB+passesB))*100) : 0;
-
-  // Determine who is more "smash-happy"
-  const tasteLabel = smashPctA > smashPctB
-    ? `${nameA} smashes more (${smashPctA}% vs ${smashPctB}%)`
-    : smashPctB > smashPctA
-    ? `${nameB} smashes more (${smashPctB}% vs ${smashPctA}%)`
-    : `Both equally picky (${smashPctA}% smash rate)`;
-
-  // Build summary HTML
-  let summaryHtml = `
-    <div class="h2h-summary">
-      <div class="h2h-sum-player">
-        <div class="player-avatar ${playerA.color}" style="width:32px;height:32px;font-size:.7rem;margin:0 auto">${initials(nameA)}</div>
-        <div class="h2h-sum-name">${nameA}</div>
-        <div class="h2h-sum-pills">
-          <span class="h2h-sum-pill pill-smash">🔥 ${smashesA}</span>
-          <span class="h2h-sum-pill pill-pass">❄️ ${passesA}</span>
-        </div>
-      </div>
-      <div class="h2h-sum-mid">
-        <div class="h2h-sum-agree">${agreePct}%</div>
-        <div class="h2h-sum-agree-label">AGREEMENT</div>
-        <div class="h2h-sum-disagree">${disagree} clash${disagree!==1?'es':''}</div>
-        <div style="font-size:.6rem;color:var(--muted);margin-top:.3rem;text-align:center;max-width:110px;letter-spacing:.3px">${tasteLabel}</div>
-      </div>
-      <div class="h2h-sum-player">
-        <div class="player-avatar ${playerB.color}" style="width:32px;height:32px;font-size:.7rem;margin:0 auto">${initials(nameB)}</div>
-        <div class="h2h-sum-name">${nameB}</div>
-        <div class="h2h-sum-pills">
-          <span class="h2h-sum-pill pill-smash">🔥 ${smashesB}</span>
-          <span class="h2h-sum-pill pill-pass">❄️ ${passesB}</span>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Build slide-by-slide table (only slides where at least one voted, plus vetoed for context)
-  const visibleRows = rows.filter(r => r.status !== 'skipped' || r.isVetoed);
-  const tableRowsHtml = visibleRows.length === 0
-    ? `<div class="h2h-empty">No overlapping votes to compare yet.</div>`
-    : `<div class="h2h-table-wrap">${visibleRows.map(r => {
-        const icon = r.isVetoed ? '🚫'
-          : r.status==='agree' ? '✅'
-          : r.status==='disagree' ? '💥'
-          : '–';
-        const rowClass = r.isVetoed ? 'vetoed-row'
-          : r.status==='agree' ? 'agree'
-          : r.status==='disagree' ? 'disagree'
-          : '';
-        return `
-          <div class="h2h-row ${rowClass}">
-            <div class="h2h-slide-num">${r.s}</div>
-            <div class="h2h-slide-label" style="color:${r.isVetoed?'var(--veto)':r.status==='agree'?'var(--green)':r.status==='disagree'?'var(--smash)':'var(--muted)'}">
-              ${r.isVetoed ? 'Unrated slide' : r.status==='agree' ? 'Agreed' : r.status==='disagree' ? 'Disagreed' : 'Incomplete'}
-            </div>
-            ${r.isVetoed
-              ? `<span class="h2h-vote-chip h2h-chip-veto" style="grid-column:3/-1">🚫 unrated</span>`
-              : `${voteChipHtml(r.vA)}${voteChipHtml(r.vB)}<div class="h2h-result-icon">${icon}</div>`
-            }
-          </div>
-        `;
-      }).join('')}</div>`;
-
-  result.innerHTML = summaryHtml + tableRowsHtml;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 function showResultsScreen(room, votesData){
   stopListeners();
   show('results');
 
-  const players=getPlayers(room);
-  const vetoed=room.vetoed||{};
-  const vetoedCount=Object.keys(vetoed).filter(k=>vetoed[k]).length;
-  const ratedSlides=room.totalSlides-vetoedCount;
+  const players = getPlayers(room);
+  const vetoed = room.vetoed || {};
+  const vetoedCount = Object.keys(vetoed).filter(k=>vetoed[k]).length;
+  const ratedSlides = room.totalSlides - vetoedCount;
 
-  document.getElementById('resSub').textContent=
+  document.getElementById('resSub').textContent =
     `${players.length} player${players.length!==1?'s':''} · ${ratedSlides} rated slide${ratedSlides!==1?'s':''}${vetoedCount>0?` · ${vetoedCount} unrated`:''}`;
 
   let totalSmash=0, totalPass=0;
-  for(let s=1;s<=room.totalSlides;s++){
+  for(let s=1; s<=room.totalSlides; s++){
     if(vetoed[s]) continue;
-    const sv=votesData[s]||votesData[String(s)]||{};
+    const sv = votesData[s]||votesData[String(s)]||{};
     players.forEach(p=>{
-      const v=sv[safeKey(p.name)];
+      const v = sv[safeKey(p.name)];
       if(v==='smash') totalSmash+=1;
       if(v==='supersmash') totalSmash+=2;
       if(v==='pass') totalPass+=1;
     });
   }
 
-  document.getElementById('statRow').innerHTML=`
+  document.getElementById('statRow').innerHTML = `
     <div class="stat-box"><div class="stat-n sn-smash">${totalSmash}</div><div class="stat-l">Total 🔥 Smashes</div></div>
     <div class="stat-box"><div class="stat-n sn-pass">${totalPass}</div><div class="stat-l">Total ❄️ Passes</div></div>
     <div class="stat-box"><div class="stat-n sn-acc">${players.length}</div><div class="stat-l">Players</div></div>
   `;
 
-  const list=document.getElementById('playerStatsList');
-  list.innerHTML='';
-  const sorted=[...players].sort((a,b)=>{
+  const list = document.getElementById('playerStatsList');
+  list.innerHTML = '';
+  const sorted = [...players].sort((a,b)=>{
     const sa=getPlayerStats(a,room,votesData), sb=getPlayerStats(b,room,votesData);
     return sb.smashPct-sa.smashPct;
   });
 
-  const contrarianName=getContrarianPlayer(players,room,votesData);
+  // ── Compute contrarian (disagrees with majority most) ──────────────────────
+  const contrarianName = getContrarianPlayer(players, room, votesData);
 
   sorted.forEach(p=>{
-    const st=getPlayerStats(p,room,votesData);
-    const isContrarian=(p.name===contrarianName);
-    const card=document.createElement('div');
-    card.className='pstat-card';
-    const pills=[];
+    const st = getPlayerStats(p, room, votesData);
+    const isContrarian = (p.name === contrarianName);
+    const card = document.createElement('div');
+    card.className = 'pstat-card';
+    const pills = [];
     pills.push(`<span class="pstat-pill pill-smash">🔥 ${st.smashes} smashed</span>`);
     pills.push(`<span class="pstat-pill pill-pass">❄️ ${st.passes} passed</span>`);
     if(st.supersmashes>0) pills.push(`<span class="pstat-pill pill-supersmash">💥 ${st.supersmashes}× doubled</span>`);
-    if(st.maxStreak>=3)   pills.push(`<span class="pstat-pill pill-streak">⚡ ${st.maxStreak}x streak</span>`);
-    if(st.skipped>0)      pills.push(`<span class="pstat-pill pill-skipped">💤 ${st.skipped} skipped</span>`);
-    if(st.altCount>=4)    pills.push(`<span class="pstat-pill pill-chaos">🎲 ${st.altCount} flips</span>`);
-    card.innerHTML=`
+    if(st.maxStreak>=3) pills.push(`<span class="pstat-pill pill-streak">⚡ ${st.maxStreak}x streak</span>`);
+    if(st.skipped>0)   pills.push(`<span class="pstat-pill pill-skipped">💤 ${st.skipped} skipped</span>`);
+    if(st.altCount>=4) pills.push(`<span class="pstat-pill pill-chaos">🎲 ${st.altCount} flips</span>`);
+
+    card.innerHTML = `
       <div class="pstat-top">
         <div class="player-avatar ${p.color}" style="width:28px;height:28px;font-size:.62rem">${initials(p.name)}</div>
         <div class="pstat-name">${p.name}</div>
         <div class="pstat-title">${st.title}</div>
-        ${isContrarian?'<span class="contrarian-badge">🤡 Contrarian</span>':''}
+        ${isContrarian ? '<span class="contrarian-badge">🤡 Contrarian</span>' : ''}
       </div>
       <div class="pstat-pills">${pills.join('')}</div>
-      <div class="pstat-bar-wrap"><div class="pstat-bar-fill" style="width:${st.smashPct}%"></div></div>
+      <div class="pstat-bar-wrap">
+        <div class="pstat-bar-fill" style="width:${st.smashPct}%"></div>
+      </div>
       <div style="display:flex;justify-content:space-between;margin-top:.3rem;font-size:.62rem;color:var(--muted);letter-spacing:1px">
         <span>SMASH RATE</span><span>${st.smashPct}%</span>
       </div>
@@ -3391,15 +3043,14 @@ function showResultsScreen(room, votesData){
     list.appendChild(card);
   });
 
-  renderSmashBoard('resultsSmashBoard',room,votesData);
-  renderHallOfFameShame(room,votesData,players);
-  renderAgreementsTracker(players,room,votesData);
-  setupH2H(players,room,votesData);
+  renderSmashBoard('resultsSmashBoard', room, votesData);
+  renderHallOfFameShame(room, votesData, players);
+  renderAgreementsTracker(players, room, votesData);
 }
 
 async function leaveRoom(){
   stopListeners(); stopSlideTimer();
-  if(!me.isMaster&&me.code&&me.name){
+  if(!me.isMaster && me.code && me.name){
     try{ await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null); }catch(e){}
   }
   goHome();
@@ -3407,7 +3058,7 @@ async function leaveRoom(){
 
 function goHome(){
   stopListeners(); stopSlideTimer();
-  me={name:'',code:'',isMaster:false};
+  me = { name:'', code:'', isMaster:false };
   lastSlide=-1; myVotedSlides={}; _latestRoom=null; _latestVotes={};
   slideImageCache={}; slideImagePromises={}; slidePreloadPromises={}; slideLoadToken=0;
   timerCfg={enabled:false,duration:15};
@@ -3418,10 +3069,9 @@ function goHome(){
   activePassEmojis=[...EMOJI_THEMES.classic.pass];
   vetoedSlides={};
   myDoubleDownUsed=false;
-  _h2hRoom=null; _h2hVotes=null; _h2hPlayers=null;
   updateVoteBtnIcons();
 
-  const img=document.getElementById('slideImg');
+  const img = document.getElementById('slideImg');
   img.onload=null; img.onerror=null; img.src=''; img.className='loading'; img.style.display='block';
   document.getElementById('slideLoader').classList.add('hidden');
   document.getElementById('slideError').classList.remove('visible');
@@ -3432,17 +3082,18 @@ function goHome(){
   document.getElementById('vetoBadgeTopbar').classList.add('hidden');
   document.getElementById('ddUsedNote').classList.add('hidden');
   document.getElementById('doubleDownBtn').classList.remove('hidden');
+
   show('entry');
 }
 
-document.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&!document.getElementById('entry').classList.contains('hidden')){
+document.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !document.getElementById('entry').classList.contains('hidden')){
     document.getElementById('joinCode').value.trim()?joinRoom():createRoom();
   }
   if(!document.getElementById('game').classList.contains('hidden')){
     if(e.key==='ArrowLeft') castVote('smash');
     if(e.key==='ArrowRight') castVote('pass');
-    if(e.key===' '&&me.isMaster){ e.preventDefault(); toggleTimerPause(); }
+    if(e.key===' ' && me.isMaster){ e.preventDefault(); toggleTimerPause(); }
   }
 });
 
