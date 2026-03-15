@@ -310,27 +310,6 @@ input:focus{
   border-color:rgba(255,221,0,.4);
   background:rgba(255,221,0,.06)
 }
-.player-chip .kick-btn{
-  margin-left:auto;
-  background:#2a1020;
-  color:#ff8ea1;
-  border:1px solid rgba(255,107,129,.55);
-  border-radius:10px;
-  padding:.34rem .62rem;
-  font-size:.72rem;
-  font-weight:700;
-  letter-spacing:.6px;
-  cursor:pointer;
-  transition:transform .12s ease, background .12s ease, border-color .12s ease;
-}
-.player-chip .kick-btn:hover{
-  background:#3a152a;
-  border-color:#ff6b81;
-  transform:translateY(-1px);
-}
-.player-chip .kick-btn:active{
-  transform:translateY(0);
-}
 .waiting-note{
   color:var(--muted);
   font-size:.82rem;
@@ -1875,7 +1854,7 @@ input:focus{
 
     <!-- Agreements Tracker -->
     <div class="agreements-panel" id="agreementsPanel" style="display:none">
-      <div class="agreements-title">👯 AGREEMENT TRACKER</div>
+      <div class="agreements-title">⚔️ HEAD-TO-HEAD COMPARISON</div>
       <div class="agreements-list" id="agreementsList"></div>
     </div>
 
@@ -2518,6 +2497,7 @@ function renderWaiting(room){
     chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
 
     const crown = p.name===room.hostName ? '<span style="font-size:.72rem">👑</span>' : '';
+    const kick = '';
 
     chip.innerHTML = `
       <div class="player-avatar ${p.color}">${initials(p.name)}</div>
@@ -2983,7 +2963,7 @@ function renderAgreementsTracker(players, room, votesData){
     for(let j = i+1; j < players.length; j++){
       const ka = safeKey(players[i].name);
       const kb = safeKey(players[j].name);
-      let agree = 0, total = 0;
+      let agree = 0, disagree = 0, total = 0;
 
       for(let s = 1; s <= room.totalSlides; s++){
         if(vetoed[s]) continue;
@@ -2994,33 +2974,81 @@ function renderAgreementsTracker(players, room, votesData){
         const normA = (va === 'supersmash') ? 'smash' : va;
         const normB = (vb === 'supersmash') ? 'smash' : vb;
         if(normA === normB) agree++;
+        else disagree++;
       }
 
-      if(total >= 3){
+      if(total >= 2){
         pairs.push({
           nameA: players[i].name,
           nameB: players[j].name,
-          agree, total,
-          pct: Math.round((agree / total) * 100)
+          agree, disagree, total,
+          pct: Math.round((agree / total) * 100),
+          disagreePct: Math.round((disagree / total) * 100)
         });
       }
     }
   }
 
   if(pairs.length === 0){ panel.style.display='none'; return; }
-  pairs.sort((a,b) => b.pct - a.pct);
-  const top = pairs.slice(0, Math.min(5, pairs.length));
+
+  const mostAligned = [...pairs].sort((a,b) => {
+    if(b.pct !== a.pct) return b.pct - a.pct;
+    return b.total - a.total;
+  })[0];
+
+  const biggestClash = [...pairs].sort((a,b) => {
+    if(b.disagreePct !== a.disagreePct) return b.disagreePct - a.disagreePct;
+    return b.total - a.total;
+  })[0];
 
   panel.style.display = '';
 
-  top.forEach(pair => {
+  if(mostAligned){
+    const row = document.createElement('div');
+    row.innerHTML = `
+      <div class="agreement-row">
+        <div style="flex:1;min-width:0">
+          <div class="agreement-names">🤝 ${mostAligned.nameA} &amp; ${mostAligned.nameB}</div>
+          <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${mostAligned.pct}%"></div></div>
+          <div class="agreement-note">Matched on ${mostAligned.agree} of ${mostAligned.total} rated slides</div>
+        </div>
+        <div class="agreement-pct">${mostAligned.pct}%</div>
+      </div>
+    `;
+    list.appendChild(row);
+  }
+
+  if(biggestClash){
+    const row = document.createElement('div');
+    row.innerHTML = `
+      <div class="agreement-row">
+        <div style="flex:1;min-width:0">
+          <div class="agreement-names">⚡ ${biggestClash.nameA} vs ${biggestClash.nameB}</div>
+          <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${biggestClash.disagreePct}%;background:linear-gradient(90deg,#ff8a8a,#ff6b81)"></div></div>
+          <div class="agreement-note">Disagreed on ${biggestClash.disagree} of ${biggestClash.total} rated slides</div>
+        </div>
+        <div class="agreement-pct">${biggestClash.disagreePct}%</div>
+      </div>
+    `;
+    list.appendChild(row);
+  }
+
+  const remaining = pairs
+    .filter(p => p !== mostAligned && p !== biggestClash)
+    .sort((a,b) => {
+      if(b.pct !== a.pct) return b.pct - a.pct;
+      return b.total - a.total;
+    })
+    .slice(0, 3);
+
+  remaining.forEach(pair => {
     const row = document.createElement('div');
     row.innerHTML = `
       <div class="agreement-row">
         <div style="flex:1;min-width:0">
           <div class="agreement-names">👯 ${pair.nameA} &amp; ${pair.nameB}</div>
           <div class="agreement-bar-wrap"><div class="agreement-bar-fill" style="width:${pair.pct}%"></div></div>
-          <div class="agreement-note">Agreed on ${pair.agree} of ${pair.total} slides</div>
+          <div class="agreement-note">Agreed on ${pair.agree} of ${pair.total} rated slides</div>
         </div>
         <div class="agreement-pct">${pair.pct}%</div>
       </div>
