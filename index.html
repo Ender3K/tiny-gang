@@ -2606,12 +2606,16 @@ function renderVoters(room, votesData){
 
     const row = document.createElement('div');
     row.className = 'voter-row';
+    const canKick = me.isMaster && p.name!==room.hostName && p.name!==me.name;
     row.innerHTML = `
       <div class="voter-name-wrap">
         <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.58rem">${initials(p.name)}</div>
         ${p.name}
       </div>
-      ${badgeHtml}
+      <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">
+        ${badgeHtml}
+        ${canKick ? `<button class="kick-btn" onclick="kickPlayer(${JSON.stringify(p.name)})">KICK</button>` : ``}
+      </div>
     `;
     list.appendChild(row);
   });
@@ -2690,7 +2694,7 @@ function listenRoom(){
     _latestRoom = room;
 
     const myKey = safeKey(me.name);
-    if(!me.isMaster && me.name && !(room.players||{})[myKey]){
+    if(me.name && !(room.players||{})[myKey]){
       showToast('You were removed from the room');
       goHome();
       return;
