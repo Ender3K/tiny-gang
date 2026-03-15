@@ -2518,9 +2518,6 @@ function renderWaiting(room){
     chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
 
     const crown = p.name===room.hostName ? '<span style="font-size:.72rem">👑</span>' : '';
-    const kick = (me.isMaster && p.name!==room.hostName)
-      ? `<button class="kick-btn" onclick="kickPlayer(${JSON.stringify(p.name)})">KICK</button>`
-      : '';
 
     chip.innerHTML = `
       <div class="player-avatar ${p.color}">${initials(p.name)}</div>
