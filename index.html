@@ -964,6 +964,29 @@ input:focus{
 }
 .btn-veto.active:hover{background:rgba(155,89,182,.07)}
 
+/* ── In-game late join toggle ── */
+.late-join-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.5rem;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:.6rem .85rem;
+  margin-top:.5rem;
+}
+.late-join-label{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  font-size:.72rem;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.late-join-label span{font-size:.88rem}
+
 /* ── In-game timer settings ── */
 .timer-settings-inline{
   background:var(--surface);
@@ -1868,6 +1891,19 @@ input:focus{
         </div>
       </div>
 
+      <!-- ── Late join config (host only, waiting room) ── -->
+      <div class="timer-config" id="lockJoinsPanel" style="display:none">
+        <div class="timer-config-title">🔒 Late Joining</div>
+        <div class="timer-toggle-row">
+          <span class="timer-toggle-label">Allow players to join mid-game</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="lateJoinEnabled" checked />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint" style="margin-top:0">When off, new players cannot join once the game has started.</p>
+      </div>
+
       <p class="waiting-note" id="waitingNote">Waiting for players to join…</p>
       <button class="btn btn-fire" id="startBtn" onclick="startGame()" style="display:none">START GAME 🚀</button>
       <button class="btn btn-ghost" onclick="leaveRoom()">LEAVE ROOM</button>
@@ -2006,6 +2042,18 @@ input:focus{
               </div>
             </div>
 
+            <!-- ── Late join toggle (in-game, host only) ── -->
+            <div class="late-join-row">
+              <div class="late-join-label">
+                <span>🔒</span>
+                <span>Allow late joining</span>
+              </div>
+              <label class="toggle-switch-sm">
+                <input type="checkbox" id="lateJoinGame" checked onchange="onGameLateJoinToggle()" />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+
             <button class="btn-next" id="nextBtn" onclick="masterNext()">NEXT SLIDE →</button>
 
             <!-- Veto button -->
@@ -2108,11 +2156,9 @@ let timerState = {
 let timerCfg = { enabled: false, duration: 15 };
 
 // ── Double Down state ────────────────────────────────────────────────────────
-// Track whether this player has used their double down this game
 let myDoubleDownUsed = false;
 
 // ── Veto state ───────────────────────────────────────────────────────────────
-// vetoedSlides: Set of slide numbers marked unrated — synced from Firebase room.vetoed
 let vetoedSlides = {};
 
 document.addEventListener('fb-ready', () => { dbReady = true; });
@@ -2270,17 +2316,22 @@ function onGameCustomTimerChange(){
   }
 }
 
-// ── ✨ NEW: Per-slide timer extend ────────────────────────────────────────────
+// ── ✨ In-game late join toggle (host, live) ──────────────────────────────────
+async function onGameLateJoinToggle(){
+  if(!me.isMaster) return;
+  const allowed = document.getElementById('lateJoinGame').checked;
+  await window._update(roomRef(me.code), { lockJoins: !allowed });
+  showToast(allowed ? '🔓 Late joining enabled' : '🔒 Late joining disabled');
+}
+
+// ── ✨ Per-slide timer extend ────────────────────────────────────────────────
 function extendTimer(seconds){
   if(!timerState.enabled) return;
   timerState.remaining = Math.min(timerState.remaining + seconds, timerState.duration + 60);
   updateTimerUI();
-
-  // Flash the timer display to acknowledge
   const disp = document.getElementById('timerDisplay');
   if(disp){
     disp.classList.remove('extend-flash');
-    // Force reflow to restart animation
     void disp.offsetWidth;
     disp.classList.add('extend-flash');
     setTimeout(() => disp.classList.remove('extend-flash'), 450);
@@ -2353,8 +2404,7 @@ function updateTimerUI(){
   if(slideWrap) slideWrap.classList.toggle('timer-urgent', urgent);
 }
 
-// ── ✨ NEW: Veto Power ────────────────────────────────────────────────────────
-// vetoedSlides is synced from room.vetoed (object of {slideNum: true})
+// ── Veto Power ───────────────────────────────────────────────────────────────
 async function toggleVeto(){
   if(!me.isMaster) return;
   const snap = await window._get(roomRef(me.code));
@@ -2384,7 +2434,6 @@ function applyVetoUI(isVetoed){
     vetoBtn.classList.toggle('active', isVetoed);
     vetoBtn.textContent = isVetoed ? '✅ REMOVE VETO' : '🚫 MARK AS UNRATED';
   }
-  // Disable voting buttons when vetoed
   if(voteBtns){
     voteBtns.querySelectorAll('.vbtn').forEach(b => {
       if(isVetoed) b.disabled = true;
@@ -2393,8 +2442,7 @@ function applyVetoUI(isVetoed){
   }
 }
 
-// ── ✨ NEW: Double Down ───────────────────────────────────────────────────────
-// castDoubleDown: cast a 'supersmash' vote — counts as 2 in tallies
+// ── Double Down ───────────────────────────────────────────────────────────────
 async function castDoubleDown(){
   if(myDoubleDownUsed) return;
   const snap = await window._get(roomRef(me.code));
@@ -2402,7 +2450,6 @@ async function castDoubleDown(){
   const room = snap.val();
   const s = room.currentSlide;
   if(myVotedSlides[s]) return;
-  // Check veto
   if((room.vetoed || {})[s]) return;
 
   myDoubleDownUsed = true;
@@ -2412,7 +2459,6 @@ async function castDoubleDown(){
   showToast('💥 DOUBLE DOWN! ×2 SMASH!', 2600);
   spawnReaction('smash', 8);
 
-  // Persist flag so if they re-join they can't double down again (best-effort)
   await window._set(window._ref(window._db, `ddused/${me.code}/${safeKey(me.name)}`), true);
 }
 
@@ -2538,7 +2584,8 @@ async function createRoom(){
       totalSlides:deck.totalSlides, slidePageIds:deck.slidePageIds,
       state:'waiting', currentSlide:1,
       players:{ [safeKey(name)]:{ name, color:avatarClass(name) } },
-      vetoed: {}
+      vetoed: {},
+      lockJoins: false,
     };
     await window._set(roomRef(code), room);
     me = { name, code, isMaster:true };
@@ -2607,13 +2654,13 @@ function getSmashTotals(room, votesData){
   players.forEach(p => totals[safeKey(p.name)] = 0);
 
   for(let s=1; s<=room.totalSlides; s++){
-    if(vetoed[s]) continue; // Skip vetoed slides in totals
+    if(vetoed[s]) continue;
     const slideVotes = votesData[s] || votesData[String(s)] || {};
     players.forEach(p => {
       const key = safeKey(p.name);
       const v = slideVotes[key];
       if(v === 'smash') totals[key] += 1;
-      if(v === 'supersmash') totals[key] += 2; // Double Down = 2 points
+      if(v === 'supersmash') totals[key] += 2;
     });
   }
 
@@ -2656,7 +2703,7 @@ async function joinRoom(){
   if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
   const room = snap.val();
   if(room.state==='done') return showErr('joinErr','This game has already ended.');
-  if(room.state==='playing') return showErr('joinErr','This game is already in progress. Wait for the next round!');
+  if(room.state==='playing' && room.lockJoins) return showErr('joinErr','The host has locked the room — late joining is disabled.');
 
   await window._update(window._ref(window._db,`rooms/${code}/players`),{
     [safeKey(name)]:{ name, color:avatarClass(name) }
@@ -2681,6 +2728,7 @@ function enterWaiting(){
     document.getElementById('timerCustom').value = timerCfg.duration;
     document.getElementById('emojiConfigPanel').style.display = '';
     applyEmojiTheme(emojiCfg.theme);
+    document.getElementById('lockJoinsPanel').style.display = '';
   }
   listenRoom();
 }
@@ -2709,13 +2757,11 @@ function renderWaiting(room){
     chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
 
     const crown = p.name===room.hostName ? '<span style="font-size:.72rem">👑</span>' : '';
-    const kick = '';
 
     chip.innerHTML = `
       <div class="player-avatar ${p.color}">${initials(p.name)}</div>
       <span>${p.name}</span>
       ${crown}
-      ${kick}
     `;
     grid.appendChild(chip);
   });
@@ -2734,10 +2780,12 @@ function renderWaiting(room){
 
 async function startGame(){
   const sets = resolveEmojiSets();
+  const lockJoins = !document.getElementById('lateJoinEnabled').checked;
   await window._update(roomRef(me.code),{
     state:'playing', currentSlide:1,
     timerEnabled:timerCfg.enabled, timerDuration:timerCfg.duration,
     emojiSmash:sets.smash, emojiPass:sets.pass,
+    lockJoins,
   });
 }
 
@@ -2777,6 +2825,9 @@ function renderGame(room){
     document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>{
       b.classList.toggle('active', parseInt(b.textContent)===timerState.duration);
     });
+    // Sync late join toggle to current room state
+    const lateJoinChk = document.getElementById('lateJoinGame');
+    if(lateJoinChk) lateJoinChk.checked = !room.lockJoins;
   }
 
   // Sync veto state for this slide
@@ -2833,7 +2884,7 @@ function renderVoters(room, votesData){
     const key = safeKey(p.name);
     const choice = slideVotes[key];
     if(choice==='smash') smashes += 1;
-    if(choice==='supersmash') smashes += 2; // Double Down counts as 2
+    if(choice==='supersmash') smashes += 2;
     if(choice==='pass')  passes  += 1;
 
     let badgeHtml = `<span class="pending-dot"></span>`;
@@ -2900,7 +2951,7 @@ async function castVote(choice){
   const room = snap.val();
   const s = room.currentSlide;
   if(myVotedSlides[s]) return;
-  if((room.vetoed||{})[s]) return; // Can't vote on vetoed slide
+  if((room.vetoed||{})[s]) return;
 
   myVotedSlides[s] = choice;
   await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
@@ -2989,7 +3040,7 @@ function getPlayerStats(player, room, votesData){
   let maxStreak=0, currentStreak=0, altCount=0, lastVote=null;
 
   for(let s=1; s<=tot; s++){
-    if(vetoed[s]){ skipped++; continue; } // Vetoed = skip from stats
+    if(vetoed[s]){ skipped++; continue; }
     const sv = votesData[s]||votesData[String(s)]||{};
     const v = sv[key];
     if(v==='smash') smashes++;
@@ -3027,7 +3078,6 @@ function getPlayerStats(player, room, votesData){
   return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title, supersmashes };
 }
 
-// ── Contrarian: player who disagrees with majority most often ─────────────────
 function getContrarianPlayer(players, room, votesData){
   if(players.length < 2) return null;
   const vetoed = room.vetoed || {};
@@ -3049,7 +3099,6 @@ function getContrarianPlayer(players, room, votesData){
       const myVote = sv[key];
       if(!myVote) continue;
 
-      // Count majority vote among ALL players for this slide
       let smashCount = 0, passCount = 0;
       players.forEach(op => {
         const ov = sv[safeKey(op.name)];
@@ -3074,7 +3123,6 @@ function getContrarianPlayer(players, room, votesData){
   return best ? best.name : null;
 }
 
-// ── Hall of Fame (most unanimous smash) & Shame (most unanimous pass) ─────────
 function renderHallOfFameShame(room, votesData, players){
   const section = document.getElementById('hallSection');
   section.innerHTML = '';
@@ -3138,7 +3186,6 @@ function renderHallOfFameShame(room, votesData, players){
       <div class="hall-voters">${data.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
     `;
 
-    // Async-load the thumbnail after card is in DOM
     if(room.slidesUrl && room.slidePageIds){
       const pageId = room.slidePageIds[data.slide - 1];
       if(pageId){
@@ -3166,7 +3213,6 @@ function renderHallOfFameShame(room, votesData, players){
   if(!bestSmash && !bestPass) section.style.display = 'none';
 }
 
-// ── Head-to-Head Comparison ───────────────────────────────────────────────────
 function renderAgreementsTracker(players, room, votesData){
   const panel = document.getElementById('agreementsPanel');
   const selectA = document.getElementById('h2hPlayerA');
@@ -3431,7 +3477,6 @@ function showResultsScreen(room, votesData){
     return sb.smashPct-sa.smashPct;
   });
 
-  // ── Compute contrarian (disagrees with majority most) ──────────────────────
   const contrarianName = getContrarianPlayer(players, room, votesData);
 
   sorted.forEach(p=>{
@@ -3504,6 +3549,7 @@ function goHome(){
   document.getElementById('vetoBadgeTopbar').classList.add('hidden');
   document.getElementById('ddUsedNote').classList.add('hidden');
   document.getElementById('doubleDownBtn').classList.remove('hidden');
+  document.getElementById('lateJoinEnabled').checked=true;
 
   show('entry');
 }
