@@ -2656,6 +2656,7 @@ async function joinRoom(){
   if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
   const room = snap.val();
   if(room.state==='done') return showErr('joinErr','This game has already ended.');
+  if(room.state==='playing') return showErr('joinErr','This game is already in progress. Wait for the next round!');
 
   await window._update(window._ref(window._db,`rooms/${code}/players`),{
     [safeKey(name)]:{ name, color:avatarClass(name) }
