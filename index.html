@@ -2130,7 +2130,14 @@ input:focus{
       </div>
     </div>
 
-    <button class="restart-btn" onclick="goHome()">PLAY AGAIN 🔄</button>
+    <!-- ── Download + Restart buttons ── -->
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;align-items:center;width:100%;max-width:760px">
+      <button class="restart-btn" onclick="goHome()">PLAY AGAIN 🔄</button>
+      <button class="restart-btn" id="downloadBtn" onclick="downloadResults(_latestRoom,_latestVotes)"
+        style="background:linear-gradient(135deg,#1a1a2e,#252545);border:1px solid var(--accent);color:var(--accent);">
+        DOWNLOAD RESULTS 📥
+      </button>
+    </div>
   </div>
 </div>
 
@@ -3568,6 +3575,82 @@ document.addEventListener('keydown', e=>{
 document.getElementById('joinCode').addEventListener('input',function(){
   this.value=this.value.toUpperCase();
 });
+
+// ── CSV Download ─────────────────────────────────────────────────────────────
+function escapeCsv(val){
+  const s = String(val ?? '');
+  return (s.includes(',') || s.includes('"') || s.includes('\n'))
+    ? '"' + s.replace(/"/g, '""') + '"'
+    : s;
+}
+function rowToCsv(arr){ return arr.map(escapeCsv).join(','); }
+
+function downloadResults(room, votesData){
+  if(!room) return showToast('No results to download.');
+  const players = getPlayers(room);
+  const vetoed = room.vetoed || {};
+  const lines = [];
+
+  // === Summary ===
+  lines.push('=== GAME SUMMARY ===');
+  lines.push(rowToCsv(['Room Code', room.code || '']));
+  lines.push(rowToCsv(['Total Slides', room.totalSlides]));
+  const vetoedCount = Object.keys(vetoed).filter(k => vetoed[k]).length;
+  lines.push(rowToCsv(['Rated Slides', room.totalSlides - vetoedCount]));
+  lines.push(rowToCsv(['Unrated Slides', vetoedCount]));
+  lines.push(rowToCsv(['Players', players.map(p => p.name).join('; ')]));
+  lines.push('');
+
+  // === Per-slide results ===
+  lines.push('=== SLIDE RESULTS ===');
+  lines.push(rowToCsv(['Slide', 'Status', 'Smashes (weighted)', 'Passes', ...players.map(p => p.name)]));
+  for(let s = 1; s <= room.totalSlides; s++){
+    const isVetoed = !!vetoed[s];
+    const sv = votesData[s] || votesData[String(s)] || {};
+    let smashes = 0, passes = 0;
+    const votes = players.map(p => {
+      const v = sv[safeKey(p.name)] || '';
+      if(v === 'smash') smashes += 1;
+      if(v === 'supersmash') smashes += 2;
+      if(v === 'pass') passes += 1;
+      if(isVetoed) return 'unrated';
+      return v || '';
+    });
+    lines.push(rowToCsv([
+      s,
+      isVetoed ? 'unrated' : 'rated',
+      isVetoed ? '' : smashes,
+      isVetoed ? '' : passes,
+      ...votes
+    ]));
+  }
+  lines.push('');
+
+  // === Player stats ===
+  lines.push('=== PLAYER STATS ===');
+  lines.push(rowToCsv([
+    'Player', 'Title', 'Smashes (weighted)', 'Passes',
+    'Skipped', 'Smash %', 'Max Streak', 'Super Smashes', 'Chaos Flips'
+  ]));
+  players.forEach(p => {
+    const st = getPlayerStats(p, room, votesData);
+    lines.push(rowToCsv([
+      p.name, st.title, st.smashes, st.passes,
+      st.skipped, st.smashPct + '%', st.maxStreak, st.supersmashes, st.altCount
+    ]));
+  });
+
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'smash-or-pass-' + (room.code || 'results') + '-results.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  showToast('📥 Results downloaded!');
+}
 </script>
 </body>
 </html>
