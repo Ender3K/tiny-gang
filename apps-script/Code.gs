@@ -38,7 +38,9 @@ function doGet(e) {
         slidePageIds,
         timingVersion: 1,
         slideDurations: timing.durations,
-        timingWarnings: timing.warnings
+        timingWarnings: timing.warnings,
+        notesRulesVersion: 1,
+        slideVotingDisabled: parseSlideVotingDisabled(notes)
       });
     }
 
@@ -83,6 +85,15 @@ function doGet(e) {
   } catch (err) {
     return respond({ ok: false, error: String(err && err.message ? err.message : err) });
   }
+}
+
+/** A standalone ! disables voting on that slide only. */
+function parseSlideVotingDisabled(notes) {
+  const disabled = {};
+  notes.forEach((note, index) => {
+    if (/(?:^|\s)!(?=\s|$)/.test(String(note || ""))) disabled[index + 1] = true;
+  });
+  return disabled;
 }
 
 /** Resolve notes in deck order. Keys are one-based slide numbers, not page IDs. */

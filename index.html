@@ -2315,7 +2315,33 @@ async function fetchSlidePageIdsViaAppsScript(rawUrl) {
   const data = await requestAppsScript(`${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`);
   if (!data || !data.ok) throw new Error(data?.error || "Could not fetch slide IDs.");
   data.slideDurations = normalizeSlideDurations(data.slideDurations, data.totalSlides);
+  data.slideVotingDisabled = normalizeSlideVotingDisabled(data.slideVotingDisabled, data.totalSlides);
   return data;
+}
+
+function normalizeSlideVotingDisabled(disabled, totalSlides){
+  const result = {};
+  if(!disabled || typeof disabled !== 'object' || Array.isArray(disabled)) return result;
+  for(let slide = 1; slide <= totalSlides; slide++){
+    if(disabled[slide] === true) result[slide] = true;
+  }
+  return result;
+}
+
+function isNotesVotingDisabled(room, slide){
+  return room.slideVotingDisabled?.[slide] === true;
+}
+
+function isSlideUnrated(room, slide){
+  return isNotesVotingDisabled(room, slide) || !!room.vetoed?.[slide];
+}
+
+function getUnratedSlideCount(room){
+  let count = 0;
+  for(let slide = 1; slide <= room.totalSlides; slide++){
+    if(isSlideUnrated(room, slide)) count++;
+  }
+  return count;
 }
 
 function isValidSlideDuration(seconds){
@@ -2525,6 +2551,7 @@ async function toggleVeto(){
   if(!snap.exists()) return;
   const room = snap.val();
   const s = room.currentSlide;
+  if(isNotesVotingDisabled(room, s)) return;
   const already = (room.vetoed || {})[s] === true;
   const update = {};
   update[`vetoed/${s}`] = already ? null : true;
@@ -2532,7 +2559,8 @@ async function toggleVeto(){
   showToast(already ? '✅ Veto removed' : '🚫 Slide marked unrated');
 }
 
-function applyVetoUI(isVetoed){
+function applyVetoUI(isVetoed, notesDisabled = false){
+  const isUnrated = isVetoed || notesDisabled;
   const overlay = document.getElementById('vetoOverlay');
   const badge = document.getElementById('vetoBadgeTopbar');
   const slideWrap = document.getElementById('slideWrap');
@@ -2541,16 +2569,24 @@ function applyVetoUI(isVetoed){
   const voteBtns = document.getElementById('voteBtns');
 
   if(overlay) overlay.classList.toggle('visible', false);
-  if(badge) badge.classList.toggle('hidden', !isVetoed);
-  if(slideWrap) slideWrap.classList.toggle('vetoed', isVetoed);
-  if(voteZone) voteZone.classList.toggle('vetoed-zone', isVetoed);
+  if(badge){
+    badge.classList.toggle('hidden', !isUnrated);
+    badge.textContent = notesDisabled ? 'VOTING DISABLED' : '🚫 UNRATED SLIDE';
+  }
+  if(slideWrap) slideWrap.classList.toggle('vetoed', isUnrated);
+  if(voteZone) voteZone.classList.toggle('vetoed-zone', isUnrated);
+  document.getElementById('voteHead').textContent = isUnrated
+    ? (notesDisabled ? 'Voting is disabled for this slide' : 'This slide is unrated')
+    : (me.isMaster ? 'Host can vote too' : 'Cast your vote');
+  if(isUnrated) document.getElementById('votedBanner').className = 'voted-banner';
   if(vetoBtn && me.isMaster){
-    vetoBtn.classList.toggle('active', isVetoed);
-    vetoBtn.textContent = isVetoed ? '✅ REMOVE VETO' : '🚫 MARK AS UNRATED';
+    vetoBtn.disabled = notesDisabled;
+    vetoBtn.classList.toggle('active', isUnrated);
+    vetoBtn.textContent = notesDisabled ? 'VOTING DISABLED IN NOTES' : (isVetoed ? '✅ REMOVE VETO' : '🚫 MARK AS UNRATED');
   }
   if(voteBtns){
     voteBtns.querySelectorAll('.vbtn').forEach(b => {
-      if(isVetoed) b.disabled = true;
+      if(isUnrated) b.disabled = true;
       else if(!myVotedSlides[_latestRoom?.currentSlide]) b.disabled = false;
     });
   }
@@ -2564,7 +2600,7 @@ async function castDoubleDown(){
   const room = snap.val();
   const s = room.currentSlide;
   if(myVotedSlides[s]) return;
-  if((room.vetoed || {})[s]) return;
+  if(isSlideUnrated(room, s)) return;
 
   myDoubleDownUsed = true;
   myVotedSlides[s] = 'supersmash';
@@ -2697,6 +2733,8 @@ async function createRoom(){
       code, hostName:name, slidesUrl:url,
       totalSlides:deck.totalSlides, slidePageIds:deck.slidePageIds,
       slideDurations:deck.slideDurations,
+      slideVotingDisabled:deck.slideVotingDisabled,
+      notesVotingAvailable:deck.notesRulesVersion === 1,
       notesTimingAvailable:deck.timingVersion === 1,
       notesTimingWarnings:Array.isArray(deck.timingWarnings) ? deck.timingWarnings.filter(w => typeof w === 'string') : [],
       state:'waiting', currentSlide:1,
@@ -2776,7 +2814,7 @@ function getSmashTotals(room, votesData){
   players.forEach(p => totals[safeKey(p.name)] = 0);
 
   for(let s=1; s<=room.totalSlides; s++){
-    if(vetoed[s]) continue;
+    if(isSlideUnrated(room, s)) continue;
     const slideVotes = votesData[s] || votesData[String(s)] || {};
     players.forEach(p => {
       const key = safeKey(p.name);
@@ -2876,6 +2914,9 @@ function renderWaiting(room){
   document.getElementById('notesTimingStatus').textContent = room.notesTimingAvailable
     ? `${timedSlides} slide${timedSlides === 1 ? '' : 's'} timed from speaker notes. Use #10 for one slide, #10< to start a range, and #> to end it.${warnings.length ? ' ' + warnings[0] : ''}`
     : 'Speaker-note timings are not available yet. The default timer will be used.';
+  document.getElementById('notesTimingStatus').textContent += room.notesVotingAvailable
+    ? ` ${Object.values(room.slideVotingDisabled || {}).filter(value => value === true).length} slides have voting disabled by ! in the notes.`
+    : ' The ! voting marker needs the updated slide service.';
   const players = getPlayers(room);
   const grid = document.getElementById('playersGrid');
   grid.innerHTML = '';
@@ -2967,7 +3008,8 @@ function renderGame(room){
   // Sync veto state for this slide
   vetoedSlides = vetoed;
   const isVetoed = !!vetoed[s];
-  applyVetoUI(isVetoed);
+  const isUnrated = isSlideUnrated(room, s);
+  applyVetoUI(isVetoed, isNotesVotingDisabled(room, s));
 
   if(s !== lastSlide){
     lastSlide = s;
@@ -2983,10 +3025,10 @@ function renderGame(room){
       if(pid) prefetchSlide(room.slidesUrl, pid);
     }
 
-    if(!myVotedSlides[s] && !isVetoed){
+    if(!myVotedSlides[s] && !isUnrated){
       document.getElementById('votedBanner').className = 'voted-banner';
       document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=false);
-    } else if(myVotedSlides[s]){
+    } else if(myVotedSlides[s] && !isUnrated){
       markVotedUI(myVotedSlides[s]);
     }
     updateDoubleDownUI();
@@ -3013,7 +3055,8 @@ function renderGame(room){
 // ── Vote rendering: supersmash shows as ×2 in tally ─────────────────────────
 function renderVoters(room, votesData){
   const s = room.currentSlide;
-  const slideVotes = votesData[s]||{};
+  const isUnrated = isSlideUnrated(room, s);
+  const slideVotes = isUnrated ? {} : (votesData[s]||{});
   const players = getPlayers(room);
   const list = document.getElementById('voterList');
   let smashes=0, passes=0;
@@ -3027,6 +3070,7 @@ function renderVoters(room, votesData){
     if(choice==='pass')  passes  += 1;
 
     let badgeHtml = `<span class="pending-dot"></span>`;
+    if(isUnrated) badgeHtml = `<span class="voter-badge">UNRATED</span>`;
     if(choice==='smash')      badgeHtml = `<span class="voter-badge badge-smash">🔥 SMASH</span>`;
     if(choice==='supersmash') badgeHtml = `<span class="voter-badge badge-supersmash">💥 ×2</span>`;
     if(choice==='pass')       badgeHtml = `<span class="voter-badge badge-pass">❄️ PASS</span>`;
@@ -3090,7 +3134,7 @@ async function castVote(choice){
   const room = snap.val();
   const s = room.currentSlide;
   if(myVotedSlides[s]) return;
-  if((room.vetoed||{})[s]) return;
+  if(isSlideUnrated(room, s)) return;
 
   myVotedSlides[s] = choice;
   await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
@@ -3179,6 +3223,7 @@ function getPlayerStats(player, room, votesData){
   let maxStreak=0, currentStreak=0, altCount=0, lastVote=null;
 
   for(let s=1; s<=tot; s++){
+    if(isNotesVotingDisabled(room, s)) continue;
     if(vetoed[s]){ skipped++; continue; }
     const sv = votesData[s]||votesData[String(s)]||{};
     const v = sv[key];
@@ -3233,7 +3278,7 @@ function getContrarianPlayer(players, room, votesData){
     );
 
     for(let s = 1; s <= maxSlides; s++){
-      if(vetoed[s]) continue;
+      if(isSlideUnrated(room, s)) continue;
       const sv = votesData[s] || votesData[String(s)] || {};
       const myVote = sv[key];
       if(!myVote) continue;
@@ -3272,7 +3317,7 @@ function renderHallOfFameShame(room, votesData, players){
   let bestPass  = null, bestPassScore  = -1;
 
   for(let s = 1; s <= room.totalSlides; s++){
-    if(vetoed[s]) continue;
+    if(isSlideUnrated(room, s)) continue;
     const sv = votesData[s] || votesData[String(s)] || {};
     let smashVoters = [], passVoters = [], totalVoted = 0;
 
@@ -3404,6 +3449,7 @@ function renderAgreementsTracker(players, room, votesData){
     if(vote === 'smash') return 'SMASH';
     if(vote === 'pass') return 'PASS';
     if(vote === 'veto') return 'VETO';
+    if(vote === 'unrated') return 'UNRATED';
     return '—';
   };
   const voteClass = (vote) => {
@@ -3454,10 +3500,10 @@ function renderAgreementsTracker(players, room, votesData){
     );
 
     for(let s = 1; s <= maxSlides; s++){
-      const isVetoed = !!(vetoed[s] || vetoed[String(s)]);
+      const isVetoed = isSlideUnrated(room, s);
       const sv = votesData[s] || votesData[String(s)] || {};
-      const rawA = getVoteForPlayer(sv, nameA, keyA);
-      const rawB = getVoteForPlayer(sv, nameB, keyB);
+      const rawA = isVetoed ? '' : getVoteForPlayer(sv, nameA, keyA);
+      const rawB = isVetoed ? '' : getVoteForPlayer(sv, nameB, keyB);
 
       if(rawA === 'smash') smashA += 1;
       if(rawA === 'supersmash') smashA += 2;
@@ -3474,7 +3520,7 @@ function renderAgreementsTracker(players, room, votesData){
       if(isVetoed){
         status = 'veto';
         statusIcon = '🚫';
-        statusLabel = 'Vetoed';
+        statusLabel = isNotesVotingDisabled(room, s) ? 'Voting disabled' : 'Vetoed';
       } else {
         const normA = normalizeVote(rawA);
         const normB = normalizeVote(rawB);
@@ -3495,8 +3541,8 @@ function renderAgreementsTracker(players, room, votesData){
 
       rows.push({
         slide: s,
-        voteA: isVetoed ? 'veto' : (rawA || '—'),
-        voteB: isVetoed ? 'veto' : (rawB || '—'),
+        voteA: isVetoed ? (isNotesVotingDisabled(room, s) ? 'unrated' : 'veto') : (rawA || '—'),
+        voteB: isVetoed ? (isNotesVotingDisabled(room, s) ? 'unrated' : 'veto') : (rawB || '—'),
         status,
         statusIcon,
         statusLabel
@@ -3585,7 +3631,7 @@ function showResultsScreen(room, votesData){
 
   const players = getPlayers(room);
   const vetoed = room.vetoed || {};
-  const vetoedCount = Object.keys(vetoed).filter(k=>vetoed[k]).length;
+  const vetoedCount = getUnratedSlideCount(room);
   const ratedSlides = room.totalSlides - vetoedCount;
 
   document.getElementById('resSub').textContent =
@@ -3593,7 +3639,7 @@ function showResultsScreen(room, votesData){
 
   let totalSmash=0, totalPass=0;
   for(let s=1; s<=room.totalSlides; s++){
-    if(vetoed[s]) continue;
+    if(isSlideUnrated(room, s)) continue;
     const sv = votesData[s]||votesData[String(s)]||{};
     players.forEach(p=>{
       const v = sv[safeKey(p.name)];
@@ -3726,7 +3772,7 @@ function downloadResults(room, votesData){
   lines.push('=== GAME SUMMARY ===');
   lines.push(rowToCsv(['Room Code', room.code || '']));
   lines.push(rowToCsv(['Total Slides', room.totalSlides]));
-  const vetoedCount = Object.keys(vetoed).filter(k => vetoed[k]).length;
+  const vetoedCount = getUnratedSlideCount(room);
   lines.push(rowToCsv(['Rated Slides', room.totalSlides - vetoedCount]));
   lines.push(rowToCsv(['Unrated Slides', vetoedCount]));
   lines.push(rowToCsv(['Players', players.map(p => p.name).join('; ')]));
@@ -3736,7 +3782,7 @@ function downloadResults(room, votesData){
   lines.push('=== SLIDE RESULTS ===');
   lines.push(rowToCsv(['Slide', 'Status', 'Smashes (weighted)', 'Passes', ...players.map(p => p.name)]));
   for(let s = 1; s <= room.totalSlides; s++){
-    const isVetoed = !!vetoed[s];
+    const isVetoed = isSlideUnrated(room, s);
     const sv = votesData[s] || votesData[String(s)] || {};
     let smashes = 0, passes = 0;
     const votes = players.map(p => {

@@ -45,7 +45,7 @@ test('new ranges replace previous ranges; multiple markers use the first',()=>{
   assert.equal(result.warnings.length,2);
 });
 test('metadata reads speaker notes and returns timings without exposing notes',()=>{
-  const notes=['Private introduction','#10<','Private explanation','#>',''];
+  const notes=['Private introduction\n!','#10<','Private explanation\n!','#>',''];
   const context=service({SlidesApp:{openById(){return{getSlides(){return notes.map((note,i)=>({getObjectId(){return 's'+(i+1)},getNotesPage(){return{getSpeakerNotesShape(){return {getText(){return{asString(){return note}}}}}}}}))}}}}});
   const response=context.doGet({parameter:{action:'meta',presentationId:'test',callback:'testCallback'}});
   assert.equal(response.mime,'js');
@@ -53,7 +53,21 @@ test('metadata reads speaker notes and returns timings without exposing notes',(
   assert.equal(data.timingVersion,1);
   assert.deepEqual(data.slidePageIds,['s1','s2','s3','s4','s5']);
   assert.deepEqual(data.slideDurations,{'2':10,'3':10,'4':10});
+  assert.equal(data.notesRulesVersion,1);
+  assert.deepEqual(data.slideVotingDisabled,{'1':true,'3':true});
   assert(!response.body.includes('Private'));
+});
+
+test('a standalone exclamation marker disables only that slide',()=>{
+  const notes=['!','Normal notes','Explain this\n!\nContinue','Hello!','!important','!!!',' #10 ! '];
+  const disabled=JSON.parse(JSON.stringify(service().parseSlideVotingDisabled(notes)));
+  assert.deepEqual(disabled,{'1':true,'3':true,'7':true});
+});
+
+test('disabled voting and timing ranges can be used together independently',()=>{
+  const notes=['#10<\n!','','#> !',''];
+  assert.deepEqual(parsed(notes).durations,{'1':10,'2':10,'3':10});
+  assert.deepEqual(JSON.parse(JSON.stringify(service().parseSlideVotingDisabled(notes))),{'1':true,'3':true});
 });
 test('slides without a speaker-notes shape use defaults',()=>{
   const context=service({SlidesApp:{openById(){return{getSlides(){return [{getObjectId(){return 's1'},getNotesPage(){return{getSpeakerNotesShape(){return null}}}}]}}}}});

@@ -42,6 +42,21 @@ Markers can be on their own line or separated from other text by whitespace.
 | `#10` | Give this slide 10 seconds. |
 | `#10<` | Start a 10-second range on this slide. |
 | `#>` | End the current range after this slide, including this slide. |
+| `!` | Disable voting on this slide only. |
+
+Use `!` on its own line, or separated from other text by whitespace. Ordinary
+punctuation such as `Hello!` does not disable voting. A slide can have both a
+timing marker and `!`, for example `#10` and `!` on separate lines: the slide
+stays visible for 10 seconds, but players and the host cannot Smash, Pass or
+Double Down. Voting returns on the next slide unless it also has `!`.
+
+Slides with `!` are unrated and excluded from scores, comparisons and rated
+slide counts. They do not count as a missed vote. The host cannot enable voting
+on these slides using the veto button; remove `!` from the notes and create a
+new room to change the rule. Metadata includes `notesRulesVersion: 1` and a
+`slideVotingDisabled` object keyed by one-based slide numbers. Deploy the new
+`Code.gs` version to enable this marker; the previous timing-only deployment
+does not send these rules.
 
 For example, the notes `['', '#10<', '', '#20', '#>', '']` give slides 2, 3 and 5
 10 seconds, and slide 4 gets 20 seconds. Slides 1 and 6 use the default timer.
