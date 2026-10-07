@@ -3454,7 +3454,7 @@ function renderHallOfFameShame(room,votes){
   const root=document.getElementById('hallSection'); root.style.display='grid';
   root.innerHTML=groups.map(([title,subtitle,rows,kind])=>{
     let rank=0,previous=null;
-    return `<section class="panel"><h2 class="panel-title">${title}</h2><p class="recap-muted">${subtitle} · at least 60% turnout${getPlayers(room).length>1?', minimum two votes':''}</p><div class="highlight-list">${rows.slice(0,3).map((r,i)=>{
+    return `<section class="panel"><h2 class="panel-title">${title}</h2><p class="recap-muted">${subtitle} · at least 60% turnout${getPlayers(room).length>1?' · two votes when multiple players were eligible':''}</p><div class="highlight-list">${rows.slice(0,3).map((r,i)=>{
       const score=kind==='split'?Math.abs(r.smashRate-.5):kind==='pass'?1-r.smashRate:r.smashRate;
       if(score!==previous){ rank=i+1; previous=score; }
       const tied=rows.filter(q=>(kind==='split'?Math.abs(q.smashRate-.5):kind==='pass'?1-q.smashRate:q.smashRate)===score).length>1;
@@ -3473,11 +3473,11 @@ function renderPersonalRecap(room,votes){
     return {...r,own,others:others.length,opposed,rate:others.length?opposed/others.length:0};
   }).filter(r=>r.own && r.opposed>r.others/2).sort((a,b)=>b.rate-a.rate || b.others-a.others);
   const closest=players.filter(q=>playerKey(q)!==playerKey(p)).map(q=>({p:q,...getPairComparison(room,votes,p,q)})).filter(q=>q.total>=3).sort((a,b)=>b.rate-a.rate || b.total-a.total);
-  const doubles=results.filter(r=>voteFor(p,room,votes,r.slide)==='supersmash');
+  const doubles=getSlideResults(room,votes).filter(r=>voteFor(p,room,votes,r.slide)==='supersmash');
   const d=disagreements[0],c=closest[0];
   root.innerHTML=`<h2 class="panel-title">Your recap · ${escapeHtml(p.name)}</h2><p class="recap-muted">${st.voted} choices from ${st.eligibleRounds} eligible rounds · ${st.smashPct}% smash · ${st.smashPoints} smash points</p><div class="recap-grid">
     <div><h3>Biggest disagreement</h3>${d?`<button class="highlight-card" data-slide="${d.slide}"><strong>Slide ${d.slide} · You chose ${d.own}</strong><small>${d.opposed}/${d.others} other voters chose the opposite · View →</small></button>`:'<p class="recap-muted">No disagreement with a majority of other voters.</p>'}</div>
-    <div><h3>Your Double Down</h3>${doubles.length?doubles.map(r=>`<button class="highlight-card" data-slide="${r.slide}"><strong>Slide ${r.slide}</strong><small>${r.smash}/${r.total} voters also chose smash · View →</small></button>`).join(''):'<p class="recap-muted">You kept your Double Down.</p>'}</div>
+    <div><h3>Your Double Down</h3>${doubles.length?doubles.map(r=>`<button class="highlight-card" data-slide="${r.slide}"><strong>Slide ${r.slide}</strong><small>${isSlideUnrated(room,r.slide)?'Unrated · excluded from scores':`${r.smash}/${r.total} voters also chose smash`} · View →</small></button>`).join(''):'<p class="recap-muted">You kept your Double Down.</p>'}</div>
     <div><h3>Closest taste</h3>${c?`<p>${escapeHtml(c.p.name)} · ${Math.round(c.rate*100)}% match</p><p class="recap-muted">${c.matches}/${c.total} shared choices${closest.filter(q=>q.rate===c.rate).length>1?' · tied match':''}</p>${c.rows.filter(r=>r.agree).slice(0,3).map(r=>`<button class="slide-link" data-slide="${r.slide}">Slide ${r.slide}</button>`).join('')}`:'<p class="recap-muted">Needs at least three shared choices with another player.</p>'}</div>
   </div>`; attachSlideButtons(root);
 }
