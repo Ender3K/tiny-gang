@@ -1806,6 +1806,8 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 .comparison-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;padding:.75rem;border-bottom:1px solid var(--border);font-size:.8rem}
 .connection-status{position:fixed;top:0;left:0;right:0;z-index:1000;background:#a03b17;color:white;text-align:center;padding:.7rem;font-size:.85rem}
 .connection-status[hidden]{display:none}
+.resume-status{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:1rem;z-index:900}
+.resume-status[hidden]{display:none}
 @media(max-width:760px){.recap-grid,.hall-section{grid-template-columns:1fr}
 .comparison-row{grid-template-columns:1fr 1fr}
 .game-dialog{padding:1rem}
@@ -2206,6 +2208,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 <div id="connectionStatus" class="connection-status" role="status" hidden>Reconnecting… Votes will be available when the connection returns.</div>
 <dialog id="shareDialog" class="game-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2>Join <span id="shareCode"></span></h2><div id="joinQR"></div><label for="shareLink">Join link</label><input id="shareLink" readonly onclick="this.select()"><button class="restart-btn" onclick="copyJoinLink()">Copy link</button></dialog>
 <dialog id="slideDetail" class="game-dialog slide-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2 id="detailTitle"></h2><p id="detailStatus" role="status"></p><img id="detailImage" alt="Selected slide" hidden><div id="detailVotes"></div></dialog>
+<div id="resumeStatus" class="resume-status" role="status" hidden>Rejoining your game…</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2931,30 +2934,48 @@ async function reserveRoom(room){
 }
 function newRound(room,slide){ return {openedAt:roomNow(),eligible:Object.fromEntries(getActivePlayers(room).map(p=>[playerKey(p),true]))}; }
 function newTimer(room,slide){ const cfg=getSlideTimerConfig(room,slide); return {...cfg,slide,status:'loading',paused:false,remainingMs:cfg.duration*1000,dueAt:null,revision:1}; }
+function firstSubscribedValue(reference){
+  let stop;
+  return new Promise((resolve,reject)=>{
+    stop=window._onValue(reference,snapshot=>resolve({snapshot,stop:()=>stop?.()}),error=>{stop?.();reject(error);});
+  });
+}
 async function enterExistingRoom(code){
-  const snap=await window._get(roomRef(code)); if(!snap.exists()) throw new Error('This room is no longer available.');
-  const room=snap.val(), p=room.players?.[myKey()];
-  if(!p || p.kicked || p.active === false) throw new Error('Your place in this room is no longer active.');
-  stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={};
-  me={...me,code,name:p.name,isMaster:room.hostId ? room.hostId===myKey() : room.hostName===p.name};
-  _latestRoom=room;
-  timerCfg={enabled:!!room.timerEnabled,duration:room.timerDuration || 15};
-  if(room.emojiSmash?.length){
-    emojiCfg={theme:'custom',customSmash:room.emojiSmash.join(' '),customPass:(room.emojiPass || []).join(' ')};
-    document.getElementById('smashEmojiInput').value=emojiCfg.customSmash;
-    document.getElementById('passEmojiInput').value=emojiCfg.customPass;
-  }
-  const dd=await window._get(window._ref(window._db,`ddused/${code}/${myKey()}`)); myDoubleDownUsed=dd.val() === true;
-  saveSession();
-  if(room.state==='waiting') enterWaiting(); else enterGame();
+  const loaded=await firstSubscribedValue(roomRef(code));
+  let dd;
+  try {
+    const snap=loaded.snapshot;
+    if(!snap.exists()) throw new Error('This room is no longer available.');
+    const room=snap.val(), p=room.players?.[myKey()];
+    if(!p || p.kicked || p.active === false) throw new Error('Your place in this room is no longer active.');
+    stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={};
+    me={...me,code,name:p.name,isMaster:room.hostId ? room.hostId===myKey() : room.hostName===p.name};
+    _latestRoom=room;
+    timerCfg={enabled:!!room.timerEnabled,duration:room.timerDuration || 15};
+    if(room.emojiSmash?.length){
+      emojiCfg={theme:'custom',customSmash:room.emojiSmash.join(' '),customPass:(room.emojiPass || []).join(' ')};
+      document.getElementById('smashEmojiInput').value=emojiCfg.customSmash;
+      document.getElementById('passEmojiInput').value=emojiCfg.customPass;
+    }
+    dd=await firstSubscribedValue(window._ref(window._db,`ddused/${code}/${myKey()}`));
+    myDoubleDownUsed=dd.snapshot.val() === true;
+    saveSession();
+    if(room.state==='waiting') enterWaiting(); else enterGame();
+  } finally { loaded.stop(); dd?.stop(); }
 }
 async function resumeSession(){
   const requested=new URL(location.href).searchParams.get('room')?.toUpperCase();
   const saved=storageRead('sop-session');
   if(saved?.code && (!requested || requested===saved.code)){
     me=saved;
+    document.getElementById('resumeStatus').hidden=false;
     try { await enterExistingRoom(saved.code); showToast('Welcome back'); return; }
-    catch { storageWrite('sop-session',null); me={name:'',code:'',isMaster:false}; }
+    catch(e) {
+      if(e.message==='This room is no longer available.' || e.message==='Your place in this room is no longer active.') storageWrite('sop-session',null);
+      me={name:'',code:'',isMaster:false};
+      document.getElementById('joinCode').value=saved.code;
+      showErr('joinErr','Could not resume: '+e.message+' You can try joining again.');
+    } finally { document.getElementById('resumeStatus').hidden=true; }
   }
   if(requested){ document.getElementById('joinCode').value=requested; setEntryMode('join'); }
   const name=storageRead('sop-name'); if(typeof name==='string'){ document.getElementById('joinName').value=name; document.getElementById('hostName').value=name; }

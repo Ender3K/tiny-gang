@@ -30,3 +30,12 @@ test('joining keeps Firebase room data subscribed until its transaction finishes
  vm.runInContext('async function transactLoadedRoom'+section('async function transactLoadedRoom','async function reserveRoom').split('async function transactLoadedRoom')[1],c);
  assert.equal(await c.transactLoadedRoom('TEST',r=>r.code),'TEST');assert.equal(active,false);
 });
+
+test('resume restores membership and Double Down through subscriptions without blocking one-off reads',async()=>{
+ const held=new Set();
+ const r={state:'waiting',hostId:'a',players:{b:{id:'b',name:'B',active:true}},timerDuration:30};
+ let entered=false,saved=false;
+ const c=vm.createContext({me:{id:'b',name:'B'},myKey:()=> 'b',roomRef:()=> 'room',stopListeners(){},stopSlideTimer(){},saveSession(){saved=true},enterWaiting(){entered=true;assert(held.has('room'))},window:{_db:{},_ref:()=> 'dd',_get(){throw new Error('one-off read must not run')},_onValue(ref,cb){held.add(ref);Promise.resolve().then(()=>cb({exists:()=>true,val:()=>ref==='room'?r:true}));return()=>held.delete(ref)}}});
+ vm.runInContext(section('function firstSubscribedValue(', 'async function resumeSession('),c);
+ await c.enterExistingRoom('TEST');assert.equal(entered,true);assert.equal(saved,true);assert.equal(c.myDoubleDownUsed,true);assert.equal(c.timerCfg.duration,30);assert.equal(c.me.isMaster,false);assert.equal(held.size,0);
+});
