@@ -26,6 +26,14 @@ now includes `timingVersion: 1` and a `slideDurations` object keyed by one-based
 slide numbers. Only resolved durations and timing warnings are sent to the app,
 not the text of the speaker notes.
 
+The app requests JSON with `fetch` and `credentials: "omit"`. This keeps the
+public deployment independent of a player's signed-in Google accounts. Both
+the Google redirect and its ContentService response support these anonymous
+cross-origin GET requests. Each request bypasses cached redirects and has a
+75-second timeout; a failed connection or temporary HTTP error retries once.
+No callback parameter is required by the frontend. The script still supports
+JSONP for older versions of the app.
+
 Put one marker in the speaker notes for each slide that needs a timing change.
 Markers can be on their own line or separated from other text by whitespace.
 
