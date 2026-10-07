@@ -1,4 +1,4 @@
-# Speaker-note timing
+# Slide service
 
 Replace the code in the existing Google Apps Script project with `Code.gs`.
 Then choose **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**.
@@ -13,6 +13,31 @@ instead of editing the existing one, its Web app URL changes: update
 publish that change to GitHub Pages. The editor's `/dev` testing URL is not a
 public deployment.
 
+For shared slide images, add **Google Slides API** under **Services → +** in
+the Apps Script editor before deploying the new version. For a standard Google
+Cloud project, also enable Google Slides API in that project's API Library;
+the default Apps Script project enables it when the service is added. The
+existing script's presentation and external-request permissions are used.
+
+The app prepares the first two slides in each player's lobby. During the game
+it preloads two slides ahead, with at most two image loads running per browser.
+The current slide takes priority over queued background loads, and leaving a
+room cancels that browser's pending work.
+
+New clients request `action=image&format=url&cacheVersion=…`. The response
+contains `imageUrl` and `expiresAt`. Apps Script caches the small Google Slides
+thumbnail URL for 20 minutes and rechecks under a script lock so players share
+one rendered image. Each lobby's metadata gets a fresh `imageCacheVersion`, so
+new games reflect edited slides. Cached URLs refresh before expiry, and a
+failed image URL is refreshed once. Google's image download is separate from
+Apps Script; no full slide images are stored in Firebase or CacheService.
+
+Apps Script's cache can evict entries early, in which case the thumbnail is
+generated again. Older clients can still request the original base64 PNG
+response without `format=url`. New clients also accept that older response,
+so lobby preloading and the request limit work before the script is redeployed.
+Shared URL caching requires the new deployment and Google Slides API.
+
 If the app cannot reach the slide service, open the deployment's `/exec` URL
 in a signed-out/private browser window. The running script should return
 `{"ok":false,"error":"Missing presentationId"}`. A 404 page means the URL does
@@ -23,7 +48,7 @@ and access settings.
 The frontend continues to use the web app URL already in `index.html`. No new
 API key or client-side access to speaker notes is required. The `meta` response
 now includes `timingVersion: 1` and a `slideDurations` object keyed by one-based
-slide numbers. Only resolved durations and timing warnings are sent to the app,
+slide numbers. Only resolved durations, voting rules and warnings are sent to the app,
 not the text of the speaker notes.
 
 The app requests JSON with `fetch` and `credentials: "omit"`. This keeps the

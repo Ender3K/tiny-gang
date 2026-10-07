@@ -40,13 +40,17 @@ function doGet(e) {
         slideDurations: timing.durations,
         timingWarnings: timing.warnings,
         notesRulesVersion: 1,
-        slideVotingDisabled: parseSlideVotingDisabled(notes)
+        slideVotingDisabled: parseSlideVotingDisabled(notes),
+        imageCacheVersion: Utilities.getUuid()
       });
     }
 
     if (action === "image") {
       if (!pageId) {
         return respond({ ok: false, error: "Missing pageId" });
+      }
+      if (e.parameter.format === "url") {
+        return respond(getSharedSlideImage(presentationId, pageId, e.parameter.cacheVersion || "legacy", e.parameter.refresh === "1"));
       }
 
       const token = ScriptApp.getOAuthToken();
@@ -84,6 +88,54 @@ function doGet(e) {
     return respond({ ok: false, error: `Unknown action: ${action}` });
   } catch (err) {
     return respond({ ok: false, error: String(err && err.message ? err.message : err) });
+  }
+}
+
+/** Share short-lived thumbnail URLs between all players in one deck snapshot. */
+function getSharedSlideImage(presentationId, pageId, cacheVersion, refresh) {
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    JSON.stringify([presentationId, pageId, cacheVersion]));
+  const key = "slide:" + digest.map(byte => (byte & 255).toString(16).padStart(2, "0")).join("");
+  const cache = CacheService.getScriptCache();
+  function read() {
+    const value = cache.get(key);
+    if (!value) return null;
+    try {
+      const entry = JSON.parse(value);
+      if (entry.expiresAt > Date.now() + 60000) return entry;
+    } catch (err) { /* Cache entries can be evicted or replaced. */ }
+    return null;
+  }
+  const cached = refresh ? null : read();
+  if (cached) return cached;
+
+  // Recheck under the lock so simultaneous players don't generate the same image.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    const reused = refresh ? null : read();
+    if (reused) return reused;
+    const url = "https://slides.googleapis.com/v1/presentations/" + encodeURIComponent(presentationId)
+      + "/pages/" + encodeURIComponent(pageId) + "/thumbnail?thumbnailProperties.thumbnailSize=LARGE";
+    const response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+      muteHttpExceptions: true
+    });
+    if (response.getResponseCode() !== 200) {
+      throw new Error("Slide thumbnail failed with HTTP " + response.getResponseCode()
+        + ". Enable Google Slides API in Apps Script Services and keep the deployment public.");
+    }
+    const thumbnail = JSON.parse(response.getContentText());
+    if (!thumbnail.contentUrl || !/^https:\/\//.test(thumbnail.contentUrl)) {
+      throw new Error("Google Slides did not return a thumbnail URL.");
+    }
+    // Google URLs normally last 30 minutes; refresh after 20 minutes with margin.
+    const entry = {ok: true, presentationId, pageId, imageUrl: thumbnail.contentUrl,
+      expiresAt: Date.now() + 20 * 60 * 1000};
+    cache.put(key, JSON.stringify(entry), 20 * 60);
+    return entry;
+  } finally {
+    lock.releaseLock();
   }
 }
 

@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../apps-script/Code.gs'), 'utf8');
 function service(extra = {}) {
-  const context = vm.createContext({ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput(body){return {body,setMimeType(mime){this.mime=mime;return this}}}},...extra});
+  const context = vm.createContext({Utilities:{getUuid:()=> 'deck-snapshot'},ContentService:{MimeType:{JSON:'json',JAVASCRIPT:'js'},createTextOutput(body){return {body,setMimeType(mime){this.mime=mime;return this}}}},...extra});
   vm.runInContext(source, context);
   return context;
 }
@@ -54,6 +54,7 @@ test('metadata reads speaker notes and returns timings without exposing notes',(
   assert.deepEqual(data.slidePageIds,['s1','s2','s3','s4','s5']);
   assert.deepEqual(data.slideDurations,{'2':10,'3':10,'4':10});
   assert.equal(data.notesRulesVersion,1);
+  assert.equal(data.imageCacheVersion,'deck-snapshot');
   assert.deepEqual(data.slideVotingDisabled,{'1':true,'3':true});
   assert(!response.body.includes('Private'));
 });

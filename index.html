@@ -1928,6 +1928,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
         <p class="hint" style="margin-top:0">When off, new players cannot join once the game has started.</p>
       </div>
 
+      <p class="hint" id="slidePrepStatus" role="status"></p>
       <button class="btn btn-fire" id="startBtn" onclick="startGame()" style="display:none">START GAME 🚀</button>
       <button class="btn btn-ghost" onclick="leaveRoom()">Leave room</button>
       </div>
@@ -2172,7 +2173,8 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwU3-zlc0EqXUr2ncYybguEtyiCudnIUevNwlNV4LQiRiyidVTjC24cd2e4HDxViZqh/exec";
 let slideImageCache = {};
 let slideImagePromises = {};
-let slidePreloadPromises = {};
+const slideImageQueue = createSlideImageQueue(2);
+let lobbyPreloadKey = "";
 let dbReady = false;
 let slideLoadToken = 0;
 
@@ -2257,9 +2259,12 @@ function getSlideId(rawUrl) {
   return m ? m[1] : null;
 }
 
-async function fetchAppsScript(url, timeoutMs = 75000) {
+async function fetchAppsScript(url, timeoutMs = 75000, signal) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const cancel = () => controller.abort();
+  if(signal?.aborted) controller.abort();
+  else signal?.addEventListener("abort", cancel, {once:true});
   const sep = url.includes("?") ? "&" : "?";
   // Omit Google account cookies and avoid cached ContentService redirects.
   const requestUrl = `${url}${sep}_request=${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -2291,20 +2296,24 @@ async function fetchAppsScript(url, timeoutMs = 75000) {
     }
     return data;
   } catch(error) {
-    if(controller.signal.aborted) throw new Error("The slide service request timed out. Please try again.");
+    if(controller.signal.aborted){
+      if(signal?.aborted){ const cancelled = new Error("Slide loading cancelled."); cancelled.name="AbortError"; throw cancelled; }
+      throw new Error("The slide service request timed out. Please try again.");
+    }
     if(error.name === "TypeError"){
       throw transportError("Could not reach the slide service. Check the Apps Script deployment URL and set access to Anyone, then try again.");
     }
     throw error;
   } finally {
     clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", cancel);
   }
 }
 
-async function requestAppsScript(url) {
+async function requestAppsScript(url, signal) {
   // Retry a failed connection once; do not retry slow requests or script errors.
   for(let attempt = 0; attempt < 2; attempt++){
-    try { return await fetchAppsScript(url); }
+    try { return await fetchAppsScript(url, 75000, signal); }
     catch(error){ if(attempt === 1 || !error.retryable) throw error; }
   }
 }
@@ -2363,36 +2372,118 @@ function getSlideTimerConfig(room, slide){
   return {enabled:!!room.timerEnabled, duration:isValidSlideDuration(room.timerDuration) ? room.timerDuration : 15};
 }
 
-async function fetchSlideImageDataUrl(rawUrl, pageId) {
-  const presentationId = getSlideId(rawUrl);
-  if (!presentationId) throw new Error("Invalid Google Slides URL.");
-  const cacheKey = `${presentationId}::${pageId}`;
-  if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
-  if (slideImagePromises[cacheKey]) return slideImagePromises[cacheKey];
-  slideImagePromises[cacheKey] = requestAppsScript(
-    `${APPS_SCRIPT_WEBAPP_URL}?action=image&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}`
-  ).then((data) => {
-    if (!data || !data.ok || !data.dataUrl) throw new Error(data?.error || "Could not fetch slide image.");
-    slideImageCache[cacheKey] = data.dataUrl;
-    return data.dataUrl;
-  }).finally(() => { delete slideImagePromises[cacheKey]; });
-  return slideImagePromises[cacheKey];
+function createSlideImageQueue(limit){
+  let active = 0;
+  const pending = [];
+  const running = new Set();
+  function pump(){
+    pending.sort((a,b) => a.priority - b.priority);
+    while(active < limit && pending.length){
+      const job = pending.shift();
+      active++; running.add(job);
+      Promise.resolve().then(() => job.task(job.controller.signal)).then(job.resolve, job.reject)
+        .finally(() => { active--; running.delete(job); pump(); });
+    }
+  }
+  return {
+    add(key, priority, task){
+      return new Promise((resolve, reject) => {
+        pending.push({key, priority, task, resolve, reject, controller:new AbortController()});
+        pump();
+      });
+    },
+    promote(key, priority){
+      for(const job of pending) if(job.key === key) job.priority = Math.min(job.priority, priority);
+      pending.sort((a,b) => a.priority - b.priority);
+    },
+    prune(wanted){
+      for(let i = pending.length - 1; i >= 0; i--){
+        if(!wanted.has(pending[i].key)){
+          const [job] = pending.splice(i, 1);
+          job.reject(new Error("Slide preload no longer needed."));
+        }
+      }
+    },
+    reset(){
+      this.prune(new Set());
+      for(const job of running) job.controller.abort();
+    }
+  };
 }
 
-async function prefetchSlide(rawUrl, pageId) {
+function slideCacheKey(rawUrl, pageId, cacheVersion = ""){
+  return `${getSlideId(rawUrl)}::${cacheVersion}::${pageId}`;
+}
+
+function decodeSlideSource(src, signal){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    function cleanup(){ img.onload=null; img.onerror=null; signal?.removeEventListener('abort', abort); }
+    function abort(){ cleanup(); img.src=''; reject(new Error('Slide loading cancelled.')); }
+    if(signal?.aborted) return abort();
+    img.onload = () => { cleanup(); resolve(); };
+    img.onerror = () => { cleanup(); reject(new Error('Could not load slide image.')); };
+    signal?.addEventListener('abort', abort, {once:true});
+    img.src = src;
+  });
+}
+
+async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priority = 0) {
   const presentationId = getSlideId(rawUrl);
-  if (!presentationId || !pageId) return null;
-  const cacheKey = `${presentationId}::${pageId}`;
-  if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
-  if (slidePreloadPromises[cacheKey]) return slidePreloadPromises[cacheKey];
-  slidePreloadPromises[cacheKey] = fetchSlideImageDataUrl(rawUrl, pageId)
-    .then((dataUrl) => {
-      const img = new Image();
-      img.src = dataUrl;
-      if (img.decode) return img.decode().catch(() => {}).then(() => dataUrl);
-      return dataUrl;
-    }).catch(() => null).finally(() => { delete slidePreloadPromises[cacheKey]; });
-  return slidePreloadPromises[cacheKey];
+  if (!presentationId) throw new Error("Invalid Google Slides URL.");
+  const cacheKey = slideCacheKey(rawUrl, pageId, cacheVersion);
+  const entry = slideImageCache[cacheKey];
+  if(entry && entry.expiresAt > Date.now() + 60000) return entry.src;
+  if(slideImagePromises[cacheKey]){
+    slideImageQueue.promote(cacheKey, priority);
+    return slideImagePromises[cacheKey];
+  }
+  const cache = slideImageCache;
+  const promises = slideImagePromises;
+  const url = `${APPS_SCRIPT_WEBAPP_URL}?action=image&format=url&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}&cacheVersion=${encodeURIComponent(cacheVersion || 'legacy')}`;
+  promises[cacheKey] = slideImageQueue.add(cacheKey, priority, async signal => {
+    let data = await requestAppsScript(url, signal);
+    if(!data?.ok || !(data.imageUrl || data.dataUrl)) throw new Error(data?.error || "Could not fetch slide image.");
+    let src = data.imageUrl || data.dataUrl;
+    try { await decodeSlideSource(src, signal); }
+    catch(error){
+      if(signal.aborted || !data.imageUrl) throw error;
+      // A thumbnail can expire early after sharing changes. Refresh it once.
+      data = await requestAppsScript(url + '&refresh=1', signal);
+      if(!data?.ok || !data.imageUrl) throw new Error(data?.error || "Could not refresh slide image.");
+      src = data.imageUrl;
+      await decodeSlideSource(src, signal);
+    }
+    cache[cacheKey] = {src, expiresAt:data.imageUrl ? data.expiresAt : Infinity};
+    return src;
+  }).finally(() => { delete promises[cacheKey]; });
+  return promises[cacheKey];
+}
+
+async function prefetchSlide(rawUrl, pageId, cacheVersion = "") {
+  if(!getSlideId(rawUrl) || !pageId) return null;
+  return fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion, 2).catch(() => null);
+}
+
+function prepareLobbySlides(room){
+  if(!room.slidePageIds?.length) return;
+  const version = room.imageCacheVersion || room.code;
+  const key = `${room.code}::${version}`;
+  if(lobbyPreloadKey === key) return;
+  lobbyPreloadKey = key;
+  const status = document.getElementById('slidePrepStatus');
+  status.textContent = 'Preparing first slide…';
+  const stillWaiting = () => lobbyPreloadKey === key && _latestRoom?.state === 'waiting';
+  fetchSlideImageDataUrl(room.slidesUrl, room.slidePageIds[0], version, 0).then(async () => {
+    if(!stillWaiting()) return;
+    status.textContent = 'First slide ready.';
+    if(room.slidePageIds[1]){
+      const next = await prefetchSlide(room.slidesUrl, room.slidePageIds[1], version);
+      if(stillWaiting()) status.textContent = next ? 'First two slides ready.' : 'First slide ready. The next slide will load during the game.';
+    }
+  }).catch(error => {
+    if(stillWaiting()) status.textContent = 'First slide could not be prepared. It will retry when the game starts. ' + error.message;
+  });
 }
 
 // ── Timer config (waiting room) ──────────────────────────────────────────────
@@ -2733,6 +2824,7 @@ async function createRoom(){
       code, hostName:name, slidesUrl:url,
       totalSlides:deck.totalSlides, slidePageIds:deck.slidePageIds,
       slideDurations:deck.slideDurations,
+      imageCacheVersion:deck.imageCacheVersion || code,
       slideVotingDisabled:deck.slideVotingDisabled,
       notesVotingAvailable:deck.notesRulesVersion === 1,
       notesTimingAvailable:deck.timingVersion === 1,
@@ -2752,7 +2844,7 @@ async function createRoom(){
   }
 }
 
-async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[]) {
+async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], cacheVersion="") {
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
@@ -2769,7 +2861,7 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[]) {
   if(!pageId){ loader.classList.add('hidden'); img.style.display='none'; errEl.classList.add('visible'); return false; }
 
   try {
-    const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId);
+    const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion);
     if(token!==slideLoadToken) return false;
     const preImg = new Image();
     await new Promise((resolve, reject) => {
@@ -2917,6 +3009,7 @@ function renderWaiting(room){
   document.getElementById('notesTimingStatus').textContent += room.notesVotingAvailable
     ? ` ${Object.values(room.slideVotingDisabled || {}).filter(value => value === true).length} slides have voting disabled by ! in the notes.`
     : ' The ! voting marker needs the updated slide service.';
+  prepareLobbySlides(room);
   const players = getPlayers(room);
   const grid = document.getElementById('playersGrid');
   grid.innerHTML = '';
@@ -3014,15 +3107,18 @@ function renderGame(room){
   if(s !== lastSlide){
     lastSlide = s;
     prevVoteCounts = { smash:0, pass:0 };
-    loadSlide(room.slidesUrl, s, tot, room.slidePageIds||[]).then(loaded => {
+    loadSlide(room.slidesUrl, s, tot, room.slidePageIds||[], room.imageCacheVersion || room.code).then(loaded => {
       if(s !== lastSlide) return;
       timerState.slideReady = loaded;
       if(timerState.enabled && loaded) startSlideTimer();
       else updateTimerUI();
     });
-    for(let offset=0;offset<5;offset++){
+    const version = room.imageCacheVersion || room.code;
+    const wanted = new Set((room.slidePageIds || []).slice(s-1, s+2).map(pid => slideCacheKey(room.slidesUrl, pid, version)));
+    slideImageQueue.prune(wanted);
+    for(let offset=0;offset<2;offset++){
       const pid = room.slidePageIds?.[s+offset];
-      if(pid) prefetchSlide(room.slidesUrl, pid);
+      if(pid) prefetchSlide(room.slidesUrl, pid, version);
     }
 
     if(!myVotedSlides[s] && !isUnrated){
@@ -3373,7 +3469,7 @@ function renderHallOfFameShame(room, votesData, players){
     if(room.slidesUrl && room.slidePageIds){
       const pageId = room.slidePageIds[data.slide - 1];
       if(pageId){
-        fetchSlideImageDataUrl(room.slidesUrl, pageId).then(dataUrl => {
+        fetchSlideImageDataUrl(room.slidesUrl, pageId, room.imageCacheVersion || room.code).then(dataUrl => {
           const img = document.getElementById(thumbId);
           const spinner = document.getElementById(spinnerId);
           if(!img) return;
@@ -3712,7 +3808,8 @@ function goHome(){
   stopListeners(); stopSlideTimer();
   me = { name:'', code:'', isMaster:false };
   lastSlide=-1; myVotedSlides={}; _latestRoom=null; _latestVotes={};
-  slideImageCache={}; slideImagePromises={}; slidePreloadPromises={}; slideLoadToken=0;
+  slideImageQueue.reset();
+  slideImageCache={}; slideImagePromises={}; lobbyPreloadKey=""; slideLoadToken++;
   timerCfg={enabled:false,duration:15};
   timerState={enabled:false,duration:15,remaining:15,paused:false,slideReady:false,intervalId:null};
   prevVoteCounts={smash:0,pass:0};
