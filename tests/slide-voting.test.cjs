@@ -13,6 +13,7 @@ function app(extra = {}) {
   });
   vm.runInContext([
     section('function normalizeSlideVotingDisabled(', 'function isValidSlideDuration('),
+    section('function getPlayers(', 'let serverOffset='),
     section('function getSmashTotals(', 'function renderSmashBoard('),
     section('function getPlayerStats(', 'function renderHallOfFameShame('),
     section('async function castVote(', 'async function masterNext('),
@@ -50,19 +51,19 @@ test('stale votes on disabled slides never affect totals, personal scores or awa
   assert.equal(stats.smashes, 1);
   assert.equal(stats.passes, 1);
   assert.equal(stats.supersmashes, 0);
-  assert.equal(stats.skipped, 1); // The existing manual veto; note-disabled slides are not missed votes.
+  assert.equal(stats.skipped, 0); // Unrated slides are never missed votes.
   assert.equal(context.getContrarianPlayer(Object.values(room.players), room, votes), null);
 });
 
 test('vote handlers refuse disabled slides and leave Double Down available for the next slide', async () => {
-  const room = {state: 'playing', currentSlide: 1, slideVotingDisabled: {'1': true}};
+  const room = {state: 'playing', currentSlide: 1, players:{Alice:{name:'Alice'}}, slideVotingDisabled: {'1': true}};
   const writes = [];
   const context = app({
-    window: {_get: async () => ({exists: () => true, val: () => room}), _set: async (ref, value) => writes.push({ref, value}), _ref: (db, ref) => ref},
+    window: {_get: async () => ({exists: () => true, val: () => room}), _update: async (ref, value) => writes.push({ref, value}), _ref: (db, ref) => ref},
     me: {name: 'Alice', code: 'TEST'},
-    myVotedSlides: {}, myDoubleDownUsed: false,
+    myVotedSlides: {}, myDoubleDownUsed: false, votePending:false, connected:true, _latestRoom:room,
     roomRef: () => 'room', voteRef: (code, slide) => 'votes/' + slide,
-    markVotedUI() {}, showToast() {}, spawnReaction() {}
+    markVotedUI() {}, updateDoubleDownUI() {}, showToast() {}, spawnReaction() {}
   });
   await context.castVote('smash');
   await context.castVote('pass');
@@ -74,5 +75,29 @@ test('vote handlers refuse disabled slides and leave Double Down available for t
   await context.castDoubleDown();
   assert.equal(context.myDoubleDownUsed, true);
   assert.equal(context.myVotedSlides[2], 'supersmash');
-  assert.equal(writes.length, 2);
+  assert.equal(writes.length, 1);
+});
+
+
+test('early endings and late joins only count played eligible rounds; Double Down adds points, not choices',()=>{
+ const room={totalSlides:100,currentSlide:3,players:{a:{id:'a',name:'A'},b:{id:'b',name:'B'}},rounds:{1:{eligible:{a:true}},2:{eligible:{a:true,b:true}},3:{eligible:{a:true,b:true}}}};
+ const votes={1:{a:'supersmash',b:'smash'},2:{a:'pass',b:'pass'}};
+ const c=app(); const a=c.getPlayerStats(room.players.a,room,votes),b=c.getPlayerStats(room.players.b,room,votes);
+ assert.equal(a.smashPct,50); assert.equal(a.smashPoints,2); assert.equal(a.voted,2); assert.equal(a.skipped,1);
+ assert.equal(b.eligibleRounds,2);assert.equal(b.skipped,1);assert.equal(b.smashes,0);
+ assert.equal(c.getPairComparison(room,votes,room.players.a,room.players.b).total,1);
+});
+test('highlights require real turnout and exclude unrated and unplayed slides',()=>{
+ const room={totalSlides:50,currentSlide:3,players:{a:{name:'a'},b:{name:'b'},c:{name:'c'}}};
+ const c=app(),results=c.getSlideResults(room,{1:{a:'smash'},2:{a:'supersmash',b:'pass'},3:{a:'pass',b:'pass',c:'pass'},45:{a:'smash'}});
+ assert.equal(results.length,3);assert.equal(results[0].qualified,false);assert.equal(results[1].qualified,true);assert.equal(results[1].total,2);assert.equal(results[1].bonus,1);
+});
+
+test('a rejected optimistic vote can be retried without consuming Double Down',async()=>{
+ const room={state:'playing',currentSlide:1,players:{Alice:{name:'Alice'}}};
+ const voted={},buttons=[{disabled:true},{disabled:true},{disabled:true}];
+ const c=app({me:{name:'Alice',code:'TEST'},myVotedSlides:voted,myDoubleDownUsed:false,votePending:false,connected:true,_latestRoom:room,
+  roomRef:()=>null,window:{_ref:()=>null,_get:async()=>({exists:()=>true,val:()=>room}),_update:async()=>{voted[1]='supersmash';throw new Error('permission denied')}},
+  document:{getElementById:()=>({className:''}),querySelectorAll:()=>buttons},showToast(){},spawnReaction(){},updateDoubleDownUI(){},markVotedUI(){}});
+ await c.castDoubleDown();assert.equal(voted[1],undefined);assert.equal(c.myDoubleDownUsed,false);assert.equal(c.votePending,false);assert(buttons.every(b=>!b.disabled));
 });

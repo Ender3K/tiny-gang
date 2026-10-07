@@ -7,9 +7,10 @@
 <title>Smash or Pass — Live</title>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
+<script src="assets/qrcode.min.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getDatabase, ref, set, get, update, onValue } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
+  import { getDatabase, ref, set, get, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
 
   try {
     const firebaseConfig = {
@@ -31,6 +32,7 @@
     window._get = get;
     window._update = update;
     window._onValue = onValue;
+    window._transaction = runTransaction;
     document.dispatchEvent(new Event("fb-ready"));
   } catch (e) {
     window._fbError = e.message;
@@ -1779,6 +1781,36 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
   #game .vbtn{padding:12px;font-size:22px}
   #game .vbtn-doubledown{grid-column:1/-1;max-width:none;font-size:13px;min-height:36px;padding:8px}
 }
+.share-actions{display:flex;gap:.7rem;justify-content:center;margin:1rem 0}
+.game-dialog{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:min(440px,92vw);max-height:92vh;overflow:auto;margin:auto}
+.game-dialog::backdrop{background:#000b}
+.dialog-close{float:right;background:none;border:0;color:inherit;font-size:1.3rem;cursor:pointer}
+.game-dialog h2{margin-bottom:1rem}
+.game-dialog input{width:100%;margin:.75rem 0}
+#joinQR{background:white;padding:12px;width:244px;margin:1rem auto}
+#joinQR img{max-width:100%}
+.slide-dialog{width:min(1100px,96vw)}
+#detailImage{width:100%;max-height:65vh;object-fit:contain;background:#000;border-radius:8px}
+.detail-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.5rem;margin-top:1rem}
+.detail-choices>div{display:flex;justify-content:space-between;gap:1rem;padding:.7rem;background:var(--bg);border-radius:8px}
+.detail-choices span,.recap-muted{color:var(--muted);font-size:.8rem;line-height:1.5}
+.personal-recap{width:100%;max-width:1100px}
+.recap-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1.25rem;margin-top:1rem}
+.recap-grid h3{font-size:.9rem;margin-bottom:.6rem}
+.highlight-list{display:grid;gap:.75rem;margin-top:1rem}
+.highlight-card{display:flex;flex-direction:column;gap:.5rem;text-align:left;width:100%;padding:1rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;cursor:pointer}
+.highlight-card:hover,.highlight-card:focus-visible{border-color:var(--smash)}
+.highlight-card small{color:var(--muted)}
+.hall-section{grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}
+.slide-link{background:none;border:0;color:var(--smash);padding:.4rem;cursor:pointer;text-decoration:underline}
+.comparison-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;padding:.75rem;border-bottom:1px solid var(--border);font-size:.8rem}
+.connection-status{position:fixed;top:0;left:0;right:0;z-index:1000;background:#a03b17;color:white;text-align:center;padding:.7rem;font-size:.85rem}
+.connection-status[hidden]{display:none}
+@media(max-width:760px){.recap-grid,.hall-section{grid-template-columns:1fr}
+.comparison-row{grid-template-columns:1fr 1fr}
+.game-dialog{padding:1rem}
+}
+
 </style>
 </head>
 <body>
@@ -1856,7 +1888,8 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
           <div class="room-share"><span id="playerCountLabel">1 player</span> connected</div>
         </div>
         <div class="section-label">Players</div>
-        <div class="players-grid" id="playersGrid"></div>
+        <div class="share-actions"><button class="restart-btn" onclick="copyJoinLink()">Copy join link</button><button class="restart-btn" onclick="showShareDialog()">Show QR code</button></div>
+    <div class="players-grid" id="playersGrid"></div>
         <p class="waiting-note" id="waitingNote">Waiting for players to join…</p>
       </div>
       <div class="lobby-settings">
@@ -1921,7 +1954,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
         <div class="timer-toggle-row">
           <span class="timer-toggle-label">Allow players to join mid-game</span>
           <label class="toggle-switch">
-            <input type="checkbox" id="lateJoinEnabled" checked />
+            <input type="checkbox" id="lateJoinEnabled" checked onchange="persistWaitingSettings()" />
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -2025,7 +2058,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 
           <div class="panel">
             <div class="panel-title">
-              <span>Smash leaderboard</span>
+              <span>Smash points</span>
               <span style="font-size:.68rem;color:var(--muted)">all slides</span>
             </div>
             <div class="smashboard" id="smashBoard"></div>
@@ -2102,13 +2135,14 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
     </div>
 
     <div class="stat-row" id="statRow"></div>
+    <section class="panel personal-recap" id="personalRecap"></section>
 
     <div class="results-grid">
       <div class="results-side">
         <div class="panel">
           <div class="panel-title">
-            <span>Player smash totals</span>
-            <span style="font-size:.68rem;color:var(--muted)">highest first</span>
+            <span>Smash points</span>
+            <span style="font-size:.68rem;color:var(--muted)">Double Down adds +1</span>
           </div>
           <div class="smashboard" id="resultsSmashBoard"></div>
         </div>
@@ -2159,7 +2193,9 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 
     <!-- ── Download + Restart buttons ── -->
     <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;align-items:center;width:100%;max-width:760px">
-      <button class="restart-btn" onclick="goHome()">Play again</button>
+      <button class="restart-btn" id="rematchBtn" onclick="rematch()" hidden>Rematch with this group</button>
+      <p class="recap-muted" id="rematchNote" hidden>Stay here to join the host’s rematch automatically.</p>
+      <button class="restart-btn" onclick="leaveRoom()">Leave results</button>
       <button class="restart-btn" id="downloadBtn" onclick="downloadResults(_latestRoom,_latestVotes)">
         Download results
       </button>
@@ -2167,6 +2203,9 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
   </div>
 </div>
 
+<div id="connectionStatus" class="connection-status" role="status" hidden>Reconnecting… Votes will be available when the connection returns.</div>
+<dialog id="shareDialog" class="game-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2>Join <span id="shareCode"></span></h2><div id="joinQR"></div><label for="shareLink">Join link</label><input id="shareLink" readonly onclick="this.select()"><button class="restart-btn" onclick="copyJoinLink()">Copy link</button></dialog>
+<dialog id="slideDetail" class="game-dialog slide-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2 id="detailTitle"></h2><p id="detailStatus" role="status"></p><img id="detailImage" alt="Selected slide" hidden><div id="detailVotes"></div></dialog>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2196,7 +2235,15 @@ let myDoubleDownUsed = false;
 // ── Veto state ───────────────────────────────────────────────────────────────
 let vetoedSlides = {};
 
-document.addEventListener('fb-ready', () => { dbReady = true; });
+document.addEventListener('fb-ready', () => {
+  dbReady = true;
+  window._onValue(window._ref(window._db,'.info/serverTimeOffset'), snap => { serverOffset = Number(snap.val()) || 0; });
+  window._onValue(window._ref(window._db,'.info/connected'), snap => {
+    connected = snap.val() === true;
+    document.getElementById('connectionStatus').hidden = connected || !me.code;
+  });
+  resumeSession();
+});
 document.addEventListener('fb-error', () => {
   const msg = window._fbError || 'Unknown error';
   const warn = document.getElementById('cfgWarn');
@@ -2486,11 +2533,18 @@ function prepareLobbySlides(room){
   });
 }
 
+function persistWaitingSettings(){
+  if(!me.isMaster || _latestRoom?.state!=='waiting') return;
+  const sets=resolveEmojiSets();
+  window._update(roomRef(me.code),{timerEnabled:timerCfg.enabled,timerDuration:timerCfg.duration,emojiSmash:sets.smash,emojiPass:sets.pass,lockJoins:!document.getElementById('lateJoinEnabled').checked}).catch(()=>showToast('Could not save lobby settings'));
+}
+
 // ── Timer config (waiting room) ──────────────────────────────────────────────
 function onTimerToggle(){
   const en = document.getElementById('timerEnabled').checked;
   timerCfg.enabled = en;
   document.getElementById('timerDurationRow').style.display = en ? 'flex' : 'none';
+  persistWaitingSettings();
 }
 function setTimerPreset(secs){
   timerCfg.duration = secs;
@@ -2498,141 +2552,82 @@ function setTimerPreset(secs){
   document.querySelectorAll('#timerConfigPanel .preset-btn').forEach(b=>{
     b.classList.toggle('active', parseInt(b.textContent)===secs);
   });
+  persistWaitingSettings();
 }
 function onCustomTimerChange(){
   const v = parseInt(document.getElementById('timerCustom').value);
   if(v>=5 && v<=300){
     timerCfg.duration = v;
     document.querySelectorAll('#timerConfigPanel .preset-btn').forEach(b=>b.classList.remove('active'));
+    persistWaitingSettings();
   }
 }
 
 // ── In-game timer settings (host) ────────────────────────────────────────────
-function onGameTimerToggle(){
-  const en = document.getElementById('timerGameEnabled').checked;
-  timerState.enabled = en;
-  timerCfg.enabled = en;
-  document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
-  document.getElementById('timerExtendRow').style.display = en ? 'flex' : 'none';
-  if(en){
-    startSlideTimer();
-    document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
-  } else {
-    stopSlideTimer();
-    document.getElementById('timerWidget').classList.add('hidden');
-  }
-}
-function setGameTimerPreset(secs){
-  timerState.duration = secs;
-  timerCfg.duration = secs;
-  document.getElementById('timerGameCustom').value = secs;
-  document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>{
-    b.classList.toggle('active', parseInt(b.textContent)===secs);
-  });
-  if(timerState.enabled) startSlideTimer();
-}
-function onGameCustomTimerChange(){
-  const v = parseInt(document.getElementById('timerGameCustom').value);
-  if(v>=5 && v<=300){
-    timerState.duration = v;
-    timerCfg.duration = v;
-    document.querySelectorAll('#timerSettingsInline .tsi-preset').forEach(b=>b.classList.remove('active'));
-    if(timerState.enabled) startSlideTimer();
-  }
-}
-
-// ── ✨ In-game late join toggle (host, live) ──────────────────────────────────
+function onGameTimerToggle(){ changeSharedTimer('enabled',document.getElementById('timerGameEnabled').checked); }
+function setGameTimerPreset(secs){ changeSharedTimer('duration',secs); }
+function onGameCustomTimerChange(){ const n=Number(document.getElementById('timerGameCustom').value); if(n>=5 && n<=300) changeSharedTimer('duration',n); }
 async function onGameLateJoinToggle(){
   if(!me.isMaster) return;
-  const allowed = document.getElementById('lateJoinGame').checked;
-  await window._update(roomRef(me.code), { lockJoins: !allowed });
-  showToast(allowed ? '🔓 Late joining enabled' : '🔒 Late joining disabled');
+  try { await window._update(roomRef(me.code),{lockJoins:!document.getElementById('lateJoinGame').checked}); }
+  catch { showToast('Could not change late joining'); }
 }
-
-// ── ✨ Per-slide timer extend ────────────────────────────────────────────────
-function extendTimer(seconds){
-  if(!timerState.enabled) return;
-  timerState.remaining = Math.min(timerState.remaining + seconds, timerState.duration + 60);
+function extendTimer(seconds){ changeSharedTimer('extend',seconds); }
+function toggleTimerPause(){ changeSharedTimer('pause'); }
+function toggleTimerEnabled(){ changeSharedTimer('enabled',!timerState.enabled); }
+function remainingMs(t){ return t.dueAt && !t.paused ? Math.max(0,t.dueAt-roomNow()) : Math.max(0,t.remainingMs || 0); }
+async function changeSharedTimer(action,value){
+  if(!me.isMaster || !connected || !_latestRoom) return;
+  const slide=_latestRoom.currentSlide;
+  try { await window._transaction(roomRef(me.code),room=>{
+    if(!room || room.state!=='playing' || room.currentSlide!==slide) return;
+    const t=room.timer || newTimer(room,slide), now=roomNow();
+    t.remainingMs=remainingMs(t);
+    if(action==='pause'){ t.paused=!t.paused; }
+    if(action==='extend'){ t.remainingMs+=value*1000; }
+    if(action==='duration'){ t.duration=value; t.remainingMs=value*1000; room.timerDuration=value; }
+    if(action==='enabled'){ t.enabled=value; room.timerEnabled=value; if(value && t.remainingMs<=0) t.remainingMs=t.duration*1000; }
+    t.dueAt=t.enabled && !t.paused && t.status==='running' ? now+t.remainingMs : null;
+    t.revision=(t.revision||0)+1; room.timer=t; return room;
+  }); } catch { showToast('Could not update the timer'); }
+}
+async function armSharedTimer(slide){
+  if(!me.isMaster || !timerState.slideReady || !connected || arming) return;
+  arming=true;
+  try { await window._transaction(roomRef(me.code),room=>{
+    if(!room || room.state!=='playing' || room.currentSlide!==slide || room.timer?.status!=='loading') return;
+    room.timer.status='running'; room.timer.dueAt=room.timer.enabled && !room.timer.paused ? roomNow()+room.timer.remainingMs : null;
+    return room;
+  }); } catch { showToast('Timer could not start. Retrying…'); }
+  finally { arming=false; }
+}
+function syncSharedTimer(room){
+  const t=room.timer || {...getSlideTimerConfig(room,room.currentSlide),remainingMs:15000,status:'loading'};
+  Object.assign(timerState,{enabled:t.enabled,duration:t.duration,paused:!!t.paused,remaining:Math.ceil(remainingMs(t)/1000),loading:t.status==='loading'});
+  document.getElementById('timerWidget').classList.toggle('hidden',!t.enabled);
+  const btn=document.getElementById('timerPauseBtn'); btn.textContent=t.paused?'▶':'⏸'; btn.title=t.paused?'Resume':'Pause';
   updateTimerUI();
-  const disp = document.getElementById('timerDisplay');
-  if(disp){
-    disp.classList.remove('extend-flash');
-    void disp.offsetWidth;
-    disp.classList.add('extend-flash');
-    setTimeout(() => disp.classList.remove('extend-flash'), 450);
-  }
-  showToast(`⏱ +${seconds}s added`);
+  if(!timerState.intervalId) startSlideTimer();
 }
-
-function toggleTimerPause(){
-  timerState.paused = !timerState.paused;
-  const btn = document.getElementById('timerPauseBtn');
-  btn.textContent = timerState.paused ? '▶' : '⏸';
-  btn.title = timerState.paused ? 'Resume' : 'Pause';
-}
-
-function toggleTimerEnabled(){
-  const en = !timerState.enabled;
-  timerState.enabled = en;
-  timerCfg.enabled = en;
-  document.getElementById('timerGameEnabled').checked = en;
-  document.getElementById('timerGameDurationRow').style.display = en ? 'flex' : 'none';
-  document.getElementById('timerExtendRow').style.display = en ? 'flex' : 'none';
-  if(!en){
-    stopSlideTimer();
-    document.getElementById('timerWidget').classList.add('hidden');
-  } else {
-    startSlideTimer();
-    document.getElementById('timerWidget').classList.remove('hidden','timer-disabled');
-  }
-}
-
 function startSlideTimer(){
   stopSlideTimer();
-  timerState.remaining = timerState.duration;
-  updateTimerUI();
-  if(!timerState.enabled || !timerState.slideReady) return;
-  timerState.paused = false;
-  const btn = document.getElementById('timerPauseBtn');
-  if(btn) { btn.textContent = '⏸'; btn.title = 'Pause'; }
-  updateTimerUI();
-  timerState.intervalId = setInterval(() => {
-    if(timerState.paused) return;
-    timerState.remaining -= 1;
-    updateTimerUI();
-    if(timerState.remaining <= 0){
-      stopSlideTimer();
-      if(me.isMaster) masterNext();
-    }
-  }, 1000);
+  timerState.intervalId=setInterval(()=>{
+    const room=_latestRoom; if(!room || room.state!=='playing') return;
+    const t=room.timer; if(!t) return;
+    timerState.remaining=Math.ceil(remainingMs(t)/1000); updateTimerUI();
+    if(me.isMaster && connected && timerState.slideReady && t.status==='loading') armSharedTimer(room.currentSlide);
+    if(me.isMaster && connected && t.enabled && !t.paused && t.dueAt && remainingMs(t)<=0) masterNext(room.currentSlide,t.revision);
+  },200);
 }
-
-function stopSlideTimer(){
-  if(timerState.intervalId){ clearInterval(timerState.intervalId); timerState.intervalId = null; }
-}
-
+function stopSlideTimer(){ if(timerState.intervalId){ clearInterval(timerState.intervalId); timerState.intervalId=null; } }
 function updateTimerUI(){
-  const r = Math.max(0, timerState.remaining);
-  const total = timerState.duration;
-  const frac = total > 0 ? r / total : 0;
-  const urgent = r <= Math.min(5, Math.floor(total * 0.25));
-
-  const disp = document.getElementById('timerDisplay');
-  const arcFill = document.getElementById('timerArcFill');
-  const widget = document.getElementById('timerWidget');
-  const slideWrap = document.getElementById('slideWrap');
-
-  if(disp){ disp.textContent = r; disp.classList.toggle('urgent', urgent); }
-  if(arcFill){
-    arcFill.style.strokeDashoffset = TIMER_CIRCUMFERENCE * (1 - frac);
-    arcFill.classList.toggle('urgent', urgent);
-  }
-  if(widget) widget.classList.toggle('timer-urgent', urgent);
-  if(widget){
-    widget.classList.toggle('timer-loading', !timerState.slideReady);
-    widget.title = timerState.slideReady ? '' : 'Countdown starts when the slide is visible';
-  }
-  if(slideWrap) slideWrap.classList.toggle('timer-urgent', urgent);
+  const r=Math.max(0,timerState.remaining), frac=Math.min(1,r/Math.max(1,timerState.duration));
+  const urgent=!timerState.loading && !timerState.paused && r<=Math.min(5,Math.floor(timerState.duration*.25));
+  const disp=document.getElementById('timerDisplay'); disp.textContent=timerState.loading?'…':r; disp.classList.toggle('urgent',urgent);
+  const arc=document.getElementById('timerArcFill'); arc.style.strokeDashoffset=TIMER_CIRCUMFERENCE*(1-frac); arc.classList.toggle('urgent',urgent);
+  const widget=document.getElementById('timerWidget'); widget.classList.toggle('timer-urgent',urgent); widget.classList.toggle('timer-loading',timerState.loading);
+  widget.title=timerState.loading?'Waiting for the host’s slide to load':timerState.paused?'Paused for everyone':'Shared countdown';
+  document.getElementById('slideWrap').classList.toggle('timer-urgent',urgent);
 }
 
 // ── Veto Power ───────────────────────────────────────────────────────────────
@@ -2684,24 +2679,7 @@ function applyVetoUI(isVetoed, notesDisabled = false){
 }
 
 // ── Double Down ───────────────────────────────────────────────────────────────
-async function castDoubleDown(){
-  if(myDoubleDownUsed) return;
-  const snap = await window._get(roomRef(me.code));
-  if(!snap.exists()) return;
-  const room = snap.val();
-  const s = room.currentSlide;
-  if(myVotedSlides[s]) return;
-  if(isSlideUnrated(room, s)) return;
-
-  myDoubleDownUsed = true;
-  myVotedSlides[s] = 'supersmash';
-  await window._set(voteRef(me.code, s, safeKey(me.name)), 'supersmash');
-  markVotedUI('supersmash');
-  showToast('💥 DOUBLE DOWN! ×2 SMASH!', 2600);
-  spawnReaction('smash', 8);
-
-  await window._set(window._ref(window._db, `ddused/${me.code}/${safeKey(me.name)}`), true);
-}
+async function castDoubleDown(){ if(!myDoubleDownUsed) await submitVote('supersmash'); }
 
 function updateDoubleDownUI(){
   const btn = document.getElementById('doubleDownBtn');
@@ -2746,6 +2724,7 @@ function applyEmojiTheme(theme){
     customRow.style.display = 'none';
     emojiCfg.customSmash = ''; emojiCfg.customPass = '';
     updateEmojiPreview(EMOJI_THEMES[theme].smash, EMOJI_THEMES[theme].pass);
+    persistWaitingSettings();
   }
 }
 function onCustomEmojiChange(){
@@ -2755,6 +2734,7 @@ function onCustomEmojiChange(){
   const passArr  = parseEmojiInput(rawPass);
   emojiCfg.customSmash = rawSmash; emojiCfg.customPass = rawPass;
   updateEmojiPreview(smashArr.length?smashArr:EMOJI_THEMES.classic.smash, passArr.length?passArr:EMOJI_THEMES.classic.pass);
+  persistWaitingSettings();
 }
 function parseEmojiInput(str){ return str.trim().split(/\s+/).filter(s=>s.length>0); }
 function updateEmojiPreview(smashArr, passArr){
@@ -2819,23 +2799,23 @@ async function createRoom(){
 
   try {
     const deck = await fetchSlidePageIdsViaAppsScript(url);
-    const code = genCode();
     const room = {
-      code, hostName:name, slidesUrl:url,
+      hostName:name, hostId:deviceId, slidesUrl:url,
       totalSlides:deck.totalSlides, slidePageIds:deck.slidePageIds,
       slideDurations:deck.slideDurations,
-      imageCacheVersion:deck.imageCacheVersion || code,
+      imageCacheVersion:deck.imageCacheVersion || "",
       slideVotingDisabled:deck.slideVotingDisabled,
       notesVotingAvailable:deck.notesRulesVersion === 1,
       notesTimingAvailable:deck.timingVersion === 1,
       notesTimingWarnings:Array.isArray(deck.timingWarnings) ? deck.timingWarnings.filter(w => typeof w === 'string') : [],
       state:'waiting', currentSlide:1,
-      players:{ [safeKey(name)]:{ name, color:avatarClass(name) } },
+      players:{ [deviceId]:{ id:deviceId, name, color:avatarClass(name), active:true } },
       vetoed: {},
       lockJoins: false,
     };
-    await window._set(roomRef(code), room);
-    me = { name, code, isMaster:true };
+    const created = await reserveRoom(room);
+    me = { id:deviceId, name, code:created.code, isMaster:true };
+    saveSession();
     enterWaiting();
   } catch(e) {
     showErr('createErr','❌ '+e.message);
@@ -2896,29 +2876,93 @@ let _latestVotes = {};
 function roomRef(code){ return window._ref(window._db, `rooms/${code}`); }
 function votesRef(code){ return window._ref(window._db, `votes/${code}`); }
 function voteRef(code,slide,playerKey){ return window._ref(window._db, `votes/${code}/${slide}/${playerKey}`); }
-function getPlayers(room){ return Object.values(room.players||{}); }
+function getPlayers(room){ return Object.entries(room.players||{}).map(([key,p]) => ({...p,key})); }
+function playerKey(p){ return p.id || p.key || safeKey(p.name); }
+function myKey(){ return me.id || safeKey(me.name); }
+function getActivePlayers(room){ return getPlayers(room).filter(p => p.active !== false && !p.kicked); }
+function playedSlides(room, votes = {}){
+  if(room.rounds) return Object.keys(room.rounds).map(Number).filter(s => s >= 1 && s <= room.totalSlides).sort((a,b)=>a-b);
+  const end = room.currentSlide || Math.max(0,...Object.keys(votes).map(Number)) || room.totalSlides;
+  return Array.from({length:Math.min(end,room.totalSlides || end)},(_,i)=>i+1);
+}
+function eligible(p,room,slide){
+  if(room.rounds) return room.rounds[slide]?.eligible?.[playerKey(p)] === true;
+  return slide >= (p.joinedSlide || 1) && (!p.leftSlide || slide <= p.leftSlide);
+}
+function voteFor(p,room,votes,slide){ return eligible(p,room,slide) ? votes[slide]?.[playerKey(p)] : undefined; }
+function normalVote(v){ return v === 'supersmash' ? 'smash' : (v === 'smash' || v === 'pass' ? v : null); }
+let serverOffset=0, connected=true, advancing=false, votePending=false, followingRoom=false, arming=false;
+function roomNow(){ return Date.now()+serverOffset; }
+function storageRead(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function storageWrite(k,v){ try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k,JSON.stringify(v)); } catch {} }
+const deviceId = storageRead('sop-device') || (crypto.randomUUID ? crypto.randomUUID() : 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2));
+storageWrite('sop-device',deviceId);
+function saveSession(){ storageWrite('sop-session',me); storageWrite('sop-name',me.name); }
+function roomLink(code=me.code){ const url=new URL(location.href); url.search=''; url.hash=''; url.searchParams.set('room',code); return url.href; }
+async function copyJoinLink(){ try { await navigator.clipboard.writeText(roomLink()); showToast('Join link copied'); } catch { showShareDialog(); } }
+function showShareDialog(){
+  const dialog=document.getElementById('shareDialog');
+  document.getElementById('shareLink').value=roomLink();
+  document.getElementById('shareCode').textContent=me.code;
+  const qr=document.getElementById('joinQR'); qr.innerHTML='';
+  if(window.QRCode) new QRCode(qr,{text:roomLink(),width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  dialog.showModal();
+}
+// Keep the listener alive until the transaction commits: Firebase can discard
+// the cached room as soon as its last value listener is detached.
+async function transactLoadedRoom(code,apply){
+  let stop;
+  try {
+    const initial=await new Promise((resolve,reject)=>{
+      stop=window._onValue(roomRef(code),resolve,reject);
+    });
+    if(!initial.exists()) throw new Error('Room not found.');
+    return await window._transaction(roomRef(code),apply);
+  } finally { stop?.(); }
+}
+async function reserveRoom(room){
+  for(let attempt=0;attempt<8;attempt++){
+    const code=genCode();
+    const candidate={...room,code,imageCacheVersion:room.imageCacheVersion || code};
+    const result=await window._transaction(roomRef(code),current=>current === null ? candidate : undefined);
+    if(result.committed) return candidate;
+  }
+  throw new Error('Could not reserve a room code. Try again.');
+}
+function newRound(room,slide){ return {openedAt:roomNow(),eligible:Object.fromEntries(getActivePlayers(room).map(p=>[playerKey(p),true]))}; }
+function newTimer(room,slide){ const cfg=getSlideTimerConfig(room,slide); return {...cfg,slide,status:'loading',paused:false,remainingMs:cfg.duration*1000,dueAt:null,revision:1}; }
+async function enterExistingRoom(code){
+  const snap=await window._get(roomRef(code)); if(!snap.exists()) throw new Error('This room is no longer available.');
+  const room=snap.val(), p=room.players?.[myKey()];
+  if(!p || p.kicked || p.active === false) throw new Error('Your place in this room is no longer active.');
+  stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={};
+  me={...me,code,name:p.name,isMaster:room.hostId ? room.hostId===myKey() : room.hostName===p.name};
+  _latestRoom=room;
+  timerCfg={enabled:!!room.timerEnabled,duration:room.timerDuration || 15};
+  if(room.emojiSmash?.length){
+    emojiCfg={theme:'custom',customSmash:room.emojiSmash.join(' '),customPass:(room.emojiPass || []).join(' ')};
+    document.getElementById('smashEmojiInput').value=emojiCfg.customSmash;
+    document.getElementById('passEmojiInput').value=emojiCfg.customPass;
+  }
+  const dd=await window._get(window._ref(window._db,`ddused/${code}/${myKey()}`)); myDoubleDownUsed=dd.val() === true;
+  saveSession();
+  if(room.state==='waiting') enterWaiting(); else enterGame();
+}
+async function resumeSession(){
+  const requested=new URL(location.href).searchParams.get('room')?.toUpperCase();
+  const saved=storageRead('sop-session');
+  if(saved?.code && (!requested || requested===saved.code)){
+    me=saved;
+    try { await enterExistingRoom(saved.code); showToast('Welcome back'); return; }
+    catch { storageWrite('sop-session',null); me={name:'',code:'',isMaster:false}; }
+  }
+  if(requested){ document.getElementById('joinCode').value=requested; setEntryMode('join'); }
+  const name=storageRead('sop-name'); if(typeof name==='string'){ document.getElementById('joinName').value=name; document.getElementById('hostName').value=name; }
+}
 
 // ── Smash totals: supersmash counts as 2 ────────────────────────────────────
-function getSmashTotals(room, votesData){
-  const players = getPlayers(room);
-  const totals = {};
-  const vetoed = room.vetoed || {};
-  players.forEach(p => totals[safeKey(p.name)] = 0);
-
-  for(let s=1; s<=room.totalSlides; s++){
-    if(isSlideUnrated(room, s)) continue;
-    const slideVotes = votesData[s] || votesData[String(s)] || {};
-    players.forEach(p => {
-      const key = safeKey(p.name);
-      const v = slideVotes[key];
-      if(v === 'smash') totals[key] += 1;
-      if(v === 'supersmash') totals[key] += 2;
-    });
-  }
-
-  return players
-    .map(p => ({ name:p.name, color:p.color, key:safeKey(p.name), smashes:totals[safeKey(p.name)]||0 }))
-    .sort((a,b) => b.smashes-a.smashes || a.name.localeCompare(b.name));
+function getSmashTotals(room,votes){
+  return getPlayers(room).map(p=>({ ...p, key:playerKey(p), smashes:getPlayerStats(p,room,votes).smashPoints })).sort((a,b)=>b.smashes-a.smashes || a.name.localeCompare(b.name));
 }
 
 function renderSmashBoard(targetId, room, votesData){
@@ -2927,10 +2971,10 @@ function renderSmashBoard(targetId, room, votesData){
   el.innerHTML = totals.map((p,i) => `
     <div class="smash-row">
       <div class="smash-left">
-        <div class="player-avatar ${p.color}" style="width:26px;height:26px;font-size:.62rem">${initials(p.name)}</div>
+        <div class="player-avatar ${p.color}" style="width:26px;height:26px;font-size:.62rem">${escapeHtml(initials(p.name))}</div>
         <div>
-          <div class="smash-name">${i===0?'👑 ':''}${p.name}</div>
-          <div class="smash-sub">${p.smashes===1?'1 smash':`${p.smashes} smashes`}</div>
+          <div class="smash-name">${i===0?'👑 ':''}${escapeHtml(p.name)}</div>
+          <div class="smash-sub">${p.smashes} smash point${p.smashes===1?'':'s'}</div>
         </div>
       </div>
       <div class="smash-count">${p.smashes}🔥</div>
@@ -2945,35 +2989,36 @@ function stopListeners(){
 
 async function joinRoom(){
   hideErr('joinErr');
-  if(!dbReady) return showErr('joinErr','Firebase not ready — check your config.');
-  const name = document.getElementById('joinName').value.trim();
-  const code = document.getElementById('joinCode').value.trim().toUpperCase();
-  if(!name) return showErr('joinErr','Enter your name.');
-  if(!code) return showErr('joinErr','Enter a room code.');
-
-  const snap = await window._get(roomRef(code));
-  if(!snap.exists()) return showErr('joinErr','Room not found. Check the code.');
-  const room = snap.val();
-  if(room.state==='done') return showErr('joinErr','This game has already ended.');
-  if(room.state==='playing' && room.lockJoins) return showErr('joinErr','The host has locked the room — late joining is disabled.');
-
-  await window._update(window._ref(window._db,`rooms/${code}/players`),{
-    [safeKey(name)]:{ name, color:avatarClass(name) }
-  });
-
-  // Check if player already used double down in this room
-  const ddSnap = await window._get(window._ref(window._db, `ddused/${code}/${safeKey(name)}`));
-  if(ddSnap.exists() && ddSnap.val()) myDoubleDownUsed = true;
-
-  me = { name, code, isMaster:false };
-  if(room.state==='playing') enterGame();
-  else enterWaiting();
+  if(!dbReady) return showErr('joinErr','Connecting… try again shortly.');
+  const name=document.getElementById('joinName').value.trim(), code=document.getElementById('joinCode').value.trim().toUpperCase();
+  if(!name || !code) return showErr('joinErr','Enter your name and room code.');
+  const btn=document.querySelector('#joinPanel button'); if(btn) btn.disabled=true;
+  try {
+    let reason='Room not found.';
+    const joined=await transactLoadedRoom(code,room=>{
+      if(!room) return;
+      const existing=room.players?.[deviceId];
+      if(existing?.kicked){ reason='You were removed from this room.'; return; }
+      if(room.state==='done' && !existing){ reason='This game has ended.'; return; }
+      if(room.state==='playing' && room.lockJoins && !existing){ reason='Late joining is disabled.'; return; }
+      if(getActivePlayers(room).some(p=>playerKey(p)!==deviceId && p.name.toLowerCase()===name.toLowerCase())){ reason='That name is in use. Choose another name.'; return; }
+      room.players ||= {};
+      room.players[deviceId]={...existing,id:deviceId,name,color:avatarClass(name),active:true,joinedSlide:existing?.joinedSlide || room.currentSlide || 1};
+      if(room.rounds?.[room.currentSlide]){ room.rounds[room.currentSlide].eligible ||= {}; room.rounds[room.currentSlide].eligible[deviceId]=true; }
+      return room;
+    });
+    if(!joined.committed) throw new Error(reason);
+    me={id:deviceId,name,code,isMaster:false}; await enterExistingRoom(code);
+  } catch(e){ showErr('joinErr',e.message); }
+  finally { if(btn) btn.disabled=false; }
 }
 
 function enterWaiting(){
   show('waiting');
   document.getElementById('displayCode').textContent = me.code;
+  ['timerConfigPanel','emojiConfigPanel','lockJoinsPanel'].forEach(id=>document.getElementById(id).style.display=me.isMaster?'':'none');
   if(me.isMaster){
+    document.getElementById('lateJoinEnabled').checked=!_latestRoom?.lockJoins;
     document.getElementById('timerConfigPanel').style.display = '';
     document.getElementById('timerEnabled').checked = timerCfg.enabled;
     document.getElementById('timerDurationRow').style.display = timerCfg.enabled ? 'flex' : 'none';
@@ -2986,17 +3031,13 @@ function enterWaiting(){
 }
 
 async function kickPlayer(playerName){
-  if(!me.isMaster || !me.code) return;
-  if(!playerName || playerName===me.name) return;
-
-  const playerKey = safeKey(playerName);
-  try {
-    await window._set(window._ref(window._db, `rooms/${me.code}/players/${playerKey}`), null);
-    showToast(`👢 ${playerName} was kicked`);
-  } catch(e) {
-    showToast('Could not kick player');
-  }
+  if(!me.isMaster) return;
+  const p=getActivePlayers(_latestRoom).find(p=>p.name===playerName);
+  if(!p || playerKey(p)===myKey()) return;
+  try { await window._update(window._ref(window._db,`rooms/${me.code}/players/${playerKey(p)}`),{active:false,kicked:true,leftSlide:_latestRoom.currentSlide}); showToast(`${escapeHtml(p.name)} was removed`); }
+  catch { showToast('Could not remove player'); }
 }
+
 window.kickPlayer = kickPlayer;
 
 
@@ -3010,7 +3051,7 @@ function renderWaiting(room){
     ? ` ${Object.values(room.slideVotingDisabled || {}).filter(value => value === true).length} slides have voting disabled by ! in the notes.`
     : ' The ! voting marker needs the updated slide service.';
   prepareLobbySlides(room);
-  const players = getPlayers(room);
+  const players = getActivePlayers(room);
   const grid = document.getElementById('playersGrid');
   grid.innerHTML = '';
   players.forEach(p => {
@@ -3020,8 +3061,8 @@ function renderWaiting(room){
     const crown = p.name===room.hostName ? '<span style="font-size:.72rem">👑</span>' : '';
 
     chip.innerHTML = `
-      <div class="player-avatar ${p.color}">${initials(p.name)}</div>
-      <span>${p.name}</span>
+      <div class="player-avatar ${p.color}">${escapeHtml(initials(p.name))}</div>
+      <span>${escapeHtml(p.name)}</span>
       ${crown}
     `;
     grid.appendChild(chip);
@@ -3040,14 +3081,13 @@ function renderWaiting(room){
 }
 
 async function startGame(){
-  const sets = resolveEmojiSets();
-  const lockJoins = !document.getElementById('lateJoinEnabled').checked;
-  await window._update(roomRef(me.code),{
-    state:'playing', currentSlide:1,
-    timerEnabled:timerCfg.enabled, timerDuration:timerCfg.duration,
-    emojiSmash:sets.smash, emojiPass:sets.pass,
-    lockJoins,
-  });
+  if(!me.isMaster) return;
+  const sets=resolveEmojiSets(), lockJoins=!document.getElementById('lateJoinEnabled').checked;
+  try { await window._transaction(roomRef(me.code),room=>{
+    if(!room || room.state!=='waiting') return;
+    Object.assign(room,{state:'playing',currentSlide:1,startedAt:roomNow(),timerEnabled:timerCfg.enabled,timerDuration:timerCfg.duration,emojiSmash:sets.smash,emojiPass:sets.pass,lockJoins});
+    room.rounds={1:newRound(room,1)}; room.timer=newTimer(room,1); return room;
+  }); } catch { showToast('Could not start. Please try again.'); }
 }
 
 function enterGame(){
@@ -3055,7 +3095,7 @@ function enterGame(){
   const isHost = me.isMaster;
   document.getElementById('masterControls').style.display = isHost ? '' : 'none';
   document.getElementById('voteHead').textContent = isHost ? 'Host can vote too' : 'Cast your vote';
-  if(isHost) document.getElementById('timerInlineControls').style.display = '';
+  document.getElementById('timerInlineControls').style.display = isHost ? '' : 'none';
   updateDoubleDownUI();
   listenRoom();
   listenVotes();
@@ -3077,6 +3117,7 @@ function renderGame(room){
     timerState.paused = false;
     stopSlideTimer();
   }
+  syncSharedTimer(room);
   if(Array.isArray(room.emojiSmash) && room.emojiSmash.length) activeSmashEmojis = room.emojiSmash;
   if(Array.isArray(room.emojiPass)  && room.emojiPass.length)  activePassEmojis  = room.emojiPass;
   updateVoteBtnIcons();
@@ -3108,10 +3149,10 @@ function renderGame(room){
     lastSlide = s;
     prevVoteCounts = { smash:0, pass:0 };
     loadSlide(room.slidesUrl, s, tot, room.slidePageIds||[], room.imageCacheVersion || room.code).then(loaded => {
-      if(s !== lastSlide) return;
+      if(s !== lastSlide || _latestRoom?.state!=='playing') return;
       timerState.slideReady = loaded;
-      if(timerState.enabled && loaded) startSlideTimer();
-      else updateTimerUI();
+      if(loaded) armSharedTimer(s);
+      updateTimerUI();
     });
     const version = room.imageCacheVersion || room.code;
     const wanted = new Set((room.slidePageIds || []).slice(s-1, s+2).map(pid => slideCacheKey(room.slidesUrl, pid, version)));
@@ -3135,7 +3176,6 @@ function renderGame(room){
       updateTimerUI();
     } else {
       widget.classList.add('hidden');
-      stopSlideTimer();
     }
   }
 
@@ -3153,13 +3193,13 @@ function renderVoters(room, votesData){
   const s = room.currentSlide;
   const isUnrated = isSlideUnrated(room, s);
   const slideVotes = isUnrated ? {} : (votesData[s]||{});
-  const players = getPlayers(room);
+  const players = getActivePlayers(room).filter(p=>eligible(p,room,s));
   const list = document.getElementById('voterList');
   let smashes=0, passes=0;
 
   list.innerHTML = '';
   players.forEach(p => {
-    const key = safeKey(p.name);
+    const key = playerKey(p);
     const choice = slideVotes[key];
     if(choice==='smash') smashes += 1;
     if(choice==='supersmash') smashes += 2;
@@ -3176,12 +3216,12 @@ function renderVoters(room, votesData){
     const canKick = me.isMaster && p.name!==room.hostName && p.name!==me.name;
     row.innerHTML = `
       <div class="voter-name-wrap">
-        <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.58rem">${initials(p.name)}</div>
-        ${p.name}
+        <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.58rem">${escapeHtml(initials(p.name))}</div>
+        ${escapeHtml(p.name)}
       </div>
       <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">
         ${badgeHtml}
-        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(p.name)}" aria-label="Kick ${p.name}" title="Remove ${p.name} from the game"><span>✕</span><span>Kick</span></button>` : ``}
+        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(p.name)}" aria-label="Kick ${escapeHtml(p.name)}" title="Remove ${escapeHtml(p.name)} from the game"><span>✕</span><span>Kick</span></button>` : ``}
       </div>
     `;
     const kickBtn = row.querySelector('[data-kick-player]');
@@ -3199,7 +3239,7 @@ function renderVoters(room, votesData){
   document.getElementById('tallyPass').textContent  = passes;
   triggerVoteReactions(smashes, passes);
 
-  const myChoice = slideVotes[safeKey(me.name)];
+  const myChoice = slideVotes[myKey()];
   if(myChoice && !myVotedSlides[s]){
     myVotedSlides[s] = myChoice;
     markVotedUI(myChoice);
@@ -3224,41 +3264,56 @@ function markVotedUI(choice){
   document.getElementById('voteBtns').querySelectorAll('.vbtn').forEach(b=>b.disabled=true);
 }
 
-async function castVote(choice){
-  const snap = await window._get(roomRef(me.code));
-  if(!snap.exists()) return;
-  const room = snap.val();
-  const s = room.currentSlide;
-  if(myVotedSlides[s]) return;
-  if(isSlideUnrated(room, s)) return;
-
-  myVotedSlides[s] = choice;
-  await window._set(voteRef(me.code, s, safeKey(me.name)), choice);
-  markVotedUI(choice);
-  showToast(choice==='smash'?'🔥 SMASHED!':'❄️ Passed');
-  spawnReaction(choice, 4);
-}
-
-async function masterNext(){
-  stopSlideTimer();
-  const snap = await window._get(roomRef(me.code));
-  if(!snap.exists()) return;
-  const room = snap.val();
-  if(room.currentSlide >= room.totalSlides){
-    await window._update(roomRef(me.code),{ state:'done' });
-  } else {
-    await window._update(roomRef(me.code),{
-      currentSlide: room.currentSlide+1,
-      timerEnabled: timerCfg.enabled,
-      timerDuration: timerCfg.duration,
-    });
+async function castVote(choice){ if(choice==='smash' || choice==='pass') await submitVote(choice); }
+async function submitVote(choice){
+  if(votePending || !me.code || !connected) return;
+  votePending=true;
+  let submittedSlide=null;
+  try {
+    const snap=await window._get(roomRef(me.code)); if(!snap.exists()) return;
+    const room=snap.val(), slide=room.currentSlide;
+    const p=getPlayers(room).find(p=>playerKey(p)===myKey());
+    if(room.state!=='playing' || !p || p.active===false || p.kicked || !eligible(p,room,slide) || isSlideUnrated(room,slide) || myVotedSlides[slide]) return;
+    if(room.timer?.enabled && room.timer.dueAt && !room.timer.paused && remainingMs(room.timer)<=0) return;
+    if(choice==='supersmash' && myDoubleDownUsed) return;
+    submittedSlide=slide;
+    const changes={ [`votes/${me.code}/${slide}/${myKey()}`]:choice };
+    if(choice==='supersmash') changes[`ddused/${me.code}/${myKey()}`]=true;
+    await window._update(window._ref(window._db),changes);
+    myVotedSlides[slide]=choice;
+    if(choice==='supersmash'){ myDoubleDownUsed=true; updateDoubleDownUI(); }
+    if(_latestRoom?.currentSlide===slide) markVotedUI(choice);
+    spawnReaction(choice==='pass'?'pass':'smash',4);
+  } catch {
+    if(submittedSlide!==null){
+      delete myVotedSlides[submittedSlide];
+      if(_latestRoom?.currentSlide===submittedSlide){
+        document.getElementById('votedBanner').className='voted-banner';
+        document.querySelectorAll('#voteBtns .vbtn').forEach(b=>b.disabled=isSlideUnrated(_latestRoom,submittedSlide));
+      }
+    }
+    showToast('Vote could not be saved. Please try again.');
   }
+  finally { votePending=false; }
 }
-
+async function masterNext(expectedSlide=_latestRoom?.currentSlide, timerRevision=null){
+  if(!me.isMaster || advancing || !connected) return;
+  advancing=true;
+  try { await window._transaction(roomRef(me.code),room=>{
+    if(!room || room.state!=='playing' || room.currentSlide!==expectedSlide) return;
+    if(timerRevision!==null && (room.timer?.revision!==timerRevision || !room.timer.enabled || room.timer.paused || !room.timer.dueAt || remainingMs(room.timer)>0)) return;
+    if(room.currentSlide>=room.totalSlides){ room.state='done'; room.endedAt=roomNow(); }
+    else { room.currentSlide++; room.rounds ||= {}; room.rounds[room.currentSlide]=newRound(room,room.currentSlide); room.timer=newTimer(room,room.currentSlide); }
+    return room;
+  }); } catch { showToast('Could not advance. Please try again.'); }
+  finally { advancing=false; }
+}
 async function masterEnd(){
-  if(!confirm('End the game and show results?')) return;
-  stopSlideTimer();
-  await window._update(roomRef(me.code),{ state:'done' });
+  if(!me.isMaster || !confirm('End the game and show results?')) return;
+  try { await window._transaction(roomRef(me.code),room=>{
+    if(!room || room.state!=='playing') return;
+    room.state='done'; room.endedAt=roomNow(); return room;
+  }); } catch { showToast('Could not end the game'); }
 }
 
 function listenRoom(){
@@ -3268,14 +3323,18 @@ function listenRoom(){
     const room = snap.val();
     _latestRoom = room;
 
-    const myKey = safeKey(me.name);
-    if(me.name && !(room.players||{})[myKey]){
+    const key = myKey();
+    if(me.name && (!room.players?.[key] || room.players[key].kicked)){
       showToast('You were removed from the room');
       goHome();
       return;
     }
 
+    if(room.nextRoomCode && !followingRoom){
+      followingRoom=true; enterExistingRoom(room.nextRoomCode).catch(e=>showToast(e.message)).finally(()=>followingRoom=false); return;
+    }
     if(room.state==='waiting'){
+      if(document.getElementById('waiting').classList.contains('hidden')) show('waiting');
       renderWaiting(room);
     } else if(room.state==='playing'){
       if(document.getElementById('game').classList.contains('hidden')){
@@ -3293,9 +3352,10 @@ function listenRoom(){
     } else if(room.state==='done'){
       if(!document.getElementById('results').classList.contains('hidden')) return;
       stopSlideTimer();
-      window._get(votesRef(me.code)).then(vSnap => {
-        showResultsScreen(room, vSnap.exists()?vSnap.val():_latestVotes);
-      }).catch(()=>showResultsScreen(room, _latestVotes));
+      const code=me.code;
+      window._get(votesRef(code)).then(vSnap => {
+        if(me.code===code && !followingRoom) showResultsScreen(room, vSnap.exists()?vSnap.val():_latestVotes);
+      }).catch(()=>{ if(me.code===code && !followingRoom) showResultsScreen(room, _latestVotes); });
     }
   });
 }
@@ -3311,436 +3371,162 @@ function listenVotes(){
   });
 }
 
-function getPlayerStats(player, room, votesData){
-  const key = safeKey(player.name);
-  const tot = room.totalSlides;
-  const vetoed = room.vetoed || {};
-  let smashes=0, passes=0, skipped=0, supersmashes=0;
-  let maxStreak=0, currentStreak=0, altCount=0, lastVote=null;
-
-  for(let s=1; s<=tot; s++){
-    if(isNotesVotingDisabled(room, s)) continue;
-    if(vetoed[s]){ skipped++; continue; }
-    const sv = votesData[s]||votesData[String(s)]||{};
-    const v = sv[key];
-    if(v==='smash') smashes++;
-    else if(v==='supersmash'){ smashes += 2; supersmashes++; }
-    else if(v==='pass') passes++;
-    else { skipped++; currentStreak=0; lastVote=null; continue; }
-
-    const normV = (v==='supersmash')?'smash':v;
-    if(normV==='smash'){
-      currentStreak++;
-      if(lastVote==='pass') altCount++;
-    } else {
-      currentStreak=0;
-      if(lastVote==='smash') altCount++;
-    }
-    if(currentStreak>maxStreak) maxStreak=currentStreak;
-    lastVote=normV;
+function getPlayerStats(player,room,votes){
+  let smashes=0,passes=0,skipped=0,supersmashes=0,maxStreak=0,currentStreak=0,altCount=0,lastVote=null;
+  for(const slide of playedSlides(room,votes)){
+    if(isSlideUnrated(room,slide) || !eligible(player,room,slide)) continue;
+    const v=voteFor(player,room,votes,slide), norm=normalVote(v);
+    if(!norm){ skipped++; currentStreak=0; lastVote=null; continue; }
+    if(norm==='smash'){ smashes++; currentStreak++; } else { passes++; currentStreak=0; }
+    if(v==='supersmash') supersmashes++;
+    if(lastVote && lastVote!==norm) altCount++;
+    maxStreak=Math.max(maxStreak,currentStreak); lastVote=norm;
   }
-
-  const voted = smashes+passes;
-  const smashPct = voted>0?Math.round((smashes/voted)*100):0;
-
-  let title='';
-  if(voted===0) title='👻 Ghost';
-  else if(supersmashes>0 && smashPct>=80) title='💥 All In';
-  else if(smashPct===100) title='🔥 All In';
-  else if(smashPct===0) title='❄️ Ice Cold';
-  else if(smashPct>=80) title='💘 Simp';
-  else if(smashPct<=20) title='😤 Picky';
-  else if(altCount>=voted*.7) title='🎲 Chaotic';
-  else if(maxStreak>=5) title='🚀 On Fire';
-  else if(Math.abs(smashPct-50)<=10) title='⚖️ Balanced';
-  else title='😏 Player';
-
-  return { smashes, passes, skipped, smashPct, maxStreak, altCount, voted, title, supersmashes };
+  const voted=smashes+passes, smashPct=voted?Math.round(smashes/voted*100):0;
+  const title=!voted?'No votes yet':smashPct===100?'🔥 All In':smashPct===0?'❄️ Ice Cold':smashPct>=80?'💘 Enthusiast':smashPct<=20?'😤 Selective':Math.abs(smashPct-50)<=10?'⚖️ Balanced':'😏 Player';
+  return {smashes,passes,skipped,supersmashes,maxStreak,altCount,voted,smashPct,title,smashPoints:smashes+supersmashes,eligibleRounds:voted+skipped};
 }
-
-function getContrarianPlayer(players, room, votesData){
-  if(players.length < 2) return null;
-  const vetoed = room.vetoed || {};
-  let best = null, bestCount = -1;
-
-  players.forEach(p => {
-    const key = safeKey(p.name);
-    let disagreeCount = 0, eligible = 0;
-
-    const maxSlides = Number(room.totalSlides) || Math.max(
-      0,
-      ...Object.keys(votesData||{}).map(k => Number(k) || 0),
-      ...Object.keys(vetoed||{}).map(k => Number(k) || 0)
-    );
-
-    for(let s = 1; s <= maxSlides; s++){
-      if(isSlideUnrated(room, s)) continue;
-      const sv = votesData[s] || votesData[String(s)] || {};
-      const myVote = sv[key];
-      if(!myVote) continue;
-
-      let smashCount = 0, passCount = 0;
-      players.forEach(op => {
-        const ov = sv[safeKey(op.name)];
-        if(ov === 'smash' || ov === 'supersmash') smashCount++;
-        else if(ov === 'pass') passCount++;
-      });
-
-      if(smashCount === 0 && passCount === 0) continue;
-      const majoritySmash = smashCount >= passCount;
-      const mySmash = (myVote === 'smash' || myVote === 'supersmash');
-
-      eligible++;
-      if(majoritySmash !== mySmash) disagreeCount++;
-    }
-
-    if(eligible >= 3 && disagreeCount > bestCount){
-      bestCount = disagreeCount;
-      best = { name: p.name, disagreeCount, eligible };
-    }
+function getSlideResults(room,votes){
+  const players=getPlayers(room);
+  return playedSlides(room,votes).map(slide=>{
+    const voters=players.filter(p=>eligible(p,room,slide));
+    const picks=voters.map(p=>({...p,vote:voteFor(p,room,votes,slide)}));
+    const smash=picks.filter(p=>normalVote(p.vote)==='smash').length, pass=picks.filter(p=>p.vote==='pass').length;
+    const total=smash+pass, needed=Math.max(voters.length>1?2:1,Math.ceil(voters.length*.6));
+    return {slide,picks,smash,pass,total,eligible:voters.length,bonus:picks.filter(p=>p.vote==='supersmash').length,smashRate:total?smash/total:0,qualified:!isSlideUnrated(room,slide) && total>=needed};
   });
-
-  return best ? best.name : null;
 }
-
-function renderHallOfFameShame(room, votesData, players){
-  const section = document.getElementById('hallSection');
-  section.innerHTML = '';
-  if(players.length === 0 || room.totalSlides === 0){ section.style.display='none'; return; }
-
-  const vetoed = room.vetoed || {};
-  let bestSmash = null, bestSmashScore = -1;
-  let bestPass  = null, bestPassScore  = -1;
-
-  for(let s = 1; s <= room.totalSlides; s++){
-    if(isSlideUnrated(room, s)) continue;
-    const sv = votesData[s] || votesData[String(s)] || {};
-    let smashVoters = [], passVoters = [], totalVoted = 0;
-
-    players.forEach(p => {
-      const v = sv[safeKey(p.name)];
-      if(v === 'smash' || v === 'supersmash'){ smashVoters.push(p.name); totalVoted++; }
-      else if(v === 'pass'){ passVoters.push(p.name); totalVoted++; }
-    });
-
-    if(totalVoted === 0) continue;
-
-    const smashScore = smashVoters.length / totalVoted;
-    const passScore  = passVoters.length  / totalVoted;
-
-    if(smashScore > bestSmashScore || (smashScore === bestSmashScore && smashVoters.length > (bestSmash?.voters?.length||0))){
-      bestSmashScore = smashScore;
-      bestSmash = { slide: s, voters: smashVoters, total: totalVoted, pct: Math.round(smashScore*100) };
-    }
-    if(passScore > bestPassScore || (passScore === bestPassScore && passVoters.length > (bestPass?.voters?.length||0))){
-      bestPassScore = passScore;
-      bestPass = { slide: s, voters: passVoters, total: totalVoted, pct: Math.round(passScore*100) };
-    }
+function getPairComparison(room,votes,a,b){
+  const rows=[];
+  for(const slide of playedSlides(room,votes)){
+    if(isSlideUnrated(room,slide)) continue;
+    const va=voteFor(a,room,votes,slide),vb=voteFor(b,room,votes,slide);
+    if(!normalVote(va) || !normalVote(vb)) continue;
+    rows.push({slide,va,vb,agree:normalVote(va)===normalVote(vb)});
   }
-
-  section.style.display = '';
-
-  function buildHallCard(data, type){
-    const isFame = type === 'fame';
-    const isUnanimous = data.pct === 100;
-    const card = document.createElement('div');
-    card.className = `hall-card ${type}`;
-
-    const thumbId = `hall-thumb-${type}`;
-    const spinnerId = `hall-spinner-${type}`;
-
-    card.innerHTML = `
-      <div class="hall-label">${isFame ? '🏆 HALL OF FAME — Most Smashed' : '💀 HALL OF SHAME — Most Passed'}</div>
-      <div class="hall-thumb-wrap">
-        <img class="hall-thumb loading" id="${thumbId}" alt="Slide ${data.slide}" />
-        <div class="hall-thumb-spinner" id="${spinnerId}">
-          <div class="spinner"></div>
-          <span>Loading slide…</span>
-        </div>
-      </div>
-      <div class="hall-slide-num">Slide ${data.slide}</div>
-      <div class="hall-desc">${isFame
-        ? (isUnanimous ? 'Unanimous 🔥 — everyone smashed it!' : `${data.pct}% smash rate (${data.voters.length}/${data.total})`)
-        : (isUnanimous ? 'Universal ❄️ — nobody wanted it!'    : `${data.pct}% pass rate (${data.voters.length}/${data.total})`)
-      }</div>
-      <div class="hall-voters">${data.voters.map(n=>`<span class="hall-voter-chip">${n}</span>`).join('')}</div>
-    `;
-
-    if(room.slidesUrl && room.slidePageIds){
-      const pageId = room.slidePageIds[data.slide - 1];
-      if(pageId){
-        fetchSlideImageDataUrl(room.slidesUrl, pageId, room.imageCacheVersion || room.code).then(dataUrl => {
-          const img = document.getElementById(thumbId);
-          const spinner = document.getElementById(spinnerId);
-          if(!img) return;
-          img.onload = () => {
-            img.classList.remove('loading');
-            if(spinner) spinner.style.display = 'none';
-          };
-          img.src = dataUrl;
-        }).catch(() => {
-          const spinner = document.getElementById(spinnerId);
-          if(spinner) spinner.innerHTML = '<span style="color:var(--muted);font-size:.7rem">Could not load slide</span>';
-        });
-      }
-    }
-
-    return card;
-  }
-
-  if(bestSmash) section.appendChild(buildHallCard(bestSmash, 'fame'));
-  if(bestPass)  section.appendChild(buildHallCard(bestPass,  'shame'));
-  if(!bestSmash && !bestPass) section.style.display = 'none';
+  const matches=rows.filter(r=>r.agree).length;
+  return {rows,matches,total:rows.length,rate:rows.length?matches/rows.length:0};
 }
-
-function renderAgreementsTracker(players, room, votesData){
-  const panel = document.getElementById('agreementsPanel');
-  const selectA = document.getElementById('h2hPlayerA');
-  const selectB = document.getElementById('h2hPlayerB');
-  const summary = document.getElementById('h2hSummary');
-  const table = document.getElementById('h2hTable');
-
-  if(!panel || !selectA || !selectB || !summary || !table) return;
-  if(players.length < 2){
-    panel.style.display = 'none';
-    return;
-  }
-
-  panel.style.display = '';
-  const playerNames = players.map(p => p.name).filter(Boolean);
-
-  selectA.innerHTML = '';
-  selectB.innerHTML = '';
-
-  playerNames.forEach(name => {
-    selectA.add(new Option(name, name));
-    selectB.add(new Option(name, name));
-  });
-
-  let defaultA = playerNames[0] || '';
-  let defaultB = playerNames[1] || playerNames[0] || '';
-
-  outer:
-  for(let i = 0; i < players.length; i++){
-    for(let j = i + 1; j < players.length; j++){
-      if(players[i].name !== players[j].name){
-        defaultA = players[i].name;
-        defaultB = players[j].name;
-        break outer;
-      }
+function getContrarianPlayer(players,room,votes){
+  const results=getSlideResults(room,votes);
+  const ranked=players.map(p=>{
+    let disagree=0,total=0;
+    for(const r of results){
+      const own=normalVote(voteFor(p,room,votes,r.slide)); if(!own || isSlideUnrated(room,r.slide)) continue;
+      const others=r.picks.filter(q=>playerKey(q)!==playerKey(p));
+      const smash=others.filter(q=>normalVote(q.vote)==='smash').length,pass=others.filter(q=>q.vote==='pass').length;
+      if(smash===pass) continue;
+      total++; if(own!==(smash>pass?'smash':'pass')) disagree++;
     }
+    return {name:p.name,total,disagree,rate:total?disagree/total:0};
+  }).filter(p=>p.total>=3 && p.disagree>0).sort((a,b)=>b.rate-a.rate || b.total-a.total);
+  return ranked[0]?.name || null;
+}
+function attachSlideButtons(root){ root.querySelectorAll('[data-slide]').forEach(btn=>btn.onclick=()=>openSlideDetail(Number(btn.dataset.slide))); }
+function renderHallOfFameShame(room,votes){
+  const results=getSlideResults(room,votes).filter(r=>r.qualified);
+  const groups=[
+    ['🔥 Hall of Fame','Most loved',results.filter(r=>r.smash>r.pass).sort((a,b)=>b.smashRate-a.smashRate || b.total-a.total),'smash'],
+    ['❄️ Hall of Shame','Most passed',results.filter(r=>r.pass>r.smash).sort((a,b)=>a.smashRate-b.smashRate || b.total-a.total),'pass'],
+    ['⚡ Most divisive','Closest splits',results.filter(r=>r.smash && r.pass).sort((a,b)=>Math.abs(a.smashRate-.5)-Math.abs(b.smashRate-.5) || b.total-a.total),'split']
+  ];
+  const root=document.getElementById('hallSection'); root.style.display='grid';
+  root.innerHTML=groups.map(([title,subtitle,rows,kind])=>{
+    let rank=0,previous=null;
+    return `<section class="panel"><h2 class="panel-title">${title}</h2><p class="recap-muted">${subtitle} · at least 60% turnout${getPlayers(room).length>1?', minimum two votes':''}</p><div class="highlight-list">${rows.slice(0,3).map((r,i)=>{
+      const score=kind==='split'?Math.abs(r.smashRate-.5):kind==='pass'?1-r.smashRate:r.smashRate;
+      if(score!==previous){ rank=i+1; previous=score; }
+      const tied=rows.filter(q=>(kind==='split'?Math.abs(q.smashRate-.5):kind==='pass'?1-q.smashRate:q.smashRate)===score).length>1;
+      return `<button class="highlight-card" data-slide="${r.slide}"><strong>${tied?'Joint ':''}#${rank} · Slide ${r.slide}</strong><span>${kind==='split'?`${r.smash} smash / ${r.pass} pass`:`${Math.round(score*100)}% ${kind}`}</span><small>${r.total}/${r.eligible} voted${r.bonus?` · ${r.bonus} Double Down`:''} · View slide →</small></button>`;
+    }).join('') || '<p class="recap-muted">No qualifying slides yet.</p>'}</div></section>`;
+  }).join(''); attachSlideButtons(root);
+}
+function renderPersonalRecap(room,votes){
+  const root=document.getElementById('personalRecap'),players=getPlayers(room),p=players.find(p=>playerKey(p)===myKey());
+  if(!p){ root.hidden=true; return; } root.hidden=false;
+  const st=getPlayerStats(p,room,votes), results=getSlideResults(room,votes).filter(r=>!isSlideUnrated(room,r.slide));
+  const disagreements=results.map(r=>{
+    const own=normalVote(voteFor(p,room,votes,r.slide));
+    const others=r.picks.filter(q=>playerKey(q)!==playerKey(p) && normalVote(q.vote));
+    const opposed=others.filter(q=>normalVote(q.vote)!==own).length;
+    return {...r,own,others:others.length,opposed,rate:others.length?opposed/others.length:0};
+  }).filter(r=>r.own && r.opposed>r.others/2).sort((a,b)=>b.rate-a.rate || b.others-a.others);
+  const closest=players.filter(q=>playerKey(q)!==playerKey(p)).map(q=>({p:q,...getPairComparison(room,votes,p,q)})).filter(q=>q.total>=3).sort((a,b)=>b.rate-a.rate || b.total-a.total);
+  const doubles=results.filter(r=>voteFor(p,room,votes,r.slide)==='supersmash');
+  const d=disagreements[0],c=closest[0];
+  root.innerHTML=`<h2 class="panel-title">Your recap · ${escapeHtml(p.name)}</h2><p class="recap-muted">${st.voted} choices from ${st.eligibleRounds} eligible rounds · ${st.smashPct}% smash · ${st.smashPoints} smash points</p><div class="recap-grid">
+    <div><h3>Biggest disagreement</h3>${d?`<button class="highlight-card" data-slide="${d.slide}"><strong>Slide ${d.slide} · You chose ${d.own}</strong><small>${d.opposed}/${d.others} other voters chose the opposite · View →</small></button>`:'<p class="recap-muted">No disagreement with a majority of other voters.</p>'}</div>
+    <div><h3>Your Double Down</h3>${doubles.length?doubles.map(r=>`<button class="highlight-card" data-slide="${r.slide}"><strong>Slide ${r.slide}</strong><small>${r.smash}/${r.total} voters also chose smash · View →</small></button>`).join(''):'<p class="recap-muted">You kept your Double Down.</p>'}</div>
+    <div><h3>Closest taste</h3>${c?`<p>${escapeHtml(c.p.name)} · ${Math.round(c.rate*100)}% match</p><p class="recap-muted">${c.matches}/${c.total} shared choices${closest.filter(q=>q.rate===c.rate).length>1?' · tied match':''}</p>${c.rows.filter(r=>r.agree).slice(0,3).map(r=>`<button class="slide-link" data-slide="${r.slide}">Slide ${r.slide}</button>`).join('')}`:'<p class="recap-muted">Needs at least three shared choices with another player.</p>'}</div>
+  </div>`; attachSlideButtons(root);
+}
+function voteLabel(v){ return v==='supersmash'?'💥 Smash · Double Down':v==='smash'?'🔥 Smash':v==='pass'?'❄️ Pass':'Did not vote'; }
+let detailToken=0;
+async function openSlideDetail(slide){
+  const room=_latestRoom,token=++detailToken,dialog=document.getElementById('slideDetail');
+  const r=getSlideResults(room,_latestVotes).find(r=>r.slide===slide); if(!r) return;
+  document.getElementById('detailTitle').textContent=`Slide ${slide}`;
+  const img=document.getElementById('detailImage'); img.hidden=true; img.removeAttribute('src');
+  document.getElementById('detailStatus').textContent='Loading slide…';
+  document.getElementById('detailVotes').innerHTML=`<p>${r.smash} smash · ${r.pass} pass · ${r.total}/${r.eligible} voted${r.bonus?` · ${r.bonus} Double Down bonus point${r.bonus===1?'':'s'}`:''}${isSlideUnrated(room,slide)?' · Unrated':''}</p><div class="detail-choices">${r.picks.map(p=>`<div><strong>${escapeHtml(p.name)}</strong><span>${isSlideUnrated(room,slide)?'Unrated':voteLabel(p.vote)}</span></div>`).join('')}</div>`;
+  if(!dialog.open) dialog.showModal();
+  try {
+    const src=await fetchSlideImageDataUrl(room.slidesUrl,room.slidePageIds[slide-1],room.imageCacheVersion || room.code);
+    if(token!==detailToken || !dialog.open) return;
+    img.src=src; img.hidden=false; document.getElementById('detailStatus').textContent='';
+  } catch { if(token===detailToken){ const a=document.createElement('a'); a.href=room.slidesUrl; a.target='_blank'; a.rel='noopener'; a.textContent='Could not load image. Open the deck'; document.getElementById('detailStatus').replaceChildren(a); } }
+}
+function renderAgreementsTracker(players,room,votes){
+  const panel=document.getElementById('agreementsPanel'); panel.style.display=players.length>=2?'':'none'; if(players.length<2) return;
+  const a=document.getElementById('h2hPlayerA'),b=document.getElementById('h2hPlayerB');
+  const options=players.map(p=>`<option value="${escapeHtml(playerKey(p))}">${escapeHtml(p.name)}</option>`).join(''); a.innerHTML=options;b.innerHTML=options;
+  a.value=players.some(p=>playerKey(p)===myKey())?myKey():playerKey(players[0]); b.value=playerKey(players.find(p=>playerKey(p)!==a.value));
+  function render(){
+    const pa=players.find(p=>playerKey(p)===a.value),pb=players.find(p=>playerKey(p)===b.value);
+    if(a.value===b.value){ document.getElementById('h2hSummary').textContent='Choose two different players.'; document.getElementById('h2hTable').innerHTML=''; return; }
+    const data=getPairComparison(room,votes,pa,pb);
+    document.getElementById('h2hSummary').textContent=data.total?`${Math.round(data.rate*100)}% match · ${data.matches} agreements / ${data.total} shared choices`:'No shared choices yet.';
+    const table=document.getElementById('h2hTable');
+    table.innerHTML=data.rows.map(r=>`<div class="comparison-row"><button class="slide-link" data-slide="${r.slide}">Slide ${r.slide} →</button><span>${r.agree?'Matched':'Different picks'}</span><span>${escapeHtml(pa.name)}: ${voteLabel(r.va)}</span><span>${escapeHtml(pb.name)}: ${voteLabel(r.vb)}</span></div>`).join(''); attachSlideButtons(table);
   }
-
-  if(playerNames.length < 2){
-    panel.style.display = 'none';
-    return;
-  }
-
-  selectA.value = defaultA;
-  selectB.value = defaultB;
-
-  const vetoed = room.vetoed || {};
-  const voteLabel = (vote) => {
-    if(vote === 'supersmash') return 'SUPER';
-    if(vote === 'smash') return 'SMASH';
-    if(vote === 'pass') return 'PASS';
-    if(vote === 'veto') return 'VETO';
-    if(vote === 'unrated') return 'UNRATED';
-    return '—';
-  };
-  const voteClass = (vote) => {
-    if(vote === 'supersmash') return 'vote-supersmash';
-    if(vote === 'smash') return 'vote-smash';
-    if(vote === 'pass') return 'vote-pass';
-    return 'vote-veto';
-  };
-  const normalizeVote = (vote) => vote === 'supersmash' ? 'smash' : vote;
-
-  function buildComparison(nameA, nameB){
-    const keyA = safeKey(nameA);
-    const keyB = safeKey(nameB);
-    const rows = [];
-    let compared = 0;
-    let agreements = 0;
-    let smashA = 0;
-    let smashB = 0;
-    let passA = 0;
-    let passB = 0;
-
-    const getVoteForPlayer = (slideVotes, playerName, safeName) => {
-      if(!slideVotes || typeof slideVotes !== 'object') return '';
-      if(slideVotes[safeName] != null) return slideVotes[safeName];
-      if(slideVotes[playerName] != null) return slideVotes[playerName];
-
-      const directMatch = Object.entries(slideVotes).find(([k]) => safeKey(k) === safeName);
-      if(directMatch) return directMatch[1];
-
-      for(const value of Object.values(slideVotes)){
-        if(value && typeof value === 'object'){
-          if(value.vote != null){
-            if(value.name === playerName || value.playerName === playerName || safeKey(value.name || value.playerName || '') === safeName){
-              return value.vote;
-            }
-          }
-          if(value[safeName] != null) return value[safeName];
-          if(value[playerName] != null) return value[playerName];
-        }
-      }
-      return '';
-    };
-
-    const maxSlides = Number(room.totalSlides) || Math.max(
-      0,
-      ...Object.keys(votesData||{}).map(k => Number(k) || 0),
-      ...Object.keys(vetoed||{}).map(k => Number(k) || 0)
-    );
-
-    for(let s = 1; s <= maxSlides; s++){
-      const isVetoed = isSlideUnrated(room, s);
-      const sv = votesData[s] || votesData[String(s)] || {};
-      const rawA = isVetoed ? '' : getVoteForPlayer(sv, nameA, keyA);
-      const rawB = isVetoed ? '' : getVoteForPlayer(sv, nameB, keyB);
-
-      if(rawA === 'smash') smashA += 1;
-      if(rawA === 'supersmash') smashA += 2;
-      if(rawA === 'pass') passA += 1;
-
-      if(rawB === 'smash') smashB += 1;
-      if(rawB === 'supersmash') smashB += 2;
-      if(rawB === 'pass') passB += 1;
-
-      let status = 'clash';
-      let statusIcon = '💥';
-      let statusLabel = 'Clash';
-
-      if(isVetoed){
-        status = 'veto';
-        statusIcon = '🚫';
-        statusLabel = isNotesVotingDisabled(room, s) ? 'Voting disabled' : 'Vetoed';
-      } else {
-        const normA = normalizeVote(rawA);
-        const normB = normalizeVote(rawB);
-        if(normA && normB){
-          compared++;
-          if(normA === normB){
-            agreements++;
-            status = 'agree';
-            statusIcon = '✅';
-            statusLabel = 'Agreement';
-          }
-        } else if(!normA && !normB){
-          status = 'veto';
-          statusIcon = '🚫';
-          statusLabel = 'No votes';
-        }
-      }
-
-      rows.push({
-        slide: s,
-        voteA: isVetoed ? (isNotesVotingDisabled(room, s) ? 'unrated' : 'veto') : (rawA || '—'),
-        voteB: isVetoed ? (isNotesVotingDisabled(room, s) ? 'unrated' : 'veto') : (rawB || '—'),
-        status,
-        statusIcon,
-        statusLabel
-      });
-    }
-
-    const agreementPct = compared ? Math.round((agreements / compared) * 100) : 0;
-    const smashesMore = smashA === smashB ? 'Tie' : (smashA > smashB ? nameA : nameB);
-
-    return { rows, compared, agreements, agreementPct, smashA, smashB, passA, passB, smashesMore };
-  }
-
-  function renderComparison(){
-    let nameA = selectA.value;
-    let nameB = selectB.value;
-
-    if(nameA === nameB){
-      const alt = playerNames.find(n => n !== nameA);
-      if(alt){
-        if(document.activeElement === selectA) selectB.value = alt;
-        else selectA.value = alt;
-        nameA = selectA.value;
-        nameB = selectB.value;
-      }
-    }
-
-    const data = buildComparison(nameA, nameB);
-
-    summary.innerHTML = `
-      <div class="h2h-stat">
-        <div class="h2h-stat-label">${escapeHtml(nameA)}</div>
-        <div class="h2h-stat-value">${data.smashA}🔥 / ${data.passA}❄️</div>
-        <div class="h2h-stat-sub">Smashes / Passes</div>
-      </div>
-      <div class="h2h-stat">
-        <div class="h2h-stat-label">${escapeHtml(nameB)}</div>
-        <div class="h2h-stat-value">${data.smashB}🔥 / ${data.passB}❄️</div>
-        <div class="h2h-stat-sub">Smashes / Passes</div>
-      </div>
-      <div class="h2h-stat">
-        <div class="h2h-stat-label">Overall agreement</div>
-        <div class="h2h-stat-value">${data.agreementPct}%</div>
-        <div class="h2h-stat-sub">${data.agreements} of ${data.compared} compared slides matched</div>
-      </div>
-      <div class="h2h-stat">
-        <div class="h2h-stat-label">Who smashes more</div>
-        <div class="h2h-stat-value">${data.smashesMore === 'Tie' ? 'Tie' : escapeHtml(data.smashesMore)}</div>
-        <div class="h2h-stat-sub">${data.smashesMore === 'Tie' ? 'Both players match' : 'Higher smash total overall'}</div>
-      </div>
-    `;
-
-    table.innerHTML = `
-      <div class="h2h-table-head">
-        <div>Slide</div>
-        <div>Result</div>
-        <div>${escapeHtml(nameA)}</div>
-        <div>${escapeHtml(nameB)}</div>
-        <div>Status</div>
-      </div>
-      ${data.rows.map(row => `
-        <div class="h2h-table-row is-${row.status}">
-          <div class="h2h-cell h2h-slide-name" data-label="Slide">Slide ${row.slide}</div>
-          <div class="h2h-cell" data-label="Result">
-            <span class="h2h-result">${row.statusIcon} <span>${row.statusLabel}</span></span>
-          </div>
-          <div class="h2h-cell" data-label="${escapeHtml(nameA)}">
-            <span class="h2h-pill ${voteClass(row.voteA)}">${voteLabel(row.voteA)}</span>
-          </div>
-          <div class="h2h-cell" data-label="${escapeHtml(nameB)}">
-            <span class="h2h-pill ${voteClass(row.voteB)}">${voteLabel(row.voteB)}</span>
-          </div>
-          <div class="h2h-cell" data-label="Status">${row.status === 'agree' ? 'Matched' : row.status === 'veto' ? 'Unrated' : 'Different picks'}</div>
-        </div>
-      `).join('') || '<div class="h2h-empty">No comparison data yet.</div>'}
-    `;
-  }
-
-  selectA.onchange = renderComparison;
-  selectB.onchange = renderComparison;
-  renderComparison();
+  a.onchange=render;b.onchange=render;render();
+}
+let rematchBusy=false;
+async function rematch(){
+  if(!me.isMaster || rematchBusy || !_latestRoom) return;
+  rematchBusy=true; const btn=document.getElementById('rematchBtn');btn.disabled=true;btn.textContent='Preparing lobby…';
+  try {
+    const old=_latestRoom,deck=await fetchSlidePageIdsViaAppsScript(old.slidesUrl);
+    const room=await reserveRoom({hostName:me.name,hostId:myKey(),slidesUrl:old.slidesUrl,totalSlides:deck.totalSlides,slidePageIds:deck.slidePageIds,slideDurations:deck.slideDurations,slideVotingDisabled:deck.slideVotingDisabled,imageCacheVersion:deck.imageCacheVersion || '',notesVotingAvailable:deck.notesRulesVersion===1,notesTimingAvailable:deck.timingVersion===1,notesTimingWarnings:deck.timingWarnings || [],state:'waiting',currentSlide:1,timerEnabled:old.timerEnabled || false,timerDuration:old.timerDuration || 15,emojiSmash:old.emojiSmash || activeSmashEmojis,emojiPass:old.emojiPass || activePassEmojis,lockJoins:old.lockJoins || false,players:Object.fromEntries(getActivePlayers(old).map(p=>[playerKey(p),{id:playerKey(p),name:p.name,color:p.color,active:true}]))});
+    await window._update(roomRef(old.code),{nextRoomCode:room.code});
+  } catch(e){ showToast('Could not prepare rematch: '+e.message,4000); }
+  finally {rematchBusy=false;btn.disabled=false;btn.textContent='Rematch with this group';}
 }
 
 function showResultsScreen(room, votesData){
-  stopListeners();
+  stopSlideTimer();
+  document.getElementById('reactionLayer').replaceChildren();
+  if(unsubVotes){ unsubVotes(); unsubVotes=null; }
+  _latestRoom=room; _latestVotes=votesData;
   show('results');
 
   const players = getPlayers(room);
   const vetoed = room.vetoed || {};
-  const vetoedCount = getUnratedSlideCount(room);
-  const ratedSlides = room.totalSlides - vetoedCount;
+  const played=playedSlides(room,votesData);
+  const vetoedCount=played.filter(s=>isSlideUnrated(room,s)).length;
+  const ratedSlides=played.length-vetoedCount;
 
   document.getElementById('resSub').textContent =
-    `${players.length} player${players.length!==1?'s':''} · ${ratedSlides} rated slide${ratedSlides!==1?'s':''}${vetoedCount>0?` · ${vetoedCount} unrated`:''}`;
+    `${players.length} player${players.length!==1?'s':''} · ${played.length}/${room.totalSlides} slides played · ${ratedSlides} rated slide${ratedSlides!==1?'s':''}${vetoedCount>0?` · ${vetoedCount} unrated`:''}`;
 
   let totalSmash=0, totalPass=0;
-  for(let s=1; s<=room.totalSlides; s++){
+  for(const s of playedSlides(room,votesData)){
     if(isSlideUnrated(room, s)) continue;
     const sv = votesData[s]||votesData[String(s)]||{};
     players.forEach(p=>{
-      const v = sv[safeKey(p.name)];
+      const v = voteFor(p,room,votesData,s);
       if(v==='smash') totalSmash+=1;
-      if(v==='supersmash') totalSmash+=2;
+      if(v==='supersmash') totalSmash+=1;
       if(v==='pass') totalPass+=1;
     });
   }
@@ -3775,8 +3561,8 @@ function showResultsScreen(room, votesData){
 
     card.innerHTML = `
       <div class="pstat-top">
-        <div class="player-avatar ${p.color}" style="width:28px;height:28px;font-size:.62rem">${initials(p.name)}</div>
-        <div class="pstat-name">${p.name}</div>
+        <div class="player-avatar ${p.color}" style="width:28px;height:28px;font-size:.62rem">${escapeHtml(initials(p.name))}</div>
+        <div class="pstat-name">${escapeHtml(p.name)}</div>
         <div class="pstat-title">${st.title}</div>
         ${isContrarian ? '<span class="contrarian-badge">🤡 Contrarian</span>' : ''}
       </div>
@@ -3792,6 +3578,9 @@ function showResultsScreen(room, votesData){
   });
 
   renderSmashBoard('resultsSmashBoard', room, votesData);
+  renderPersonalRecap(room,votesData);
+  document.getElementById('rematchBtn').hidden=!me.isMaster;
+  document.getElementById('rematchNote').hidden=me.isMaster;
   renderHallOfFameShame(room, votesData, players);
   renderAgreementsTracker(players, room, votesData);
 }
@@ -3799,13 +3588,17 @@ function showResultsScreen(room, votesData){
 async function leaveRoom(){
   stopListeners(); stopSlideTimer();
   if(!me.isMaster && me.code && me.name){
-    try{ await window._set(window._ref(window._db,`rooms/${me.code}/players/${safeKey(me.name)}`),null); }catch(e){}
+    try{ await window._update(window._ref(window._db,`rooms/${me.code}/players/${myKey()}`),{active:false,leftSlide:_latestRoom?.currentSlide || 1}); }catch(e){}
   }
   goHome();
 }
 
 function goHome(){
   stopListeners(); stopSlideTimer();
+  document.getElementById('connectionStatus').hidden=true;
+  storageWrite('sop-session',null);
+  history.replaceState(null,'',location.pathname);
+  document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   me = { name:'', code:'', isMaster:false };
   lastSlide=-1; myVotedSlides={}; _latestRoom=null; _latestVotes={};
   slideImageQueue.reset();
@@ -3839,6 +3632,7 @@ function goHome(){
 
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape') setSlideFocus(false);
+  if(e.target.closest('input,select,textarea,[contenteditable]') || document.querySelector('dialog[open]')) return;
   if(!document.getElementById('game').classList.contains('hidden')){
     if(e.key==='ArrowLeft') castVote('smash');
     if(e.key==='ArrowRight') castVote('pass');
@@ -3869,23 +3663,25 @@ function downloadResults(room, votesData){
   lines.push('=== GAME SUMMARY ===');
   lines.push(rowToCsv(['Room Code', room.code || '']));
   lines.push(rowToCsv(['Total Slides', room.totalSlides]));
-  const vetoedCount = getUnratedSlideCount(room);
-  lines.push(rowToCsv(['Rated Slides', room.totalSlides - vetoedCount]));
+  const played=playedSlides(room,votesData),vetoedCount=played.filter(s=>isSlideUnrated(room,s)).length;
+  lines.push(rowToCsv(['Played Slides',played.length]));
+  lines.push(rowToCsv(['Rated Slides', played.length-vetoedCount]));
   lines.push(rowToCsv(['Unrated Slides', vetoedCount]));
   lines.push(rowToCsv(['Players', players.map(p => p.name).join('; ')]));
   lines.push('');
 
   // === Per-slide results ===
   lines.push('=== SLIDE RESULTS ===');
-  lines.push(rowToCsv(['Slide', 'Status', 'Smashes (weighted)', 'Passes', ...players.map(p => p.name)]));
-  for(let s = 1; s <= room.totalSlides; s++){
+  lines.push(rowToCsv(['Slide', 'Status', 'Smash choices', 'Passes', 'Double Down bonus', ...players.map(p => p.name)]));
+  for(const s of playedSlides(room,votesData)){
     const isVetoed = isSlideUnrated(room, s);
     const sv = votesData[s] || votesData[String(s)] || {};
-    let smashes = 0, passes = 0;
+    let smashes = 0, passes = 0, bonus=0;
     const votes = players.map(p => {
-      const v = sv[safeKey(p.name)] || '';
+      if(!eligible(p,room,s)) return 'not eligible';
+      const v = voteFor(p,room,votesData,s) || '';
       if(v === 'smash') smashes += 1;
-      if(v === 'supersmash') smashes += 2;
+      if(v === 'supersmash'){ smashes += 1; bonus++; }
       if(v === 'pass') passes += 1;
       if(isVetoed) return 'unrated';
       return v || '';
@@ -3895,6 +3691,7 @@ function downloadResults(room, votesData){
       isVetoed ? 'unrated' : 'rated',
       isVetoed ? '' : smashes,
       isVetoed ? '' : passes,
+      isVetoed ? '' : bonus,
       ...votes
     ]));
   }
@@ -3903,7 +3700,7 @@ function downloadResults(room, votesData){
   // === Player stats ===
   lines.push('=== PLAYER STATS ===');
   lines.push(rowToCsv([
-    'Player', 'Title', 'Smashes (weighted)', 'Passes',
+    'Player', 'Title', 'Smash choices', 'Passes',
     'Skipped', 'Smash %', 'Max Streak', 'Super Smashes', 'Chaos Flips'
   ]));
   players.forEach(p => {

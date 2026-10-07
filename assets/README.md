@@ -1,0 +1,1 @@
+`qrcode.min.js` is vendored from [davidshimjs/qrcodejs](https://github.com/davidshimjs/qrcodejs/tree/04f46c6a0708418cb7b96fc563eacae0fbf77674), under the MIT license in `qrcode-LICENSE`. It generates join QR codes locally in the browser.
