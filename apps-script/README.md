@@ -6,6 +6,20 @@ Update the existing deployment so its web app URL stays the same. Keep the
 existing execution identity and access settings. Saving the script editor alone
 does not update the deployed service.
 
+The web app must execute as **Me** and allow access to **Anyone**, so players
+can request slides without signing in to Google. If you create a new deployment
+instead of editing the existing one, its Web app URL changes: update
+`APPS_SCRIPT_WEBAPP_URL` in `index.html` to the new URL ending in `/exec` and
+publish that change to GitHub Pages. The editor's `/dev` testing URL is not a
+public deployment.
+
+If the app cannot reach the slide service, open the deployment's `/exec` URL
+in a signed-out/private browser window. The running script should return
+`{"ok":false,"error":"Missing presentationId"}`. A 404 page means the URL does
+not resolve to a usable public deployment; a sign-in page means its access
+settings need updating. Use **Deploy → Manage deployments** to check the URL
+and access settings.
+
 The frontend continues to use the web app URL already in `index.html`. No new
 API key or client-side access to speaker notes is required. The `meta` response
 now includes `timingVersion: 1` and a `slideDurations` object keyed by one-based

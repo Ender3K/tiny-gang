@@ -2264,6 +2264,11 @@ function jsonp(url, timeoutMs = 30000) {
     const sep = url.includes("?") ? "&" : "?";
     let cleaned = false;
     let timeoutId;
+    function transportError(message) {
+      const error = new Error(message);
+      error.retryable = true;
+      return error;
+    }
     function cleanup(timedOut = false) {
       if (cleaned) return; cleaned = true;
       clearTimeout(timeoutId);
@@ -2277,10 +2282,14 @@ function jsonp(url, timeoutMs = 30000) {
       if (script.parentNode) script.parentNode.removeChild(script);
     }
     window[cbName] = (data) => { cleanup(); resolve(data); };
-    script.onload = () => { if(cleaned) delete window[cbName]; };
+    script.onload = () => {
+      if(cleaned){ delete window[cbName]; return; }
+      cleanup();
+      reject(transportError("The slide service returned an unexpected response. Check the Apps Script deployment URL and set access to Anyone."));
+    };
     script.onerror = () => {
       if(cleaned){ delete window[cbName]; return; }
-      cleanup(); reject(new Error("Apps Script request failed."));
+      cleanup(); reject(transportError("Could not reach the slide service. Check the Apps Script deployment URL and set access to Anyone, then try again."));
     };
     script.src = `${url}${sep}callback=${cbName}`;
     timeoutId = setTimeout(() => {
@@ -2290,10 +2299,19 @@ function jsonp(url, timeoutMs = 30000) {
   });
 }
 
+async function requestAppsScript(url) {
+  // A deployment redirect can briefly fail. Retry once with a fresh callback;
+  // do not extend the long timeout or retry errors returned by the script.
+  for(let attempt = 0; attempt < 2; attempt++){
+    try { return await jsonp(url, 75000); }
+    catch(error){ if(attempt === 1 || !error.retryable) throw error; }
+  }
+}
+
 async function fetchSlidePageIdsViaAppsScript(rawUrl) {
   const presentationId = getSlideId(rawUrl);
   if (!presentationId) throw new Error("Invalid Google Slides URL.");
-  const data = await jsonp(`${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`, 75000);
+  const data = await requestAppsScript(`${APPS_SCRIPT_WEBAPP_URL}?action=meta&presentationId=${encodeURIComponent(presentationId)}`);
   if (!data || !data.ok) throw new Error(data?.error || "Could not fetch slide IDs.");
   data.slideDurations = normalizeSlideDurations(data.slideDurations, data.totalSlides);
   return data;
@@ -2324,9 +2342,8 @@ async function fetchSlideImageDataUrl(rawUrl, pageId) {
   const cacheKey = `${presentationId}::${pageId}`;
   if (slideImageCache[cacheKey]) return slideImageCache[cacheKey];
   if (slideImagePromises[cacheKey]) return slideImagePromises[cacheKey];
-  slideImagePromises[cacheKey] = jsonp(
-    `${APPS_SCRIPT_WEBAPP_URL}?action=image&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}`,
-    75000
+  slideImagePromises[cacheKey] = requestAppsScript(
+    `${APPS_SCRIPT_WEBAPP_URL}?action=image&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}`
   ).then((data) => {
     if (!data || !data.ok || !data.dataUrl) throw new Error(data?.error || "Could not fetch slide image.");
     slideImageCache[cacheKey] = data.dataUrl;
