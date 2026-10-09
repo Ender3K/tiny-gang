@@ -1,0 +1,34 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$code": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "votes": {
+      "$code": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "ddused": {
+      "$code": {
+        ".read": true,
+        ".write": true
+      }
+    },
+    "audienceVotes": {
+      "$code": {
+        ".read": true,
+        "$slide": {
+          "$browser": {
+            ".write": "!data.exists() && newData.isString() && (newData.val() === 'smash' || newData.val() === 'pass') && root.child('rooms').child($code).child('state').val() === 'playing' && !root.child('rooms').child($code).child('nextRoomCode').exists() && root.child('rooms').child($code).child('currentSlide').val() + '' === $slide && root.child('rooms').child($code).child('rounds').child($slide).exists() && root.child('rooms').child($code).child('slideVotingDisabled').child($slide).val() !== true && root.child('rooms').child($code).child('vetoed').child($slide).val() !== true && root.child('rooms').child($code).child('timer').child('slide').val() + '' === $slide && root.child('rooms').child($code).child('timer').child('status').val() === 'running' && (root.child('rooms').child($code).child('timer').child('enabled').val() === false || (root.child('rooms').child($code).child('timer').child('enabled').val() === true && ((root.child('rooms').child($code).child('timer').child('paused').val() === true && root.child('rooms').child($code).child('timer').child('remainingMs').val() > 0) || (root.child('rooms').child($code).child('timer').child('paused').val() === false && root.child('rooms').child($code).child('timer').child('dueAt').isNumber() && root.child('rooms').child($code).child('timer').child('dueAt').val() > now))))"
+          }
+        }
+      }
+    }
+  }
+}

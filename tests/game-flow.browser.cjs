@@ -15,7 +15,7 @@ export async function runTransaction(path,fn){const value=await window.testRead(
 export function onValue(path,cb){const item={path,cb};listeners.add(item);window.testRead(path).then(value=>{if(listeners.has(item))cb(snapshot(value))});return()=>listeners.delete(item)}
 `;
 (async()=>{
- const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',headless:true,args:['--no-sandbox']}),pages=[],state={rooms:{},votes:{},ddused:{},'.info':{connected:true,serverTimeOffset:0}},errors=[];
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined),headless:true,args:['--no-sandbox']}),pages=[],state={rooms:{},votes:{},ddused:{},'.info':{connected:true,serverTimeOffset:0}},errors=[];
  const read=path=>path.split('/').filter(Boolean).reduce((obj,k)=>obj?.[k],state)??null;
  const put=(path,value)=>{const parts=path.split('/').filter(Boolean),key=parts.pop();let obj=state;for(const p of parts)obj=obj[p]??={};if(value===null)delete obj[key];else obj[key]=value;};
  const notify=()=>Promise.all(pages.filter(p=>!p.isClosed()).map(p=>p.evaluate(()=>window.__notify?.())));
@@ -36,7 +36,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.evaluate(()=>extendTimer(10));await player.waitForFunction(()=>timerState.remaining>=28);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
  await host.evaluate(()=>castVote('smash'));await player.evaluate(()=>castDoubleDown());
  const id=await player.evaluate(()=>myKey());assert.equal(state.ddused[code][id],true);
- await player.reload();await player.waitForFunction(()=>_latestRoom?.state==='playing' && myDoubleDownUsed);assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('.vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
+ await player.reload();await player.waitForFunction(()=>_latestRoom?.state==='playing' && myDoubleDownUsed);assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('#game .vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
  console.log('QR join, stable identity, shared pause/extend and refresh resume passed');
  for(let slide=2;slide<=4;slide++){
   await host.evaluate(()=>masterNext());for(const p of [host,player])await p.waitForFunction(slide=>lastSlide===slide && timerState.slideReady,slide);

@@ -1781,7 +1781,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
   #game .vbtn{padding:12px;font-size:22px}
   #game .vbtn-doubledown{grid-column:1/-1;max-width:none;font-size:13px;min-height:36px;padding:8px}
 }
-.share-actions{display:flex;gap:.7rem;justify-content:center;margin:1rem 0}
+.share-actions{display:flex;flex-wrap:wrap;gap:.7rem;justify-content:center;margin:1rem 0}
 .game-dialog{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:min(440px,92vw);max-height:92vh;overflow:auto;margin:auto}
 .game-dialog::backdrop{background:#000b}
 .dialog-close{float:right;background:none;border:0;color:inherit;font-size:1.3rem;cursor:pointer}
@@ -1813,6 +1813,14 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 .game-dialog{padding:1rem}
 }
 
+#spectator .screen-inner{max-width:540px;gap:20px}
+#spectator .panel{width:100%;text-align:center}
+#spectator h1{font-size:clamp(1.7rem,7vw,2.5rem)}
+#spectator .vote-btns{width:100%;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#spectator .vbtn{min-height:120px;min-width:0;font-size:clamp(1.2rem,6vw,2rem);touch-action:manipulation}
+#spectator .spectator-countdown{font:600 2.4rem 'Geist Mono',monospace;margin:16px 0}
+.audience-breakdown{width:100%;max-width:1100px}
+.audience-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);font-size:.85rem;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1890,7 +1898,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
           <div class="room-share"><span id="playerCountLabel">1 player</span> connected</div>
         </div>
         <div class="section-label">Players</div>
-        <div class="share-actions"><button class="restart-btn" onclick="copyJoinLink()">Copy join link</button><button class="restart-btn" onclick="showShareDialog()">Show QR code</button></div>
+        <div class="share-actions"><button class="restart-btn" onclick="copyJoinLink()">Copy join link</button><button class="restart-btn" onclick="showShareDialog()">Show QR code</button><button class="restart-btn" id="lobbySpectatorLink" onclick="copySpectatorLink()" hidden>Copy spectator link</button></div>
     <div class="players-grid" id="playersGrid"></div>
         <p class="waiting-note" id="waitingNote">Waiting for players to join…</p>
       </div>
@@ -2066,8 +2074,15 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
             <div class="smashboard" id="smashBoard"></div>
           </div>
 
+          <div class="panel">
+            <h2 class="panel-title">Audience votes · this slide</h2>
+            <p id="audienceTally" role="status">0 Smash · 0 Pass</p>
+            <p class="recap-muted">Separate from player scores</p>
+          </div>
+
           <div class="panel master-controls" id="masterControls" style="display:none">
             <div class="mc-title">⚡ HOST CONTROLS</div>
+            <button class="restart-btn" onclick="copySpectatorLink()">Copy spectator link</button>
             <p class="slide-timing-note" id="slideTimingLabel"></p>
 
             <div class="timer-settings-inline" id="timerSettingsInline">
@@ -2193,6 +2208,8 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
       </details>
     </div>
 
+    <section class="panel audience-breakdown"><h2 class="panel-title">Audience breakdown</h2><p class="recap-muted">Audience choices are separate from player scores and awards.</p><div id="audienceResults"></div></section>
+
     <!-- ── Download + Restart buttons ── -->
     <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;align-items:center;width:100%;max-width:760px">
       <button class="restart-btn" id="rematchBtn" onclick="rematch()" hidden>Rematch with this group</button>
@@ -2205,6 +2222,26 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
   </div>
 </div>
 
+<div class="screen hidden" id="spectator">
+  <div class="screen-inner">
+    <p class="section-label">Audience voting · <span id="spectatorCode"></span></p>
+    <h1 id="spectatorSlide">Waiting for the host</h1>
+    <p class="recap-muted">Watch the slides on the stream. Vote here.</p>
+    <div class="panel">
+      <div class="spectator-countdown" id="spectatorCountdown" aria-label="Shared countdown">—</div>
+      <p id="spectatorStatus" role="status" aria-live="polite">Connecting…</p>
+    </div>
+    <div class="vote-btns">
+      <button class="vbtn vbtn-smash" id="spectatorSmash" onclick="castAudienceVote('smash')" disabled>🔥 Smash</button>
+      <button class="vbtn vbtn-pass" id="spectatorPass" onclick="castAudienceVote('pass')" disabled>❄️ Pass</button>
+    </div>
+    <p id="spectatorTally" role="status">0 Smash · 0 Pass</p>
+    <section class="panel" id="spectatorResults" hidden><h2 class="panel-title">Audience breakdown</h2><div id="spectatorBreakdown"></div></section>
+    <p class="recap-muted">One vote per browser per slide. Keep this page open to follow a rematch.</p>
+    <button class="restart-btn" onclick="leaveRoom()">Leave audience</button>
+  </div>
+</div>
+<dialog id="spectatorShareDialog" class="game-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2>Spectator link</h2><label for="spectatorShareLink">Copy this link for your audience</label><input id="spectatorShareLink" readonly onclick="this.select()"></dialog>
 <div id="connectionStatus" class="connection-status" role="status" hidden>Reconnecting… Votes will be available when the connection returns.</div>
 <dialog id="shareDialog" class="game-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2>Join <span id="shareCode"></span></h2><div id="joinQR"></div><label for="shareLink">Join link</label><input id="shareLink" readonly onclick="this.select()"><button class="restart-btn" onclick="copyJoinLink()">Copy link</button></dialog>
 <dialog id="slideDetail" class="game-dialog slide-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2 id="detailTitle"></h2><p id="detailStatus" role="status"></p><img id="detailImage" alt="Selected slide" hidden><div id="detailVotes"></div></dialog>
@@ -2244,6 +2281,7 @@ document.addEventListener('fb-ready', () => {
   window._onValue(window._ref(window._db,'.info/connected'), snap => {
     connected = snap.val() === true;
     document.getElementById('connectionStatus').hidden = connected || !me.code;
+    if(me.spectator) renderSpectator();
   });
   resumeSession();
 });
@@ -2871,6 +2909,9 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
 let me = { name:'', code:'', isMaster:false };
 let unsubRoom = null;
 let unsubVotes = null;
+let unsubAudience = null;
+let _latestAudienceVotes = {};
+let spectatorInterval = null, audiencePending = false, audienceReady = false;
 let lastSlide = -1;
 let myVotedSlides = {};
 let _latestRoom = null;
@@ -2900,6 +2941,12 @@ function storageRead(k){ try { return JSON.parse(localStorage.getItem(k)); } cat
 function storageWrite(k,v){ try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k,JSON.stringify(v)); } catch {} }
 const deviceId = storageRead('sop-device') || (crypto.randomUUID ? crypto.randomUUID() : 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2));
 storageWrite('sop-device',deviceId);
+function spectatorLink(code=me.code){ const url=new URL(roomLink(code)); url.searchParams.set('spectator','1'); return url.href; }
+async function copySpectatorLink(){
+  if(!me.isMaster) return;
+  try { await navigator.clipboard.writeText(spectatorLink()); showToast('Spectator link copied'); }
+  catch { document.getElementById('spectatorShareLink').value=spectatorLink(); document.getElementById('spectatorShareDialog').showModal(); }
+}
 function saveSession(){ storageWrite('sop-session',me); storageWrite('sop-name',me.name); }
 function roomLink(code=me.code){ const url=new URL(location.href); url.search=''; url.hash=''; url.searchParams.set('room',code); return url.href; }
 async function copyJoinLink(){ try { await navigator.clipboard.writeText(roomLink()); showToast('Join link copied'); } catch { showShareDialog(); } }
@@ -2948,7 +2995,7 @@ async function enterExistingRoom(code){
     if(!snap.exists()) throw new Error('This room is no longer available.');
     const room=snap.val(), p=room.players?.[myKey()];
     if(!p || p.kicked || p.active === false) throw new Error('Your place in this room is no longer active.');
-    stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={};
+    stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={}; _latestAudienceVotes={};
     me={...me,code,name:p.name,isMaster:room.hostId ? room.hostId===myKey() : room.hostName===p.name};
     _latestRoom=room;
     timerCfg={enabled:!!room.timerEnabled,duration:room.timerDuration || 15};
@@ -2965,6 +3012,9 @@ async function enterExistingRoom(code){
 }
 async function resumeSession(){
   const requested=new URL(location.href).searchParams.get('room')?.toUpperCase();
+  if(new URL(location.href).searchParams.get('spectator')==='1'){
+    enterSpectatorRoom(requested || ''); return;
+  }
   const saved=storageRead('sop-session');
   if(saved?.code && (!requested || requested===saved.code)){
     me=saved;
@@ -3006,6 +3056,9 @@ function renderSmashBoard(targetId, room, votesData){
 function stopListeners(){
   if(unsubRoom){ unsubRoom(); unsubRoom=null; }
   if(unsubVotes){ unsubVotes(); unsubVotes=null; }
+  if(unsubAudience){ unsubAudience(); unsubAudience=null; }
+  if(spectatorInterval){ clearInterval(spectatorInterval); spectatorInterval=null; }
+  audienceReady=false;
 }
 
 async function joinRoom(){
@@ -3036,6 +3089,7 @@ async function joinRoom(){
 
 function enterWaiting(){
   show('waiting');
+  document.getElementById('lobbySpectatorLink').hidden=!me.isMaster;
   document.getElementById('displayCode').textContent = me.code;
   ['timerConfigPanel','emojiConfigPanel','lockJoinsPanel'].forEach(id=>document.getElementById(id).style.display=me.isMaster?'':'none');
   if(me.isMaster){
@@ -3120,6 +3174,7 @@ function enterGame(){
   updateDoubleDownUI();
   listenRoom();
   listenVotes();
+  listenAudience();
 }
 
 function renderGame(room){
@@ -3343,6 +3398,7 @@ function listenRoom(){
     if(!snap.exists()) return;
     const room = snap.val();
     _latestRoom = room;
+    renderAudience();
 
     const key = myKey();
     if(me.name && (!room.players?.[key] || room.players[key].kicked)){
@@ -3390,6 +3446,110 @@ function listenVotes(){
       renderSmashBoard('smashBoard', _latestRoom, _latestVotes);
     }
   });
+}
+
+// Audience data never enters the player vote or scoring paths.
+function audienceRef(code,slide,id){
+  return window._ref(window._db,`audienceVotes/${code}${slide === undefined ? '' : '/'+slide}${id === undefined ? '' : '/'+id}`);
+}
+function audienceEligible(room,slide,now=roomNow()){
+  if(!room || room.state!=='playing' || room.nextRoomCode || room.currentSlide!==slide || !room.rounds?.[slide] || isSlideUnrated(room,slide)) return false;
+  const t=room.timer;
+  if(!t || t.slide!==slide || t.status!=='running') return false;
+  // Existing pause behavior freezes the countdown but still permits voting.
+  return t.enabled === false || (t.enabled === true && (t.paused === true ? t.remainingMs>0 : Number.isFinite(t.dueAt) && t.dueAt>now));
+}
+function audienceTotals(room,votes,slide){
+  const tally={smash:0,pass:0};
+  if(isSlideUnrated(room,slide)) return tally;
+  for(const choice of Object.values(votes[slide] || {})) if(choice==='smash' || choice==='pass') tally[choice]++;
+  return tally;
+}
+function audienceBreakdown(room,votes){
+  return playedSlides(room).map(slide=>{
+    if(isSlideUnrated(room,slide)) return `<div class="audience-row"><strong>Slide ${slide}</strong><span>Unrated · audience voting disabled</span></div>`;
+    const t=audienceTotals(room,votes,slide);
+    return `<div class="audience-row"><strong>Slide ${slide}</strong><span>${t.smash} Smash · ${t.pass} Pass</span></div>`;
+  }).join('') || '<p class="recap-muted">No slides played yet.</p>';
+}
+function renderAudience(){
+  const room=_latestRoom; if(!room) return;
+  const t=audienceTotals(room,_latestAudienceVotes,room.currentSlide);
+  document.getElementById('audienceTally').textContent=isSlideUnrated(room,room.currentSlide) ? 'Unrated · audience voting disabled' : `${t.smash} Smash · ${t.pass} Pass`;
+  if(room.state==='done') document.getElementById('audienceResults').innerHTML=audienceBreakdown(room,_latestAudienceVotes);
+}
+function listenAudience(){
+  if(unsubAudience) unsubAudience();
+  audienceReady=false;
+  const code=me.code;
+  unsubAudience=window._onValue(audienceRef(code),snap=>{
+    if(me.code!==code) return;
+    _latestAudienceVotes=snap.val() || {}; audienceReady=true;
+    if(me.spectator) renderSpectator(); else renderAudience();
+  },()=>{
+    if(me.code!==code) return;
+    audienceReady=false;
+    if(me.spectator) renderSpectator();
+    showToast('Audience votes unavailable. Check Firebase rules.',4000);
+  });
+}
+function enterSpectatorRoom(code){
+  stopListeners(); stopSlideTimer();
+  _latestRoom=null; _latestAudienceVotes={};
+  me={id:deviceId,name:'',code,isMaster:false,spectator:true};
+  show('spectator');
+  renderSpectator();
+  if(!/^[A-Z0-9]{4,12}$/.test(code)){
+    document.getElementById('spectatorStatus').textContent='This spectator link has no valid room code.';
+    return;
+  }
+  history.replaceState(null,'',spectatorLink(code));
+  // This path does not enter a lobby/game, register a player, or fetch deck metadata/images.
+  unsubRoom=window._onValue(roomRef(code),snap=>{
+    if(me.code!==code || !me.spectator) return;
+    _latestRoom=snap.val();
+    if(_latestRoom?.nextRoomCode){ enterSpectatorRoom(_latestRoom.nextRoomCode); return; }
+    renderSpectator();
+  },()=>{
+    _latestRoom=null; renderSpectator();
+    document.getElementById('spectatorStatus').textContent='Room unavailable. Check the link or reconnect.';
+  });
+  listenAudience();
+  spectatorInterval=setInterval(renderSpectator,200);
+}
+function renderSpectator(){
+  if(!me.spectator) return;
+  const room=_latestRoom,slide=room?.currentSlide,t=room?.timer;
+  const vote=_latestAudienceVotes[slide]?.[deviceId];
+  const accepted=vote==='smash' || vote==='pass';
+  document.getElementById('spectatorCode').textContent=me.code;
+  document.getElementById('spectatorSlide').textContent=!room ? 'Room unavailable' : room.state==='waiting' ? 'Waiting for the host' : room.state==='done' ? 'Game ended' : `Slide ${slide} of ${room.totalSlides}`;
+  document.getElementById('spectatorCountdown').textContent=room?.state!=='playing' ? '—' : t?.status!=='running' ? 'Preparing…' : !t.enabled ? 'No timer' : `${Math.ceil(remainingMs(t)/1000)}s${t.paused?' · Paused':''}`;
+  const status=!connected ? 'Reconnecting… Voting is unavailable.' : !room ? 'Room not found. Check the link or wait for the host.' : room.state==='waiting' ? 'Voting opens when the host starts.' : room.state==='done' ? 'Thanks for voting! Waiting for a rematch…' : isSlideUnrated(room,slide) ? 'Unrated slide · audience voting disabled.' : accepted ? `Vote accepted: ${vote==='smash'?'Smash':'Pass'}.` : t?.status!=='running' ? 'Waiting for the host’s slide to load…' : !audienceEligible(room,slide) ? 'Voting closed. Waiting for the next slide…' : !audienceReady ? 'Loading your accepted vote…' : audiencePending ? 'Saving your vote…' : 'Cast your vote.';
+  document.getElementById('spectatorStatus').textContent=status;
+  const disabled=!connected || !audienceReady || audiencePending || accepted || !audienceEligible(room,slide);
+  document.getElementById('spectatorSmash').disabled=disabled;
+  document.getElementById('spectatorPass').disabled=disabled;
+  const tally=room ? audienceTotals(room,_latestAudienceVotes,slide) : {smash:0,pass:0};
+  document.getElementById('spectatorTally').textContent=`${tally.smash} Smash · ${tally.pass} Pass`;
+  document.getElementById('spectatorResults').hidden=room?.state!=='done';
+  if(room?.state==='done') document.getElementById('spectatorBreakdown').innerHTML=audienceBreakdown(room,_latestAudienceVotes);
+}
+async function castAudienceVote(choice){
+  if(!me.spectator || !connected || !audienceReady || audiencePending || (choice!=='smash' && choice!=='pass')) return;
+  const code=me.code,slide=_latestRoom?.currentSlide;
+  if(!audienceEligible(_latestRoom,slide) || _latestAudienceVotes[slide]?.[deviceId]) return;
+  audiencePending=true; renderSpectator();
+  try {
+    // A leaf transaction arbitrates tabs/concurrent clicks. Rules check the current
+    // round and server time at commit; never optimistically show an accepted vote.
+    const result=await window._transaction(audienceRef(code,slide,deviceId),current=>current===null ? choice : undefined,{applyLocally:false});
+    const accepted=result.snapshot.val();
+    if(me.spectator && me.code===code && (accepted==='smash' || accepted==='pass')){
+      _latestAudienceVotes[slide] ||= {}; _latestAudienceVotes[slide][deviceId]=accepted;
+    }
+  } catch { showToast('Vote was not accepted. The round may have closed; try again if voting is open.',4000); }
+  finally { audiencePending=false; renderSpectator(); }
 }
 
 function getPlayerStats(player,room,votes){
@@ -3530,6 +3690,7 @@ function showResultsScreen(room, votesData){
   if(unsubVotes){ unsubVotes(); unsubVotes=null; }
   _latestRoom=room; _latestVotes=votesData;
   show('results');
+  renderAudience();
 
   const players = getPlayers(room);
   const vetoed = room.vetoed || {};
@@ -3617,7 +3778,8 @@ async function leaveRoom(){
 function goHome(){
   stopListeners(); stopSlideTimer();
   document.getElementById('connectionStatus').hidden=true;
-  storageWrite('sop-session',null);
+  if(!me.spectator) storageWrite('sop-session',null);
+  _latestAudienceVotes={};
   history.replaceState(null,'',location.pathname);
   document.querySelectorAll('dialog[open]').forEach(d=>d.close());
   me = { name:'', code:'', isMaster:false };
