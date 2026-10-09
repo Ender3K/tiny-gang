@@ -1,3 +1,5 @@
 Run the unit checks with `node --test tests/*.test.cjs`.
 
 The multiplayer browser check uses three isolated browser contexts and mocked Firebase and slide services. It creates no live rooms. With Playwright and Chromium installed, run `node tests/game-flow.browser.cjs`; set `CHROMIUM_PATH` if Chromium is installed elsewhere. It covers QR joining, persisted lobby settings, shared timers, refresh recovery, late joining, results, CSV exports, mobile layout and rematches. Screenshots are written under `/tmp`.
+
+The Twitch service checks run with `npm --prefix twitch-service ci --ignore-scripts` and `npm --prefix twitch-service test`. `node tests/twitch-flow.browser.cjs` checks the OAuth popup, host-only connect/disconnect controls, chat account deduplication, separate shared tallies, disabled slides, refresh recovery, results and mobile layout. It uses the real local HTTP service with simulated Twitch/EventSub and Firebase data; no Twitch credentials or live backend writes are required. Local service requests use a Node transport bridge because the cloud browser restricts loopback access.

@@ -1,0 +1,16 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$code": {
+        ".read": true,
+        ".write": "newData.exists() && ((!data.exists() && (!newData.child('twitchControlHash').exists() || (newData.child('twitchControlHash').isString() && newData.child('twitchControlHash').val().matches(/^[a-f0-9]{64}$/)))) || (data.exists() && newData.child('twitchControlHash').val() === data.child('twitchControlHash').val() && newData.child('hostId').val() === data.child('hostId').val()))"
+      }
+    },
+    "votes": {"$code": {".read": true, ".write": true}},
+    "ddused": {"$code": {".read": true, ".write": true}},
+    "twitch": {"$code": {".read": true, ".write": false}},
+    "twitchPrivate": {".read": false, ".write": false}
+  }
+}

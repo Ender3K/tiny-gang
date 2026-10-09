@@ -1,0 +1,35 @@
+# This service needs a persistent disk, which requires a paid Render plan.
+services:
+  - type: web
+    name: tiny-gang-twitch
+    runtime: node
+    plan: starter
+    branch: feat/twitch-chat-voting
+    rootDir: twitch-service
+    buildCommand: npm ci --ignore-scripts
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: false
+    disk:
+      name: twitch-tokens
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: NODE_ENV
+        value: production
+      - key: APP_ORIGINS
+        value: https://ender3k.github.io
+      - key: FIREBASE_DATABASE_URL
+        value: https://smash-or-pass-bb76b-default-rtdb.europe-west1.firebasedatabase.app
+      - key: TOKEN_STORE_PATH
+        value: /var/data/twitch-tokens.json
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false

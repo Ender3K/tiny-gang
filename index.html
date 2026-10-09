@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
 <script src="assets/qrcode.min.js"></script>
+<script src="assets/twitch-config.js"></script>
+<script src="assets/twitch-voting.js"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
   import { getDatabase, ref, set, get, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
@@ -1813,6 +1815,16 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 .game-dialog{padding:1rem}
 }
 
+
+[hidden]{display:none!important}
+#twitchWaiting,#twitchGame,#twitchResults{margin-bottom:1rem;padding:1rem;overflow-wrap:anywhere}
+.twitch-tally{font-weight:700;font-size:.9rem}
+#twitchWaiting a,#twitchGame a,#twitchResults a{color:var(--text);text-underline-offset:3px}
+.twitch-dialog{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:16px;padding:24px;width:min(520px,calc(100vw - 32px));max-height:90vh;overflow:auto}
+.twitch-dialog::backdrop{background:#000a}
+.twitch-dialog input{width:100%;margin:12px 0}
+.twitch-dialog p{margin:12px 0}
+.twitch-actions{display:flex;gap:12px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1895,6 +1907,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
         <p class="waiting-note" id="waitingNote">Waiting for players to join…</p>
       </div>
       <div class="lobby-settings">
+      <div class="panel" id="twitchWaiting" hidden></div>
       <div class="timer-config" id="timerConfigPanel" style="display:none">
         <div class="timer-config-title">⏱ Countdown Timer</div>
         <p class="slide-timing-note" id="notesTimingStatus" role="status"></p>
@@ -2046,6 +2059,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
         </div>
 
         <div class="sidebar">
+          <div class="panel" id="twitchGame" hidden aria-live="polite"></div>
           <div class="panel">
             <div class="panel-title">
               <span>Live votes</span>
@@ -2137,6 +2151,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
     </div>
 
     <div class="stat-row" id="statRow"></div>
+    <div class="panel" id="twitchResults" hidden></div>
     <section class="panel personal-recap" id="personalRecap"></section>
 
     <div class="results-grid">
@@ -2212,6 +2227,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 <div class="toast" id="toast"></div>
 
 <script>
+const twitchUI=new TwitchVoting({onValue:(...args)=>window._onValue(...args),reference:path=>window._ref(window._db,path)});
 const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwU3-zlc0EqXUr2ncYybguEtyiCudnIUevNwlNV4LQiRiyidVTjC24cd2e4HDxViZqh/exec";
 let slideImageCache = {};
 let slideImagePromises = {};
@@ -2924,11 +2940,12 @@ async function transactLoadedRoom(code,apply){
   } finally { stop?.(); }
 }
 async function reserveRoom(room){
+  const owner=await TwitchVoting.reserve();
   for(let attempt=0;attempt<8;attempt++){
     const code=genCode();
-    const candidate={...room,code,imageCacheVersion:room.imageCacheVersion || code};
+    const candidate={...room,code,twitchControlHash:owner.hash,imageCacheVersion:room.imageCacheVersion || code};
     const result=await window._transaction(roomRef(code),current=>current === null ? candidate : undefined);
-    if(result.committed) return candidate;
+    if(result.committed){ TwitchVoting.remember(code,owner.key); return candidate; }
   }
   throw new Error('Could not reserve a room code. Try again.');
 }
@@ -3004,6 +3021,7 @@ function renderSmashBoard(targetId, room, votesData){
 }
 
 function stopListeners(){
+  twitchUI.stop();
   if(unsubRoom){ unsubRoom(); unsubRoom=null; }
   if(unsubVotes){ unsubVotes(); unsubVotes=null; }
 }
@@ -3343,6 +3361,7 @@ function listenRoom(){
     if(!snap.exists()) return;
     const room = snap.val();
     _latestRoom = room;
+    twitchUI.update(room,me);
 
     const key = myKey();
     if(me.name && (!room.players?.[key] || room.players[key].kicked)){
