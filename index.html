@@ -1821,6 +1821,18 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 #spectator .spectator-countdown{font:600 2.4rem 'Geist Mono',monospace;margin:16px 0}
 .audience-breakdown{width:100%;max-width:1100px}
 .audience-row{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);font-size:.85rem;flex-wrap:wrap}
+.audience-vote-bar{width:100%;min-width:0}
+.audience-bar-labels{display:flex;justify-content:space-between;gap:12px;font-size:.8rem;margin-bottom:8px}
+.audience-bar-labels .smash-label{color:#ef4444}
+.audience-bar-labels .pass-label{color:#3b82f6}
+.audience-bar-track{display:flex;width:100%;height:24px;overflow:hidden;border-radius:999px;background:var(--border)}
+.audience-bar-smash{background:#ef4444}
+.audience-bar-pass{background:#3b82f6}
+.audience-bar-empty{margin-top:8px;color:var(--muted);font-size:.8rem}
+.audience-row .audience-vote-bar{flex-basis:100%}
+#spectatorTally{width:100%}
+.code-privacy-btn{margin-top:12px;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:8px 12px;cursor:pointer;font:inherit}
+.code-privacy-btn:hover{color:var(--text);border-color:var(--muted)}
 </style>
 </head>
 <body>
@@ -1895,6 +1907,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
         <div class="room-header">
           <div class="room-code-label">Share this code with your friends</div>
           <div class="room-code" id="displayCode">------</div>
+          <button class="code-privacy-btn" id="lobbyCodePrivacy" data-code-privacy-toggle onclick="toggleJoinCodePrivacy()" aria-pressed="false" hidden>Hide join code</button>
           <div class="room-share"><span id="playerCountLabel">1 player</span> connected</div>
         </div>
         <div class="section-label">Players</div>
@@ -2076,13 +2089,14 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 
           <div class="panel">
             <h2 class="panel-title">Audience votes · this slide</h2>
-            <p id="audienceTally" role="status">0 Smash · 0 Pass</p>
+            <div id="audienceTally"></div>
             <p class="recap-muted">Separate from player scores</p>
           </div>
 
           <div class="panel master-controls" id="masterControls" style="display:none">
             <div class="mc-title">⚡ HOST CONTROLS</div>
             <button class="restart-btn" onclick="copySpectatorLink()">Copy spectator link</button>
+            <button class="code-privacy-btn" id="gameCodePrivacy" data-code-privacy-toggle onclick="toggleJoinCodePrivacy()" aria-pressed="false" hidden>Hide join code</button>
             <p class="slide-timing-note" id="slideTimingLabel"></p>
 
             <div class="timer-settings-inline" id="timerSettingsInline">
@@ -2235,7 +2249,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
       <button class="vbtn vbtn-smash" id="spectatorSmash" onclick="castAudienceVote('smash')" disabled>🔥 Smash</button>
       <button class="vbtn vbtn-pass" id="spectatorPass" onclick="castAudienceVote('pass')" disabled>❄️ Pass</button>
     </div>
-    <p id="spectatorTally" role="status">0 Smash · 0 Pass</p>
+    <div id="spectatorTally"></div>
     <section class="panel" id="spectatorResults" hidden><h2 class="panel-title">Audience breakdown</h2><div id="spectatorBreakdown"></div></section>
     <p class="recap-muted">One vote per browser per slide. Keep this page open to follow a rematch.</p>
     <button class="restart-btn" onclick="leaveRoom()">Leave audience</button>
@@ -2941,11 +2955,37 @@ function storageRead(k){ try { return JSON.parse(localStorage.getItem(k)); } cat
 function storageWrite(k,v){ try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k,JSON.stringify(v)); } catch {} }
 const deviceId = storageRead('sop-device') || (crypto.randomUUID ? crypto.randomUUID() : 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2));
 storageWrite('sop-device',deviceId);
+let hideJoinCode=storageRead('sop-hide-join-code') === true;
+function toggleJoinCodePrivacy(){
+  if(!me.isMaster) return;
+  hideJoinCode=!hideJoinCode;
+  storageWrite('sop-hide-join-code',hideJoinCode);
+  applyJoinCodePrivacy();
+}
+function applyJoinCodePrivacy(){
+  const hidden=me.isMaster && hideJoinCode;
+  document.getElementById('displayCode').textContent=hidden ? '••••••' : me.code;
+  document.getElementById('displayCode').setAttribute('aria-label',hidden ? 'Join code hidden' : `Join code ${me.code}`);
+  document.querySelectorAll('[data-code-privacy-toggle]').forEach(btn=>{
+    btn.hidden=!me.isMaster;
+    btn.textContent=hidden ? 'Show join code' : 'Hide join code';
+    btn.setAttribute('aria-pressed',String(hidden));
+  });
+  document.getElementById('shareCode').textContent=hidden ? 'code hidden' : me.code;
+  document.getElementById('shareLink').type=hidden ? 'password' : 'text';
+  document.getElementById('spectatorShareLink').type=hidden ? 'password' : 'text';
+  if(document.getElementById('shareDialog').open) renderJoinQR();
+}
+function renderJoinQR(){
+  const qr=document.getElementById('joinQR'); qr.innerHTML='';
+  qr.hidden=me.isMaster && hideJoinCode;
+  if(!qr.hidden && window.QRCode) new QRCode(qr,{text:roomLink(),width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+}
 function spectatorLink(code=me.code){ const url=new URL(roomLink(code)); url.searchParams.set('spectator','1'); return url.href; }
 async function copySpectatorLink(){
   if(!me.isMaster) return;
   try { await navigator.clipboard.writeText(spectatorLink()); showToast('Spectator link copied'); }
-  catch { document.getElementById('spectatorShareLink').value=spectatorLink(); document.getElementById('spectatorShareDialog').showModal(); }
+  catch { applyJoinCodePrivacy(); document.getElementById('spectatorShareLink').value=spectatorLink(); document.getElementById('spectatorShareDialog').showModal(); }
 }
 function saveSession(){ storageWrite('sop-session',me); storageWrite('sop-name',me.name); }
 function roomLink(code=me.code){ const url=new URL(location.href); url.search=''; url.hash=''; url.searchParams.set('room',code); return url.href; }
@@ -2953,9 +2993,8 @@ async function copyJoinLink(){ try { await navigator.clipboard.writeText(roomLin
 function showShareDialog(){
   const dialog=document.getElementById('shareDialog');
   document.getElementById('shareLink').value=roomLink();
-  document.getElementById('shareCode').textContent=me.code;
-  const qr=document.getElementById('joinQR'); qr.innerHTML='';
-  if(window.QRCode) new QRCode(qr,{text:roomLink(),width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  applyJoinCodePrivacy();
+  renderJoinQR();
   dialog.showModal();
 }
 // Keep the listener alive until the transaction commits: Firebase can discard
@@ -3090,7 +3129,7 @@ async function joinRoom(){
 function enterWaiting(){
   show('waiting');
   document.getElementById('lobbySpectatorLink').hidden=!me.isMaster;
-  document.getElementById('displayCode').textContent = me.code;
+  applyJoinCodePrivacy();
   ['timerConfigPanel','emojiConfigPanel','lockJoinsPanel'].forEach(id=>document.getElementById(id).style.display=me.isMaster?'':'none');
   if(me.isMaster){
     document.getElementById('lateJoinEnabled').checked=!_latestRoom?.lockJoins;
@@ -3168,6 +3207,7 @@ async function startGame(){
 function enterGame(){
   show('game');
   const isHost = me.isMaster;
+  applyJoinCodePrivacy();
   document.getElementById('masterControls').style.display = isHost ? '' : 'none';
   document.getElementById('voteHead').textContent = isHost ? 'Host can vote too' : 'Cast your vote';
   document.getElementById('timerInlineControls').style.display = isHost ? '' : 'none';
@@ -3465,17 +3505,29 @@ function audienceTotals(room,votes,slide){
   for(const choice of Object.values(votes[slide] || {})) if(choice==='smash' || choice==='pass') tally[choice]++;
   return tally;
 }
+function audienceBarMarkup(tally,unrated=false){
+  if(unrated) return '<p class="recap-muted">Unrated · audience voting disabled</p>';
+  const total=tally.smash+tally.pass;
+  const smash=total ? tally.smash/total*100 : 0;
+  const pass=total ? 100-smash : 0;
+  return `<div class="audience-vote-bar">
+    <div class="audience-bar-labels" aria-hidden="true"><span class="smash-label">Smash</span><span class="pass-label">Pass</span></div>
+    <div class="audience-bar-track" role="img" aria-label="${total ? `Audience: ${tally.smash} Smash, ${tally.pass} Pass` : 'No audience votes yet'}">
+      <div class="audience-bar-smash" style="width:${smash}%"></div><div class="audience-bar-pass" style="width:${pass}%"></div>
+    </div>${total ? '' : '<p class="audience-bar-empty">No audience votes yet</p>'}
+  </div>`;
+}
 function audienceBreakdown(room,votes){
   return playedSlides(room).map(slide=>{
     if(isSlideUnrated(room,slide)) return `<div class="audience-row"><strong>Slide ${slide}</strong><span>Unrated · audience voting disabled</span></div>`;
     const t=audienceTotals(room,votes,slide);
-    return `<div class="audience-row"><strong>Slide ${slide}</strong><span>${t.smash} Smash · ${t.pass} Pass</span></div>`;
+    return `<div class="audience-row"><strong>Slide ${slide}</strong>${audienceBarMarkup(t)}</div>`;
   }).join('') || '<p class="recap-muted">No slides played yet.</p>';
 }
 function renderAudience(){
   const room=_latestRoom; if(!room) return;
   const t=audienceTotals(room,_latestAudienceVotes,room.currentSlide);
-  document.getElementById('audienceTally').textContent=isSlideUnrated(room,room.currentSlide) ? 'Unrated · audience voting disabled' : `${t.smash} Smash · ${t.pass} Pass`;
+  document.getElementById('audienceTally').innerHTML=audienceBarMarkup(t,isSlideUnrated(room,room.currentSlide));
   if(room.state==='done') document.getElementById('audienceResults').innerHTML=audienceBreakdown(room,_latestAudienceVotes);
 }
 function listenAudience(){
@@ -3531,7 +3583,7 @@ function renderSpectator(){
   document.getElementById('spectatorSmash').disabled=disabled;
   document.getElementById('spectatorPass').disabled=disabled;
   const tally=room ? audienceTotals(room,_latestAudienceVotes,slide) : {smash:0,pass:0};
-  document.getElementById('spectatorTally').textContent=`${tally.smash} Smash · ${tally.pass} Pass`;
+  document.getElementById('spectatorTally').innerHTML=audienceBarMarkup(tally,room && isSlideUnrated(room,slide));
   document.getElementById('spectatorResults').hidden=room?.state!=='done';
   if(room?.state==='done') document.getElementById('spectatorBreakdown').innerHTML=audienceBreakdown(room,_latestAudienceVotes);
 }
