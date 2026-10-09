@@ -1,0 +1,14 @@
+{
+  "name": "tiny-gang",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "test:browser": "node tests/game-flow.browser.cjs && node tests/spectator-flow.browser.cjs",
+    "test:rules": "firebase emulators:exec --only database --project demo-tiny-gang 'node tests/spectator-rules.emulator.cjs'"
+  },
+  "devDependencies": {
+    "firebase-tools": "15.0.0",
+    "playwright": "1.56.1"
+  },
+  "packageManager": "pnpm@11.25.0"
+}

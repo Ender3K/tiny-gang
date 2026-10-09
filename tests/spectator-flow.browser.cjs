@@ -1,0 +1,88 @@
+const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
+const root=require('node:path').resolve(__dirname,'..'),html=fs.readFileSync(root+'/index.html','utf8');
+const deck={ok:true,totalSlides:4,slidePageIds:['s1','s2','s3','s4'],slideDurations:{},slideVotingDisabled:{3:true},timingVersion:1,notesRulesVersion:1,imageCacheVersion:'spectator-fixture'};
+const image={ok:true,dataUrl:'data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#272730"/></svg>').toString('base64')};
+const moduleSource=`
+const listeners=new Set();const snapshot=value=>({exists:()=>value!==null,val:()=>value});
+window.__notify=async()=>{for(const item of [...listeners]){const value=await window.testRead(item.path);if(listeners.has(item))item.cb(snapshot(value))}};
+export function getDatabase(){return {}}export function ref(db,path=''){return path}
+export async function get(path){return snapshot(await window.testRead(path))}
+export async function set(path,value){return window.testWrite(path,value,false)}
+export async function update(path,value){return window.testWrite(path,value,true)}
+export async function runTransaction(path,fn){for(let i=0;i<10;i++){const value=await window.testRead(path),previous=structuredClone(value),next=fn(value);if(next===undefined)return{committed:false,snapshot:snapshot(value)};const result=await window.testCAS(path,previous,next);if(result.ok)return{committed:true,snapshot:snapshot(next)}}throw Error('Too many retries')}
+export function onValue(path,cb){const item={path,cb};listeners.add(item);window.testRead(path).then(value=>{if(listeners.has(item))cb(snapshot(value))});return()=>listeners.delete(item)}
+`;
+(async()=>{
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),headless:true,args:['--no-sandbox']});
+ const pages=[],errors=[],requests=new Map(),writes=[],state={rooms:{},votes:{},ddused:{},audienceVotes:{},'.info':{connected:true,serverTimeOffset:0}};
+ const read=path=>path.split('/').filter(Boolean).reduce((o,k)=>o?.[k],state)??null;
+ const put=(path,value)=>{const parts=path.split('/').filter(Boolean),key=parts.pop();let obj=state;for(const p of parts)obj=obj[p]??={};if(value===null)delete obj[key];else obj[key]=structuredClone(value);};
+ const notify=()=>Promise.all(pages.filter(p=>!p.isClosed()).map(p=>p.evaluate(()=>window.__notify?.())));
+ let holdVote=null;
+ const eligible=(code,slide)=>{const r=state.rooms[code],t=r?.timer;return r?.state==='playing' && !r.nextRoomCode && r.currentSlide===Number(slide) && r.rounds?.[slide] && !r.slideVotingDisabled?.[slide] && !r.vetoed?.[slide] && t?.slide===Number(slide) && t.status==='running' && (!t.enabled || (t.paused?t.remainingMs>0:t.dueAt>Date.now()));};
+ async function page(width=390,context){const ctx=context || await browser.newContext({viewport:{width,height:844}});const p=await ctx.newPage();pages.push(p);requests.set(p,[]);p.setDefaultTimeout(15000);p.on('pageerror',e=>errors.push(e.message));
+  await p.exposeFunction('testRead',path=>structuredClone(read(path)));
+  await p.exposeFunction('testWrite',async(path,value,update)=>{writes.push({p,path});if(update){for(const[k,v]of Object.entries(value))put((path?path+'/':'')+k,v)}else put(path,value);await notify();});
+  await p.exposeFunction('testCAS',async(path,old,next)=>{
+   if(path.startsWith('audienceVotes/') && holdVote){const wait=holdVote;holdVote=null;await wait();}
+   if(JSON.stringify(read(path))!==JSON.stringify(old))return{ok:false};
+   if(path.startsWith('audienceVotes/')){const[,code,slide]=path.split('/');if(old!==null || !eligible(code,slide) || !['smash','pass'].includes(next))throw Error('PERMISSION_DENIED');}
+   writes.push({p,path});put(path,next);await notify();return{ok:true};
+  });
+  await p.route('**/*',route=>{const u=new URL(route.request().url());requests.get(p).push(u.href);if(u.hostname==='127.0.0.1'){if(u.pathname.startsWith('/assets/'))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(root+u.pathname)});return route.fulfill({contentType:'text/html',body:html});}if(u.pathname.endsWith('firebase-app.js'))return route.fulfill({contentType:'text/javascript',body:'export function initializeApp(){return {}}'});if(u.pathname.endsWith('firebase-database.js'))return route.fulfill({contentType:'text/javascript',body:moduleSource});if(u.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(u.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});return route.abort();});return p;
+ }
+ const isDisabled=async p=>assert.equal(await p.locator('#spectatorSmash').isDisabled(),true);
+ try{
+  const host=await page(1440);await host.goto('http://127.0.0.1:8000/');await host.waitForFunction(()=>dbReady);await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');await host.getByRole('button',{name:'Create lobby',exact:true}).click();await host.locator('#waiting').waitFor({state:'visible'});const code=await host.evaluate(()=>me.code);
+  const url='http://127.0.0.1:8000/?room='+code+'&spectator=1';assert.equal(await host.evaluate(()=>spectatorLink()),url);assert(await host.locator('#lobbySpectatorLink').isVisible());
+  // Force clipboard failure and verify its useful fallback.
+  await host.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{throw Error('denied')}}}));await host.locator('#lobbySpectatorLink').click();assert.equal(await host.locator('#spectatorShareLink').inputValue(),url);await host.locator('#spectatorShareDialog .dialog-close').click();
+  const savedHost=await host.evaluate(()=>storageRead('sop-session'));const hostViewer=await page(390,host.context());await hostViewer.goto(url);await hostViewer.waitForFunction(()=>audienceReady && me.spectator);assert.equal(await hostViewer.evaluate(()=>me.name),'');assert.deepEqual(await hostViewer.evaluate(()=>storageRead('sop-session')),savedHost);await hostViewer.getByRole('button',{name:'Leave audience',exact:true}).click();assert.deepEqual(await hostViewer.evaluate(()=>storageRead('sop-session')),savedHost);
+  const viewer=await page();await viewer.goto(url);await viewer.locator('#spectator').waitFor({state:'visible'});await viewer.waitForFunction(()=>audienceReady && _latestRoom?.state==='waiting');await isDisabled(viewer);assert.equal(Object.keys(state.rooms[code].players).length,1);assert.equal(await viewer.evaluate(()=>me.name),'');
+  // Same browser profile, two tabs: simultaneous opposite votes have one winner.
+  const twin=await page(390,viewer.context());await twin.goto(url);await twin.waitForFunction(()=>audienceReady);
+  await host.locator('#startBtn').click();await viewer.waitForFunction(()=>_latestRoom?.timer?.status==='running');await host.waitForFunction(()=>lastSlide===1 && timerState.slideReady);
+  assert(await host.getByRole('button',{name:'Copy spectator link',exact:true}).isVisible());
+  await viewer.screenshot({path:'/tmp/tiny-gang-spectator-voting-mobile.png',fullPage:true});
+  await Promise.all([viewer.evaluate(()=>castAudienceVote('smash')),twin.evaluate(()=>castAudienceVote('pass'))]);const id=await viewer.evaluate(()=>deviceId),accepted=state.audienceVotes[code][1][id];assert.equal(Object.keys(state.audienceVotes[code][1]).length,1);
+  for(const p of [viewer,twin])await p.waitForFunction(v=>document.getElementById('spectatorStatus').textContent.toLowerCase().includes('vote accepted: '+v),accepted);
+  await viewer.reload();await viewer.waitForFunction(()=>audienceReady && _latestRoom?.state==='playing');assert.equal(await viewer.evaluate(()=>deviceId),id);await isDisabled(viewer);assert((await viewer.locator('#spectatorStatus').innerText()).includes(accepted==='smash'?'Smash':'Pass'));
+  assert.equal(await host.evaluate(()=>getPlayerStats(getPlayers(_latestRoom)[0],_latestRoom,_latestVotes).smashPoints),0);assert.equal(await host.locator('#tallySmash').innerText(),'0');assert.equal(await host.locator('#tallyPass').innerText(),'0');
+  await host.evaluate(()=>castDoubleDown());assert.equal(state.votes[code][1][await host.evaluate(()=>myKey())],'supersmash');assert.equal(await host.evaluate(()=>getPlayerStats(getPlayers(_latestRoom)[0],_latestRoom,_latestVotes).smashPoints),2);assert.equal((await host.locator('#audienceTally').innerText()).includes('1'),true);
+  assert.equal(await viewer.evaluate(()=>myDoubleDownUsed),false);
+  put(`rooms/${code}/vetoed/1`,true);await notify();assert((await host.locator('#audienceTally').innerText()).includes('Unrated'));assert.equal(await viewer.evaluate(()=>audienceTotals(_latestRoom,_latestAudienceVotes,1).smash+audienceTotals(_latestRoom,_latestAudienceVotes,1).pass),0);put(`rooms/${code}/vetoed/1`,null);await notify();assert.equal(await viewer.evaluate(()=>audienceTotals(_latestRoom,_latestAudienceVotes,1).smash+audienceTotals(_latestRoom,_latestAudienceVotes,1).pass),1);await isDisabled(viewer);
+  console.log('Spectator waiting, copy controls, concurrent first vote, refresh recovery and separate player/Double Down totals passed');
+  await host.evaluate(()=>masterNext());await viewer.waitForFunction(()=>_latestRoom?.currentSlide===2 && _latestRoom.timer.status==='running');
+  // Preparation and expired timer fixtures keep the host paused so it cannot auto-advance.
+  put(`rooms/${code}/timer`,{slide:2,status:'loading',enabled:true,paused:true,remainingMs:10000,dueAt:null,duration:10,revision:1});await notify();await isDisabled(viewer);
+  put(`rooms/${code}/timer/status`,'running');await notify();await viewer.waitForFunction(()=>!document.getElementById('spectatorSmash').disabled);assert((await viewer.locator('#spectatorCountdown').innerText()).includes('Paused'));assert.equal((await viewer.locator('#spectatorCountdown').innerText()).split('s')[0],await host.locator('#timerDisplay').innerText());
+  const paused=await viewer.locator('#spectatorCountdown').innerText();await viewer.waitForTimeout(350);assert.equal(await viewer.locator('#spectatorCountdown').innerText(),paused);
+  put(`rooms/${code}/timer/remainingMs`,0);await notify();await isDisabled(viewer);
+  put(`rooms/${code}/timer/remainingMs`,10000);put(`rooms/${code}/vetoed/2`,true);await notify();await isDisabled(viewer);
+  await viewer.evaluate(()=>castAudienceVote('smash'));assert.equal(state.audienceVotes[code][2],undefined);
+  put(`rooms/${code}/vetoed/2`,null);put('.info/connected',false);await notify();await isDisabled(viewer);await viewer.evaluate(()=>castAudienceVote('pass'));assert.equal(state.audienceVotes[code][2],undefined);put('.info/connected',true);await notify();
+  await viewer.locator('#spectatorPass').click();assert.equal(state.audienceVotes[code][2][id],'pass');
+  const fresh=await page(320);await fresh.goto(url);await fresh.waitForFunction(()=>audienceReady);
+  // Commit after host advance must fail even though the vote was open on click.
+  let release,entered;const started=new Promise(r=>entered=r);holdVote=()=>{entered();return new Promise(r=>release=r)};
+  const stale=fresh.evaluate(()=>castAudienceVote('smash'));await started;await host.evaluate(()=>masterNext());release();await stale;await fresh.waitForFunction(()=>_latestRoom.currentSlide===3);assert.equal(Object.keys(state.audienceVotes[code][2]).length,1);await isDisabled(fresh);assert((await fresh.locator('#spectatorStatus').innerText()).includes('Unrated'));
+  await fresh.evaluate(()=>castAudienceVote('smash'));assert.equal(state.audienceVotes[code][3],undefined);
+  console.log('Preparation, pause, zero remaining, veto, disconnection, stale commit and notes-disabled slides passed');
+  await host.evaluate(()=>masterNext());await fresh.waitForFunction(()=>_latestRoom.currentSlide===4 && _latestRoom.timer.status==='running');
+  // Expiry at commit (host offline) and ending at commit also reject writes.
+  let finishExpired,expiredEntered;const expiryStarted=new Promise(r=>expiredEntered=r);holdVote=()=>{expiredEntered();return new Promise(r=>finishExpired=r)};
+  const expiring=fresh.evaluate(()=>castAudienceVote('smash'));await expiryStarted;put(`rooms/${code}/timer`,{slide:4,status:'running',enabled:true,paused:false,remainingMs:1000,dueAt:Date.now()-1,duration:1});finishExpired();await expiring;assert.equal(state.audienceVotes[code][4],undefined);await fresh.evaluate(()=>window.__notify());await isDisabled(fresh);assert.equal(await fresh.locator('#spectatorCountdown').innerText(),'0s');
+  put(`rooms/${code}/timer/enabled`,false);await notify();await fresh.waitForFunction(()=>!document.getElementById('spectatorSmash').disabled);
+  let finishEnded,endedEntered;const endStarted=new Promise(r=>endedEntered=r);holdVote=()=>{endedEntered();return new Promise(r=>finishEnded=r)};
+  const ending=fresh.evaluate(()=>castAudienceVote('pass'));await endStarted;host.once('dialog',d=>d.accept());await host.evaluate(()=>masterEnd());finishEnded();await ending;assert.equal(state.audienceVotes[code][4],undefined);
+  await viewer.waitForFunction(()=>_latestRoom.state==='done');await isDisabled(viewer);await host.locator('#results').waitFor({state:'visible'});assert((await host.locator('#audienceResults').innerText()).includes('Slide 2'));assert((await viewer.locator('#spectatorBreakdown').innerText()).includes('Unrated'));
+  await viewer.reload();await viewer.waitForFunction(()=>_latestRoom?.state==='done' && audienceReady);
+  const missing=await page();await missing.goto('http://127.0.0.1:8000/?room=MISSING&spectator=1');await missing.waitForFunction(()=>audienceReady);await isDisabled(missing);assert((await missing.locator('#spectatorStatus').innerText()).includes('Room not found'));
+  for(const p of [viewer,fresh]){assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert((await p.locator('#spectatorSmash').boundingBox()).height>=100);}await viewer.screenshot({path:'/tmp/tiny-gang-spectator-mobile.png',fullPage:true});
+  await host.locator('#rematchBtn').click();for(const p of [viewer,twin,fresh])await p.waitForFunction(old=>me.code!==old && _latestRoom?.state==='waiting',code);
+  const next=await host.evaluate(()=>me.code);assert.equal(Object.keys(state.rooms[next].players).length,1);assert.equal(state.audienceVotes[next],undefined);assert(viewer.url().includes('room='+next));await viewer.reload();await viewer.waitForFunction(()=>_latestRoom?.state==='waiting');assert.equal(await viewer.evaluate(()=>deviceId),id);
+  await host.locator('#startBtn').click();await viewer.waitForFunction(()=>_latestRoom?.timer?.status==='running');await viewer.locator('#spectatorSmash').click();assert.equal(state.audienceVotes[next][1][id],'smash');assert.equal(Object.keys(state.rooms[next].players).length,1);
+  for(const p of [viewer,twin,fresh,missing,hostViewer]){assert.equal(requests.get(p).filter(u=>/script\.google\.com|docs\.google\.com|googleusercontent\.com/.test(u)).length,0);assert.equal(writes.filter(w=>w.p===p && !w.path.startsWith('audienceVotes/')).length,0);assert.equal(await p.evaluate(()=>!!document.getElementById('slideImg').getAttribute('src')),false);}
+  assert.deepEqual(errors,[]);console.log('Timer/ending races, missing rooms, mobile layout, results and refresh/rematch following passed; spectators never registered or requested slide images');
+ }finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exitCode=1});
