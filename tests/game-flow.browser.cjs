@@ -62,6 +62,14 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.evaluate(()=>{const original=fetchSlideImageDataUrl;fetchSlideImageDataUrl=async()=>{fetchSlideImageDataUrl=original;throw Error('Temporary image failure');};});
  await host.locator('#startBtn').click();await host.locator('#slideError').waitFor({state:'visible'});assert.equal(await host.evaluate(()=>_latestRoom.timer.status),'loading');
  assert.equal(await host.locator('#slideErrorHint').innerText(),'Temporary image failure');
+ await host.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedLoadingDetails=text;}}}));
+ await host.locator('#copySlideLoadError').click();
+ const failedDetails=JSON.parse(await host.evaluate(()=>window.__copiedLoadingDetails));
+ assert(failedDetails.loads.some(r=>r.kind==='display' && r.status==='failed'));
+ assert(!JSON.stringify(failedDetails).includes('Temporary image failure'));
+ await host.setViewportSize({width:390,height:900});await host.screenshot({path:'/tmp/tiny-gang-error-diagnostics-mobile.png',fullPage:true});
+ assert.equal(await host.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await host.setViewportSize({width:1440,height:900});
  await host.getByRole('button',{name:'Retry slide',exact:true}).click();for(const p of [host,player])await p.waitForFunction(()=>lastSlide===1 && timerState.slideReady && _latestRoom.timer.status==='running');
  await player.waitForFunction(()=>!!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
  assert.equal(nextPreloadAttempts,2);assert.equal(await player.evaluate(()=>lastSlide),1);
@@ -87,6 +95,14 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  assert.deepEqual(reloadRequests,['s1']);assert.equal(await player.locator('#slideLoader').isVisible(),true);
  assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('#game .vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
  holdCurrent=false;releaseCurrent();await player.waitForFunction(()=>timerState.slideReady && !!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
+ // A denied clipboard still gives the player selectable details without
+ // changing the paused round or their accepted Double Down vote.
+ await player.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('Clipboard unavailable');}}}));
+ await player.locator('#copySlideLoadDetails').click();await player.locator('#slideLoadingDetails').waitFor({state:'visible'});
+ const manualDetails=JSON.parse(await player.locator('#slideLoadingDetailsText').inputValue());assert(manualDetails.loads.some(r=>r.status==='loaded'));
+ await player.screenshot({path:'/tmp/tiny-gang-loading-details-mobile.png',fullPage:true});
+ assert.equal(await player.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await player.locator('#slideLoadingDetails .dialog-close').click();assert.equal(await player.evaluate(()=>timerState.paused),true);assert.equal(state.ddused[code][id],1);
  console.log('Failed next-slide preload recovery, QR join, stable identity, shared pause/extend and refresh resume passed');
  for(let slide=2;slide<=4;slide++){
   await host.evaluate(()=>masterNext());for(const p of [host,player])await p.waitForFunction(slide=>lastSlide===slide && timerState.slideReady,slide);
