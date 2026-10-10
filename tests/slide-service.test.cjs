@@ -159,11 +159,11 @@ test('current-slide timeouts retry once after a short randomized delay',async()=
   expire(r);assert.equal((await r.promise).ok,true);assert.equal(r.calls.length,2);assert.equal(r.timers.size,0);
 });
 
-test('background requests time out sooner and never retry',async()=>{
+test('background requests allow a cold render to finish but remain bounded without retries',async()=>{
   const r=request(({options})=>abortRejection(options.signal),true,undefined,
-    {timeoutMs:8000,retries:0,retryTimeouts:true,retryDelayMs:250});
+    {timeoutMs:20000,retries:0,retryTimeouts:true,retryDelayMs:250});
   const rejected=assert.rejects(r.promise,/timed out/);
-  assert.equal([...r.timers.values()][0].ms,8000);expire(r);await rejected;
+  assert.equal([...r.timers.values()][0].ms,20000);expire(r);await rejected;
   assert.equal(r.calls.length,1);assert.equal(r.timers.size,0);
 });
 

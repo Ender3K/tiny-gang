@@ -2052,7 +2052,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
             <div class="slide-error" id="slideError">
               <div class="slide-error-icon">⚠️</div>
               <div class="slide-error-title">Could not load slide</div>
-              <div class="slide-error-hint">
+              <div class="slide-error-hint" id="slideErrorHint">
                 Make sure the presentation is set to <strong>Anyone with the link can view</strong>.
               </div>
               <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
@@ -2621,7 +2621,9 @@ async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priorit
     let timedOut=false;
     const deadline=setTimeout(()=>{timedOut=true;controller.abort();},30000);
     const options={
-      get timeoutMs(){return job.priority===0 ? 15000 : 8000;},
+      // An uncached thumbnail can take longer than a foreground cache lookup.
+      // Let preloads use their lookahead time rather than aborting valid exports.
+      get timeoutMs(){return job.priority===0 ? 15000 : 20000;},
       get retries(){return job.priority===0 ? 1 : 0;},
       retryTimeouts:true, retryDelayMs:250
     };
@@ -3016,6 +3018,7 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
   const img = document.getElementById('slideImg');
   const loader = document.getElementById('slideLoader');
   const errEl = document.getElementById('slideError');
+  const errHint = document.getElementById('slideErrorHint');
   const errLink = document.getElementById('slideErrorLink');
   const token = ++slideLoadToken;
 
@@ -3026,7 +3029,10 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
   errLink.href = rawUrl;
 
   const pageId = slidePageIds[slideNumber-1];
-  if(!pageId){ loader.classList.add('hidden'); img.style.display='none'; errEl.classList.add('visible'); return false; }
+  if(!pageId){
+    errHint.textContent='This slide is missing from the loaded deck. Open the presentation to check it.';
+    loader.classList.add('hidden'); img.style.display='none'; errEl.classList.add('visible'); return false;
+  }
 
   try {
     const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion);
@@ -3041,6 +3047,7 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
     return true;
   } catch(e) {
     if(token!==slideLoadToken) return false;
+    errHint.textContent=e?.message || 'Could not load this slide. Check your connection and retry.';
     loader.classList.add('hidden');
     img.style.display='none';
     errEl.classList.add('visible');

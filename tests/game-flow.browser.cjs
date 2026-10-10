@@ -61,6 +61,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  // A failed host image keeps the shared clock waiting; retry recovers the round.
  await host.evaluate(()=>{const original=fetchSlideImageDataUrl;fetchSlideImageDataUrl=async()=>{fetchSlideImageDataUrl=original;throw Error('Temporary image failure');};});
  await host.locator('#startBtn').click();await host.locator('#slideError').waitFor({state:'visible'});assert.equal(await host.evaluate(()=>_latestRoom.timer.status),'loading');
+ assert.equal(await host.locator('#slideErrorHint').innerText(),'Temporary image failure');
  await host.getByRole('button',{name:'Retry slide',exact:true}).click();for(const p of [host,player])await p.waitForFunction(()=>lastSlide===1 && timerState.slideReady && _latestRoom.timer.status==='running');
  await player.waitForFunction(()=>!!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
  assert.equal(nextPreloadAttempts,2);assert.equal(await player.evaluate(()=>lastSlide),1);

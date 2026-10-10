@@ -66,7 +66,8 @@ the Google redirect and its ContentService response support these anonymous
 cross-origin GET requests. Each request bypasses cached redirects and has a
 75-second timeout for deck metadata; a failed connection or temporary HTTP error
 retries once. Slide image requests use 15-second service timeouts for the current
-slide and 8-second service timeouts for background preloads. Current service
+slide and 20-second service timeouts for background preloads. This gives cold
+thumbnail generation time to finish inside the two-slide lookahead. Current service
 requests retry once, including timeouts, after a randomized 250–500 ms delay;
 individual background service requests do not retry. The nearest failed
 gameplay preload can make the separate delayed retry described above.
@@ -76,6 +77,8 @@ download retries the same URL once; a failed URL refreshes the thumbnail once
 instead. Each queued image load has a 30-second total budget covering service
 requests, retry delays and image downloads. Cancellation stops retries and
 clears timers. These frontend limits need no Apps Script redeployment.
+The slide error panel displays the actual failure reason rather than always
+suggesting that the presentation's sharing settings are wrong.
 No callback parameter is required by the frontend. The script still supports
 JSONP for older versions of the app.
 

@@ -74,7 +74,7 @@ test('a current slide interrupts a real queued preload and the same preload prom
   const first=a.context.fetchSlideImageDataUrl('deck','first','snapshot',2);
   const other=a.context.fetchSlideImageDataUrl('deck','other','snapshot',2);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(a.calls[0].options.timeoutMs,8000);assert.equal(a.calls[0].options.retries,0);
+  assert.equal(a.calls[0].options.timeoutMs,20000);assert.equal(a.calls[0].options.retries,0);
   const current=a.context.fetchSlideImageDataUrl('deck','current','snapshot',0);
   assert.equal(await current,'data:image/png;base64,fixture');
   assert.equal(a.calls[0].signal.aborted,true);assert(a.calls[2].url.includes('pageId=current'));
@@ -82,6 +82,30 @@ test('a current slide interrupts a real queued preload and the same preload prom
   assert.equal(await first,'data:image/png;base64,fixture');releaseOther();await other;
   assert.equal(a.calls.length,4);assert.equal(await a.context.fetchSlideImageDataUrl('deck','first','snapshot',0),'data:image/png;base64,fixture');
   assert.equal(a.calls.length,4);assert.equal(Object.keys(a.context.slideImagePromises).length,0);
+});
+
+test('a valid 11-second cold slide response completes its background preload',async()=>{
+  const a=app(()=>assert.fail('use the real service request functions'));
+  const timers=new Map(),requests=[];let timerId=0,clock=0;
+  a.context.setTimeout=(callback,ms)=>{timers.set(++timerId,{callback,due:clock+ms});return timerId;};
+  a.context.clearTimeout=id=>timers.delete(id);
+  a.context.fetch=(url,{signal})=>new Promise((resolve,reject)=>{
+    requests.push(url);
+    const abort=()=>{a.context.clearTimeout(timer);const error=new Error('aborted');error.name='AbortError';reject(error);};
+    const timer=a.context.setTimeout(()=>{
+      signal.removeEventListener('abort',abort);
+      resolve({ok:true,status:200,json:async()=>({ok:true,dataUrl:'data:image/png;base64,fixture'})});
+    },11000);
+    signal.addEventListener('abort',abort,{once:true});
+  });
+  vm.runInContext(html.slice(html.indexOf('async function fetchAppsScript('),html.indexOf('async function fetchSlidePageIdsViaAppsScript(')),a.context);
+  const loading=a.context.prefetchSlide('deck','page','snapshot');await new Promise(resolve=>setImmediate(resolve));
+  while(true){
+    const entry=[...timers].sort((a,b)=>a[1].due-b[1].due).find(([,timer])=>timer.due<=11000);
+    if(!entry)break;
+    const [id,timer]=entry;clock=timer.due;timers.delete(id);timer.callback();await new Promise(resolve=>setImmediate(resolve));
+  }
+  assert.equal(await loading,'data:image/png;base64,fixture');assert.equal(requests.length,1);assert.equal(timers.size,0);
 });
 
 test('leaving during an image download clears its timeout and cancels the image',async()=>{
