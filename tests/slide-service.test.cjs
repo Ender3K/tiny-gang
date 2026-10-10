@@ -10,7 +10,7 @@ const response = (data, status = 200) => ({
   async json() { return data; }
 });
 
-function request(implementation, retry = false, signal) {
+function request(implementation, retry = false, signal, options) {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   const source = html.slice(html.indexOf('async function fetchAppsScript('), html.indexOf('async function fetchSlidePageIdsViaAppsScript('));
   const calls = [];
@@ -28,7 +28,7 @@ function request(implementation, retry = false, signal) {
   });
   vm.runInContext(source, context);
   const url = 'https://example.com/exec?action=meta&presentationId=test';
-  const promise = retry ? context.requestAppsScript(url, signal) : context.fetchAppsScript(url, 75000, signal);
+  const promise = retry ? context.requestAppsScript(url, signal, options) : context.fetchAppsScript(url, 75000, signal);
   return {calls, timers, promise};
 }
 
@@ -148,4 +148,36 @@ test('leaving a room cancels the network request without treating it as a timeou
   await rejected;
   assert.equal(r.calls.length, 1);
   assert.equal(r.timers.size, 0);
+});
+
+test('current-slide timeouts retry once after a short randomized delay',async()=>{
+  const r=request(({options},attempt)=>attempt===1 ? abortRejection(options.signal) : response({ok:true}),true,undefined,
+    {timeoutMs:15000,retries:1,retryTimeouts:true,retryDelayMs:250});
+  assert.equal([...r.timers.values()][0].ms,15000);expire(r);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(r.calls.length,1);const delay=[...r.timers.values()][0].ms;assert(delay>=250 && delay<500);
+  expire(r);assert.equal((await r.promise).ok,true);assert.equal(r.calls.length,2);assert.equal(r.timers.size,0);
+});
+
+test('background requests time out sooner and never retry',async()=>{
+  const r=request(({options})=>abortRejection(options.signal),true,undefined,
+    {timeoutMs:8000,retries:0,retryTimeouts:true,retryDelayMs:250});
+  const rejected=assert.rejects(r.promise,/timed out/);
+  assert.equal([...r.timers.values()][0].ms,8000);expire(r);await rejected;
+  assert.equal(r.calls.length,1);assert.equal(r.timers.size,0);
+});
+
+test('cancelling during the retry delay clears its timer and starts no new request',async()=>{
+  const controller=new AbortController();
+  const r=request(()=>{throw new TypeError('Failed to fetch')},true,controller.signal,
+    {timeoutMs:15000,retries:1,retryDelayMs:250});
+  const rejected=assert.rejects(r.promise,error=>error.name==='AbortError');
+  await new Promise(resolve=>setImmediate(resolve));assert.equal(r.timers.size,1);
+  controller.abort();await rejected;assert.equal(r.calls.length,1);assert.equal(r.timers.size,0);
+});
+
+test('an already cancelled request never reaches the service',async()=>{
+  const controller=new AbortController();controller.abort();
+  const r=request(()=>assert.fail('cancelled request sent'),true,controller.signal);
+  await assert.rejects(r.promise,error=>error.name==='AbortError');assert.equal(r.calls.length,0);assert.equal(r.timers.size,0);
 });
