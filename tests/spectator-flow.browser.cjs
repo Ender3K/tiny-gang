@@ -63,7 +63,10 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
   // Preparation and expired timer fixtures keep the host paused so it cannot auto-advance.
   put(`rooms/${code}/timer`,{slide:2,status:'loading',enabled:true,paused:true,remainingMs:10000,dueAt:null,duration:10,revision:1});await notify();await isDisabled(viewer);
   put(`rooms/${code}/timer/status`,'running');await notify();await viewer.waitForFunction(()=>!document.getElementById('spectatorSmash').disabled);assert((await viewer.locator('#spectatorCountdown').innerText()).includes('Paused'));assert.equal((await viewer.locator('#spectatorCountdown').innerText()).split('s')[0],await host.locator('#timerDisplay').innerText());
-  const paused=await viewer.locator('#spectatorCountdown').innerText();await viewer.waitForTimeout(350);assert.equal(await viewer.locator('#spectatorCountdown').innerText(),paused);
+  const paused=await viewer.locator('#spectatorCountdown').innerText();
+  await viewer.evaluate(()=>{window.tallyNode=document.querySelector('#spectatorTally .audience-bar-track');});
+  await viewer.waitForTimeout(450);assert.equal(await viewer.locator('#spectatorCountdown').innerText(),paused);
+  assert(await viewer.evaluate(()=>window.tallyNode===document.querySelector('#spectatorTally .audience-bar-track')),'clock ticks must preserve tally DOM');
   put(`rooms/${code}/timer/remainingMs`,0);await notify();await isDisabled(viewer);
   put(`rooms/${code}/timer/remainingMs`,10000);put(`rooms/${code}/vetoed/2`,true);await notify();await isDisabled(viewer);
   await viewer.evaluate(()=>castAudienceVote('smash'));assert.equal(state.audienceVotes[code][2],undefined);

@@ -9,10 +9,12 @@
 
 <script src="assets/qrcode.min.js"></script>
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getDatabase, ref, set, get, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
-
   try {
+    // Dynamic imports keep network/module failures inside the recovery path.
+    const [{ initializeApp }, { getDatabase, ref, set, get, update, onValue, runTransaction }] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js")
+    ]);
     const firebaseConfig = {
       apiKey:            "AIzaSyAvORsMuKGubMXQ3VdkSdu2iNAK04RZxN4",
       authDomain:        "smash-or-pass-bb76b.firebaseapp.com",
@@ -2044,6 +2046,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
                 Make sure the presentation is set to <strong>Anyone with the link can view</strong>.
               </div>
               <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
+              <button type="button" class="slide-error-link" onclick="retryCurrentSlide()">Retry slide</button>
             </div>
             <!-- Veto overlay on slide -->
             <div class="veto-overlay" id="vetoOverlay">
@@ -2314,8 +2317,9 @@ document.addEventListener('fb-error', () => {
   const warn = document.getElementById('cfgWarn');
   warn.style.display = 'block';
   warn.innerHTML = `<strong>⚠️ Firebase Connection Failed</strong>
-    Error: <code>${msg}</code><br><br>
-    Most likely your <strong>databaseURL</strong> is wrong, or database rules are blocking reads/writes.`;
+    Error: <code>${escapeHtml(msg)}</code><br><br>
+    Check your connection and try again. If it keeps failing, check the Firebase configuration.<br><br>
+    <button type="button" class="restart-btn" onclick="location.reload()">Retry connection</button>`;
   show('cfgScreen');
 });
 
@@ -2530,12 +2534,16 @@ function slideCacheKey(rawUrl, pageId, cacheVersion = ""){
 function decodeSlideSource(src, signal){
   return new Promise((resolve, reject) => {
     const img = new Image();
-    function cleanup(){ img.onload=null; img.onerror=null; signal?.removeEventListener('abort', abort); }
+    let timeoutId;
+    function cleanup(){ clearTimeout(timeoutId); img.onload=null; img.onerror=null; signal?.removeEventListener('abort', abort); }
     function abort(){ cleanup(); img.src=''; reject(new Error('Slide loading cancelled.')); }
     if(signal?.aborted) return abort();
     img.onload = () => { cleanup(); resolve(); };
     img.onerror = () => { cleanup(); reject(new Error('Could not load slide image.')); };
     signal?.addEventListener('abort', abort, {once:true});
+    timeoutId = setTimeout(() => {
+      cleanup(); img.src=''; reject(new Error('Slide image download timed out. Please retry.'));
+    }, 30000);
     img.src = src;
   });
 }
@@ -2697,17 +2705,17 @@ function updateTimerUI(){
 
 // ── Veto Power ───────────────────────────────────────────────────────────────
 async function toggleVeto(){
-  if(!me.isMaster) return;
-  const snap = await window._get(roomRef(me.code));
-  if(!snap.exists()) return;
-  const room = snap.val();
-  const s = room.currentSlide;
-  if(isNotesVotingDisabled(room, s)) return;
-  const already = (room.vetoed || {})[s] === true;
-  const update = {};
-  update[`vetoed/${s}`] = already ? null : true;
-  await window._update(roomRef(me.code), update);
-  showToast(already ? '✅ Veto removed' : '🚫 Slide marked unrated');
+  if(!me.isMaster || !connected || _latestRoom?.state!=='playing') return;
+  const code=me.code, slide=_latestRoom.currentSlide;
+  try {
+    const result=await window._transaction(roomRef(code),room=>{
+      if(!room || room.state!=='playing' || room.currentSlide!==slide || isNotesVotingDisabled(room,slide)) return;
+      room.vetoed ||= {};
+      if(room.vetoed[slide]) delete room.vetoed[slide]; else room.vetoed[slide]=true;
+      return room;
+    });
+    if(result.committed && me.code===code) showToast(result.snapshot.val().vetoed?.[slide] ? '🚫 Slide marked unrated' : '✅ Veto removed');
+  } catch { if(me.code===code) showToast('Could not change the slide rating. Please try again.'); }
 }
 
 function applyVetoUI(isVetoed, notesDisabled = false){
@@ -2861,9 +2869,11 @@ async function createRoom(){
 
   const btn = document.querySelector('#entry .btn-fire');
   btn.textContent = 'Loading slides…'; btn.disabled = true;
+  const revision=++roomEntryRevision;
 
   try {
     const deck = await fetchSlidePageIdsViaAppsScript(url);
+    if(revision!==roomEntryRevision) return;
     const inviteOnly=document.getElementById('participantAccess').value==='invite';
     const inviteToken=inviteOnly ? newInviteToken() : '';
     const room = {
@@ -2883,6 +2893,7 @@ async function createRoom(){
       participantInviteHash:inviteOnly ? await hashInviteToken(inviteToken) : null,
     };
     const created = await reserveRoom(room);
+    if(revision!==roomEntryRevision) return;
     me = { id:deviceId, name, code:created.code, isMaster:true, inviteToken };
     _latestRoom=created;
     saveSession();
@@ -2913,12 +2924,7 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
   try {
     const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion);
     if(token!==slideLoadToken) return false;
-    const preImg = new Image();
-    await new Promise((resolve, reject) => {
-      preImg.onload = resolve;
-      preImg.onerror = () => reject(new Error('Could not decode slide image.'));
-      preImg.src = dataUrl;
-    });
+    await decodeSlideSource(dataUrl);
     if(token!==slideLoadToken) return false;
     img.onload=null; img.onerror=null;
     img.src = dataUrl;
@@ -2935,6 +2941,22 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
   }
 }
 
+function loadGameSlide(room){
+  const code=me.code, slide=room.currentSlide;
+  timerState.slideReady=false;
+  const loading=loadSlide(room.slidesUrl,slide,room.totalSlides,room.slidePageIds || [],room.imageCacheVersion || room.code);
+  const token=slideLoadToken;
+  return loading.then(loaded => {
+    if(token!==slideLoadToken || me.code!==code || slide!==lastSlide || _latestRoom?.state!=='playing') return;
+    timerState.slideReady=loaded;
+    if(loaded) armSharedTimer(slide);
+    updateTimerUI();
+  });
+}
+function retryCurrentSlide(){
+  if(_latestRoom?.state==='playing') return loadGameSlide(_latestRoom);
+}
+
 let me = { name:'', code:'', isMaster:false };
 let unsubRoom = null;
 let unsubVotes = null;
@@ -2945,6 +2967,7 @@ let lastSlide = -1;
 let myVotedSlides = {};
 let _latestRoom = null;
 let _latestVotes = {};
+let roomEntryRevision=0;
 
 function roomRef(code){ return window._ref(window._db, `rooms/${code}`); }
 function votesRef(code){ return window._ref(window._db, `votes/${code}`); }
@@ -3070,14 +3093,12 @@ function showShareDialog(){
 // Keep the listener alive until the transaction commits: Firebase can discard
 // the cached room as soon as its last value listener is detached.
 async function transactLoadedRoom(code,apply){
-  let stop;
+  let loaded;
   try {
-    const initial=await new Promise((resolve,reject)=>{
-      stop=window._onValue(roomRef(code),resolve,reject);
-    });
-    if(!initial.exists()) throw new Error('Room not found.');
+    loaded=await firstSubscribedValue(roomRef(code));
+    if(!loaded.snapshot.exists()) throw new Error('Room not found.');
     return await window._transaction(roomRef(code),apply);
-  } finally { stop?.(); }
+  } finally { loaded?.stop(); }
 }
 async function reserveRoom(room){
   for(let attempt=0;attempt<8;attempt++){
@@ -3093,18 +3114,27 @@ function newTimer(room,slide){ const cfg=getSlideTimerConfig(room,slide); return
 function firstSubscribedValue(reference){
   let stop;
   return new Promise((resolve,reject)=>{
-    stop=window._onValue(reference,snapshot=>resolve({snapshot,stop:()=>stop?.()}),error=>{stop?.();reject(error);});
+    const timeout=setTimeout(()=>{
+      stop?.(); reject(new Error('Loading the room timed out. Check your connection and try again.'));
+    },15000);
+    try {
+      stop=window._onValue(reference,snapshot=>{
+        clearTimeout(timeout); resolve({snapshot,stop:()=>stop?.()});
+      },error=>{clearTimeout(timeout);stop?.();reject(error);});
+    } catch(error){clearTimeout(timeout);reject(error);}
   });
 }
 async function enterExistingRoom(code){
-  const loaded=await firstSubscribedValue(roomRef(code));
-  let dd;
+  const revision=++roomEntryRevision;
+  let loaded,dd;
   try {
+    loaded=await firstSubscribedValue(roomRef(code));
+    if(revision!==roomEntryRevision) return false;
     const snap=loaded.snapshot;
     if(!snap.exists()) throw new Error('This room is no longer available.');
     const room=snap.val(), p=room.players?.[myKey()];
     if(!p || p.kicked || p.active === false) throw new Error('Your place in this room is no longer active.');
-    stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={}; _latestAudienceVotes={};
+    stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={}; _latestAudienceVotes={}; votePending=false;
     me={...me,code,name:p.name,isMaster:room.hostId ? room.hostId===myKey() : room.hostName===p.name};
     _latestRoom=room;
     timerCfg={enabled:!!room.timerEnabled,duration:room.timerDuration || 15};
@@ -3114,11 +3144,16 @@ async function enterExistingRoom(code){
       document.getElementById('passEmojiInput').value=emojiCfg.customPass;
     }
     dd=await firstSubscribedValue(window._ref(window._db,`ddused/${code}/${myKey()}`));
+    if(revision!==roomEntryRevision) return false;
     myDoubleDownUsed=dd.snapshot.val() === true;
     saveSession();
     history.replaceState(null,'',roomLink(code));
     if(room.state==='waiting') enterWaiting(); else enterGame();
-  } finally { loaded.stop(); dd?.stop(); }
+    return true;
+  } catch(error){
+    if(revision!==roomEntryRevision) return false;
+    throw error;
+  } finally { loaded?.stop(); dd?.stop(); }
 }
 async function resumeSession(){
   const requested=new URL(location.href).searchParams.get('room')?.toUpperCase();
@@ -3130,7 +3165,7 @@ async function resumeSession(){
   if(saved?.code && (!requested || requested===saved.code)){
     me=saved;
     document.getElementById('resumeStatus').hidden=false;
-    try { await enterExistingRoom(saved.code); showToast('Welcome back'); return; }
+    try { if(await enterExistingRoom(saved.code)) showToast('Welcome back'); return; }
     catch(e) {
       if(e.message==='This room is no longer available.' || e.message==='Your place in this room is no longer active.') storageWrite('sop-session',null);
       me={name:'',code:'',isMaster:false};
@@ -3178,6 +3213,7 @@ async function joinRoom(){
   const name=document.getElementById('joinName').value.trim(), code=document.getElementById('joinCode').value.trim().toUpperCase();
   if(!name || !code) return showErr('joinErr','Enter your name and room code.');
   const btn=document.querySelector('#joinPanel button'); if(btn) btn.disabled=true;
+  const revision=++roomEntryRevision;
   try {
     const inviteToken=new URL(location.href).searchParams.get('room')?.toUpperCase()===code ? incomingInviteToken() : '';
     const inviteHash=await hashInviteToken(inviteToken);
@@ -3197,6 +3233,7 @@ async function joinRoom(){
       if(room.rounds?.[room.currentSlide]){ room.rounds[room.currentSlide].eligible ||= {}; room.rounds[room.currentSlide].eligible[deviceId]=true; }
       return room;
     });
+    if(revision!==roomEntryRevision) return;
     if(!joined.committed) throw new Error(reason);
     me={id:deviceId,name,code,isMaster:false}; await enterExistingRoom(code);
   } catch(e){ showErr('joinErr',e.message); }
@@ -3272,7 +3309,7 @@ function renderWaiting(room){
 }
 
 async function startGame(){
-  if(!me.isMaster) return;
+  if(!me.isMaster || !connected) return;
   const sets=resolveEmojiSets(), lockJoins=!document.getElementById('lateJoinEnabled').checked;
   try { await window._transaction(roomRef(me.code),room=>{
     if(!room || room.state!=='waiting') return;
@@ -3341,12 +3378,7 @@ function renderGame(room){
   if(s !== lastSlide){
     lastSlide = s;
     prevVoteCounts = { smash:0, pass:0 };
-    loadSlide(room.slidesUrl, s, tot, room.slidePageIds||[], room.imageCacheVersion || room.code).then(loaded => {
-      if(s !== lastSlide || _latestRoom?.state!=='playing') return;
-      timerState.slideReady = loaded;
-      if(loaded) armSharedTimer(s);
-      updateTimerUI();
-    });
+    loadGameSlide(room);
     const version = room.imageCacheVersion || room.code;
     const wanted = new Set((room.slidePageIds || []).slice(s-1, s+2).map(pid => slideCacheKey(room.slidesUrl, pid, version)));
     slideImageQueue.prune(wanted);
@@ -3378,7 +3410,6 @@ function renderGame(room){
     nb.textContent = s>=tot ? 'SHOW RESULTS' : 'NEXT SLIDE →';
   }
 
-  renderSmashBoard('smashBoard', room, _latestVotes);
 }
 
 // ── Vote rendering: supersmash shows as ×2 in tally ─────────────────────────
@@ -3459,25 +3490,32 @@ function markVotedUI(choice){
 
 async function castVote(choice){ if(choice==='smash' || choice==='pass') await submitVote(choice); }
 async function submitVote(choice){
-  if(votePending || !me.code || !connected) return;
+  if(votePending || !me.code || !connected || _latestRoom?.state!=='playing') return;
+  const code=me.code, key=myKey(), slide=_latestRoom.currentSlide, revision=roomEntryRevision;
+  const inSameRoom=()=>revision===roomEntryRevision && me.code===code && myKey()===key;
   votePending=true;
   let submittedSlide=null;
   try {
-    const snap=await window._get(roomRef(me.code)); if(!snap.exists()) return;
-    const room=snap.val(), slide=room.currentSlide;
-    const p=getPlayers(room).find(p=>playerKey(p)===myKey());
-    if(room.state!=='playing' || !p || p.active===false || p.kicked || !eligible(p,room,slide) || isSlideUnrated(room,slide) || myVotedSlides[slide]) return;
+    const snap=await window._get(roomRef(code)); if(!snap.exists()) return;
+    if(!inSameRoom() || !connected || _latestRoom?.state!=='playing' || _latestRoom.currentSlide!==slide || isSlideUnrated(_latestRoom,slide)) return;
+    const room=snap.val();
+    const p=getPlayers(room).find(p=>playerKey(p)===key);
+    if(room.state!=='playing' || room.nextRoomCode || room.currentSlide!==slide || !p || p.active===false || p.kicked || !eligible(p,room,slide) || isSlideUnrated(room,slide) || myVotedSlides[slide]) return;
     if(room.timer?.enabled && room.timer.dueAt && !room.timer.paused && remainingMs(room.timer)<=0) return;
     if(choice==='supersmash' && myDoubleDownUsed) return;
     submittedSlide=slide;
-    const changes={ [`votes/${me.code}/${slide}/${myKey()}`]:choice };
-    if(choice==='supersmash') changes[`ddused/${me.code}/${myKey()}`]=true;
+    const changes={ [`votes/${code}/${slide}/${key}`]:choice };
+    if(choice==='supersmash') changes[`ddused/${code}/${key}`]=true;
     await window._update(window._ref(window._db),changes);
+    if(!inSameRoom()) return;
     myVotedSlides[slide]=choice;
     if(choice==='supersmash'){ myDoubleDownUsed=true; updateDoubleDownUI(); }
-    if(_latestRoom?.currentSlide===slide) markVotedUI(choice);
-    spawnReaction(choice==='pass'?'pass':'smash',4);
+    if(_latestRoom?.state==='playing' && _latestRoom.currentSlide===slide){
+      markVotedUI(choice);
+      spawnReaction(choice==='pass'?'pass':'smash',4);
+    }
   } catch {
+    if(!inSameRoom()) return;
     if(submittedSlide!==null){
       delete myVotedSlides[submittedSlide];
       if(_latestRoom?.currentSlide===submittedSlide){
@@ -3487,7 +3525,7 @@ async function submitVote(choice){
     }
     showToast('Vote could not be saved. Please try again.');
   }
-  finally { votePending=false; }
+  finally { if(revision===roomEntryRevision) votePending=false; }
 }
 async function masterNext(expectedSlide=_latestRoom?.currentSlide, timerRevision=null){
   if(!me.isMaster || advancing || !connected) return;
@@ -3502,7 +3540,7 @@ async function masterNext(expectedSlide=_latestRoom?.currentSlide, timerRevision
   finally { advancing=false; }
 }
 async function masterEnd(){
-  if(!me.isMaster || !confirm('End the game and show results?')) return;
+  if(!me.isMaster || !connected || !confirm('End the game and show results?')) return;
   try { await window._transaction(roomRef(me.code),room=>{
     if(!room || room.state!=='playing') return;
     room.state='done'; room.endedAt=roomNow(); return room;
@@ -3511,8 +3549,12 @@ async function masterEnd(){
 
 function listenRoom(){
   if(unsubRoom){ unsubRoom(); unsubRoom=null; }
-  unsubRoom = window._onValue(roomRef(me.code), snap => {
-    if(!snap.exists()) return;
+  const code=me.code;
+  unsubRoom = window._onValue(roomRef(code), snap => {
+    if(me.code!==code || me.spectator) return;
+    if(!snap.exists()){
+      goHome(); showToast('This room is no longer available.',4000); return;
+    }
     const room = snap.val();
     _latestRoom = room;
     applyJoinCodePrivacy();
@@ -3545,24 +3587,27 @@ function listenRoom(){
       renderGame(room);
       renderVoters(room, _latestVotes);
     } else if(room.state==='done'){
-      if(!document.getElementById('results').classList.contains('hidden')) return;
-      stopSlideTimer();
-      const code=me.code;
-      window._get(votesRef(code)).then(vSnap => {
-        if(me.code===code && !followingRoom) showResultsScreen(room, vSnap.exists()?vSnap.val():_latestVotes);
-      }).catch(()=>{ if(me.code===code && !followingRoom) showResultsScreen(room, _latestVotes); });
+      showResultsScreen(room,_latestVotes);
     }
+  }, () => {
+    if(me.code!==code || me.spectator) return;
+    goHome(); showToast('Room access failed. Check your connection and rejoin.',4000);
   });
 }
 
 function listenVotes(){
   if(unsubVotes){ unsubVotes(); unsubVotes=null; }
-  unsubVotes = window._onValue(votesRef(me.code), snap => {
+  const code=me.code;
+  unsubVotes = window._onValue(votesRef(code), snap => {
+    if(me.code!==code || me.spectator) return;
     _latestVotes = snap.exists()?snap.val():{};
     if(_latestRoom && _latestRoom.state==='playing'){
       renderVoters(_latestRoom, _latestVotes);
-      renderSmashBoard('smashBoard', _latestRoom, _latestVotes);
+    } else if(_latestRoom?.state==='done' && !followingRoom){
+      showResultsScreen(_latestRoom,_latestVotes);
     }
+  }, () => {
+    if(me.code===code && !me.spectator) showToast('Player votes unavailable. Check Firebase access and refresh.',4000);
   });
 }
 
@@ -3624,6 +3669,7 @@ function listenAudience(){
   });
 }
 function enterSpectatorRoom(code){
+  roomEntryRevision++;
   stopListeners(); stopSlideTimer();
   _latestRoom=null; _latestAudienceVotes={};
   me={id:deviceId,name:'',code,isMaster:false,spectator:true};
@@ -3645,9 +3691,9 @@ function enterSpectatorRoom(code){
     document.getElementById('spectatorStatus').textContent='Room unavailable. Check the link or reconnect.';
   });
   listenAudience();
-  spectatorInterval=setInterval(renderSpectator,200);
+  spectatorInterval=setInterval(()=>renderSpectator(false),200);
 }
-function renderSpectator(){
+function renderSpectator(refreshTallies=true){
   if(!me.spectator) return;
   const room=_latestRoom,slide=room?.currentSlide,t=room?.timer;
   const vote=_latestAudienceVotes[slide]?.[deviceId];
@@ -3659,10 +3705,14 @@ function renderSpectator(){
   const disabled=!connected || !audienceReady || audiencePending || accepted || !audienceEligible(room,slide);
   document.getElementById('spectatorSmash').disabled=disabled;
   document.getElementById('spectatorPass').disabled=disabled;
-  const tally=room ? audienceTotals(room,_latestAudienceVotes,slide) : {smash:0,pass:0};
-  document.getElementById('spectatorTally').innerHTML=audienceBarMarkup(tally,room && isSlideUnrated(room,slide));
-  document.getElementById('spectatorResults').hidden=room?.state!=='done';
-  if(room?.state==='done') document.getElementById('spectatorBreakdown').innerHTML=audienceBreakdown(room,_latestAudienceVotes);
+  // Clock ticks only update countdown and voting eligibility. Firebase events
+  // refresh tallies/results, which can include the entire game's vote history.
+  if(refreshTallies){
+    const tally=room ? audienceTotals(room,_latestAudienceVotes,slide) : {smash:0,pass:0};
+    document.getElementById('spectatorTally').innerHTML=audienceBarMarkup(tally,room && isSlideUnrated(room,slide));
+    document.getElementById('spectatorResults').hidden=room?.state!=='done';
+    if(room?.state==='done') document.getElementById('spectatorBreakdown').innerHTML=audienceBreakdown(room,_latestAudienceVotes);
+  }
 }
 async function castAudienceVote(choice){
   if(!me.spectator || !connected || !audienceReady || audiencePending || (choice!=='smash' && choice!=='pass')) return;
@@ -3803,11 +3853,13 @@ function renderAgreementsTracker(players,room,votes){
 }
 let rematchBusy=false;
 async function rematch(){
-  if(!me.isMaster || rematchBusy || !_latestRoom) return;
+  if(!me.isMaster || !connected || rematchBusy || _latestRoom?.state!=='done') return;
   rematchBusy=true; const btn=document.getElementById('rematchBtn');btn.disabled=true;btn.textContent='Preparing lobby…';
   try {
     const old=_latestRoom,deck=await fetchSlidePageIdsViaAppsScript(old.slidesUrl);
+    if(me.code!==old.code || !me.isMaster || !connected) return;
     const room=await reserveRoom({hostName:me.name,hostId:myKey(),slidesUrl:old.slidesUrl,totalSlides:deck.totalSlides,slidePageIds:deck.slidePageIds,slideDurations:deck.slideDurations,slideVotingDisabled:deck.slideVotingDisabled,imageCacheVersion:deck.imageCacheVersion || '',notesVotingAvailable:deck.notesRulesVersion===1,notesTimingAvailable:deck.timingVersion===1,notesTimingWarnings:deck.timingWarnings || [],state:'waiting',currentSlide:1,timerEnabled:old.timerEnabled || false,timerDuration:old.timerDuration || 15,emojiSmash:old.emojiSmash || activeSmashEmojis,emojiPass:old.emojiPass || activePassEmojis,lockJoins:old.lockJoins || false,participantAccess:old.participantAccess || 'code',participantInviteHash:old.participantInviteHash || null,players:Object.fromEntries(getActivePlayers(old).map(p=>[playerKey(p),{id:playerKey(p),name:p.name,color:p.color,active:true}]))});
+    if(me.code!==old.code || !me.isMaster || !connected) return;
     await window._update(roomRef(old.code),{nextRoomCode:room.code});
   } catch(e){ showToast('Could not prepare rematch: '+e.message,4000); }
   finally {rematchBusy=false;btn.disabled=false;btn.textContent='Rematch with this group';}
@@ -3816,7 +3868,6 @@ async function rematch(){
 function showResultsScreen(room, votesData){
   stopSlideTimer();
   document.getElementById('reactionLayer').replaceChildren();
-  if(unsubVotes){ unsubVotes(); unsubVotes=null; }
   _latestRoom=room; _latestVotes=votesData;
   show('results');
   renderAudience();
@@ -3905,6 +3956,8 @@ async function leaveRoom(){
 }
 
 function goHome(){
+  roomEntryRevision++;
+  votePending=false;
   stopListeners(); stopSlideTimer();
   document.getElementById('connectionStatus').hidden=true;
   if(!me.spectator) storageWrite('sop-session',null);

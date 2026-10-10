@@ -7,6 +7,7 @@ const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 const section = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
 function app(extra = {}) {
   const context = vm.createContext({
+    roomEntryRevision:0,
     getPlayers: room => Object.values(room.players || {}),
     safeKey: name => name,
     ...extra
@@ -100,4 +101,38 @@ test('a rejected optimistic vote can be retried without consuming Double Down',a
   roomRef:()=>null,window:{_ref:()=>null,_get:async()=>({exists:()=>true,val:()=>room}),_update:async()=>{voted[1]='supersmash';throw new Error('permission denied')}},
   document:{getElementById:()=>({className:''}),querySelectorAll:()=>buttons},showToast(){},spawnReaction(){},updateDoubleDownUI(){},markVotedUI(){}});
  await c.castDoubleDown();assert.equal(voted[1],undefined);assert.equal(c.myDoubleDownUsed,false);assert.equal(c.votePending,false);assert(buttons.every(b=>!b.disabled));
+});
+
+function pendingVoteApp(){
+ const room={state:'playing',currentSlide:1,players:{Alice:{name:'Alice'}}};
+ let deliver,finish;const writes=[],ui=[];
+ const c=app({me:{name:'Alice',code:'TEST'},myVotedSlides:{},myDoubleDownUsed:false,votePending:false,connected:true,_latestRoom:room,
+  roomRef:code=>code,window:{_ref:()=>null,_get:()=>new Promise(resolve=>deliver=resolve),_update:(_ref,value)=>{writes.push(value);return new Promise(resolve=>finish=resolve);}},
+  markVotedUI:choice=>ui.push(choice),updateDoubleDownUI(){},showToast(){},spawnReaction(){}});
+ return{c,room,writes,ui,deliver:()=>deliver({exists:()=>true,val:()=>room}),finish:()=>finish()};
+}
+
+test('a delayed room read cannot move a vote to the next slide',async()=>{
+ const a=pendingVoteApp(),pending=a.c.castVote('smash');a.room.currentSlide=2;a.deliver();await pending;
+ assert.equal(a.writes.length,0);assert.equal(a.c.votePending,false);assert.equal(a.c.myVotedSlides[2],undefined);
+});
+
+test('a delayed vote read cannot write after leaving or disconnecting',async()=>{
+ for(const change of [c=>c.me={name:'Alice',code:'NEXT'},c=>c.connected=false]){
+  const a=pendingVoteApp(),pending=a.c.castDoubleDown();change(a.c);a.deliver();await pending;
+  assert.equal(a.writes.length,0);assert.equal(a.c.myDoubleDownUsed,false);assert.equal(a.c.votePending,false);
+ }
+});
+
+test('a previous-room write completion cannot consume Double Down in the rematch',async()=>{
+ const a=pendingVoteApp(),pending=a.c.castDoubleDown();a.deliver();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(a.writes[0]['votes/TEST/1/Alice'],'supersmash');
+ a.c.me={name:'Alice',code:'NEXT'};a.c.myVotedSlides={};a.finish();await pending;
+ assert.equal(a.c.myDoubleDownUsed,false);assert.equal(a.c.myVotedSlides[1],undefined);assert.equal(a.ui.length,0);
+});
+
+test('an old write completion cannot unlock a pending vote in a new room',async()=>{
+ const a=pendingVoteApp(),pending=a.c.castVote('smash');a.deliver();await new Promise(resolve=>setImmediate(resolve));
+ a.c.roomEntryRevision++;a.c.me.code='NEXT';a.c.votePending=true;a.finish();await pending;
+ assert.equal(a.c.votePending,true);assert.equal(a.c.myVotedSlides[1],undefined);
 });

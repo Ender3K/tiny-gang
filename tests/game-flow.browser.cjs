@@ -25,6 +25,12 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
   await p.route('**/*',route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1'){if(u.pathname.startsWith('/assets/'))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(root+u.pathname)});return route.fulfill({contentType:'text/html',body:html});}if(u.pathname.endsWith('firebase-app.js'))return route.fulfill({contentType:'text/javascript',body:'export function initializeApp(){return {}}'});if(u.pathname.endsWith('firebase-database.js'))return route.fulfill({contentType:'text/javascript',body:moduleSource});if(u.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(u.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});return route.abort();});return p;
  }
  try {
+ // A failed SDK download has a usable recovery screen and retry action.
+ const startup=await page(390);let failSDK=true;
+ await startup.route('**/firebase-app.js',route=>failSDK?route.abort():route.fallback());
+ await startup.goto('http://127.0.0.1:8000/');await startup.locator('#cfgScreen').waitFor({state:'visible'});
+ assert((await startup.locator('#cfgWarn').innerText()).includes('Firebase Connection Failed'));failSDK=false;
+ await startup.getByRole('button',{name:'Retry connection',exact:true}).click();await startup.waitForFunction(()=>dbReady);await startup.close();
  const host=await page(1440);await host.goto('http://127.0.0.1:8000/');await host.waitForFunction(()=>dbReady);await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');await host.getByRole('button',{name:'Create lobby',exact:true}).click();await host.locator('#waiting').waitFor({state:'visible'});const code=await host.locator('#displayCode').innerText();
  await host.evaluate(()=>{timerCfg={enabled:true,duration:30};document.getElementById('lateJoinEnabled').checked=false;persistWaitingSettings()});
  await host.locator('#lobbyCodePrivacy').click();assert.equal(await host.locator('#displayCode').innerText(),'••••••');await host.getByRole('button',{name:'Show QR code',exact:true}).click();assert.equal(await host.locator('#joinQR canvas').count(),0);assert.equal(await host.locator('#joinQR').isVisible(),false);assert.equal(await host.locator('#shareLink').getAttribute('type'),'password');assert(!(await host.locator('#shareDialog').innerText()).includes(code));await host.locator('#shareDialog .dialog-close').click();
@@ -33,7 +39,10 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.getByRole('button',{name:'Show QR code',exact:true}).click();assert.equal(await host.locator('#joinQR canvas').count(),1);assert((await host.locator('#shareLink').inputValue()).includes('?room='+code));await host.locator('#shareDialog .dialog-close').click();
  const player=await page(390);await player.goto('http://127.0.0.1:8000/?room='+code);await player.waitForFunction(()=>dbReady);await player.waitForFunction(code=>document.getElementById('joinCode').value===code,code);await player.locator('#joinName').fill('Player');await player.getByRole('button',{name:'Join game',exact:true}).click();await player.locator('#waiting').waitFor({state:'visible'});
  assert.equal(await player.locator('#displayCode').innerText(),code);assert.equal(await player.locator('#lobbyCodePrivacy').isVisible(),false);
- await host.locator('#startBtn').click();for(const p of [host,player])await p.waitForFunction(()=>lastSlide===1 && timerState.slideReady && _latestRoom.timer.status==='running');
+ // A failed host image keeps the shared clock waiting; retry recovers the round.
+ await host.evaluate(()=>{const original=fetchSlideImageDataUrl;fetchSlideImageDataUrl=async()=>{fetchSlideImageDataUrl=original;throw Error('Temporary image failure');};});
+ await host.locator('#startBtn').click();await host.locator('#slideError').waitFor({state:'visible'});assert.equal(await host.evaluate(()=>_latestRoom.timer.status),'loading');
+ await host.getByRole('button',{name:'Retry slide',exact:true}).click();for(const p of [host,player])await p.waitForFunction(()=>lastSlide===1 && timerState.slideReady && _latestRoom.timer.status==='running');
  await host.locator('#gameCodePrivacy').click();assert.equal(await host.locator('#gameCodePrivacy').innerText(),'Show join code');assert.equal(await player.locator('#gameCodePrivacy').isVisible(),false);
  assert.equal(await host.evaluate(()=>_latestRoom.timer.dueAt),await player.evaluate(()=>_latestRoom.timer.dueAt));
  await host.evaluate(()=>toggleTimerPause());await player.waitForFunction(()=>timerState.paused);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
@@ -47,6 +56,8 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
   await host.evaluate(()=>castVote('smash'));await player.evaluate(slide=>castVote(slide===3?'smash':'pass'),slide);
  }
  const late=await page(390);await late.goto('http://127.0.0.1:8000/?room='+code);await late.waitForFunction(()=>dbReady);await late.locator('#joinName').fill('Late');await late.getByRole('button',{name:'Join game',exact:true}).click();await late.locator('#game').waitFor({state:'visible'});await late.evaluate(()=>castVote('pass'));
+ // Results must work even when a one-off votes read never returns.
+ for(const p of [host,player,late])await p.evaluate(()=>{const original=window._get;window._get=ref=>ref.startsWith('votes/')?new Promise(()=>{}):original(ref);});
  host.once('dialog',d=>d.accept());await host.evaluate(()=>masterEnd());for(const p of [host,player,late])await p.locator('#results').waitFor({state:'visible'});
  assert((await host.locator('#resSub').innerText()).includes('4/8 slides played'));assert.equal(await host.locator('#hallSection .highlight-card').count(),5);assert((await player.locator('#personalRecap').innerText()).includes('Slide 1'));assert((await late.locator('#personalRecap').innerText()).includes('1 eligible rounds'));
  const stats=await player.evaluate(()=>getPlayerStats(getPlayers(_latestRoom).find(p=>playerKey(p)===myKey()),_latestRoom,_latestVotes));assert.equal(stats.smashPct,50);assert.equal(stats.skipped,0);assert.equal(stats.smashPoints,3);
@@ -54,10 +65,18 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.screenshot({path:'/tmp/tiny-gang-results-upgrade.png',fullPage:true});await player.screenshot({path:'/tmp/tiny-gang-results-mobile.png',fullPage:true});assert.equal(await player.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  const csv=await host.evaluate(()=>new Promise(resolve=>{const B=Blob;window.Blob=class extends B{constructor(parts,opts){super(parts,opts);resolve(parts.join(''))}};downloadResults(_latestRoom,_latestVotes);window.Blob=B;}));assert(csv.includes('Played Slides,4'));assert(csv.includes('1,rated,2,0,1,smash,supersmash,not eligible'));assert(!csv.includes('8,rated'));
  console.log('Early-end statistics, late-join eligibility, clickable highlights, personal recaps, CSV and mobile layout passed');
+ // Late delivery of an accepted final vote must also update visible results.
+ const hostId=await host.evaluate(()=>myKey());put(`votes/${code}/4/${hostId}`,'pass');await notify();
+ for(const p of [host,player,late]){
+  await p.waitForFunction(({code,id})=>_latestRoom?.code===code && _latestVotes[4]?.[id]==='pass',{code,id:hostId});
+  assert.equal(await p.locator('#resultsSmashBoard .smash-row').filter({hasText:'Host'}).locator('.smash-count').innerText(),'3🔥');
+ }
+ put(`votes/${code}/4/${hostId}`,'smash');await notify();
  await host.locator('#rematchBtn').click();for(const p of [host,player,late])await p.waitForFunction(old=>me.code!==old && _latestRoom?.state==='waiting',code);
  assert.equal(await host.locator('#displayCode').innerText(),'••••••');assert.equal(await host.locator('#lobbyCodePrivacy').getAttribute('aria-pressed'),'true');
  const next=await host.evaluate(()=>me.code);assert.equal(await player.evaluate(()=>me.code),next);assert.equal(await host.evaluate(()=>me.isMaster),true);assert.equal(await player.evaluate(()=>myDoubleDownUsed),false);assert.equal(Object.keys(state.rooms[next].players).length,3);await host.locator('#startBtn').click();await host.waitForFunction(()=>lastSlide===1 && _latestRoom.timer.status==='running');
  const deadline=state.rooms[next].timer.dueAt;put(`rooms/${next}/timer/dueAt`,Date.now()+500);await notify();await host.waitForFunction(()=>lastSlide===2);await player.waitForFunction(()=>lastSlide===2);
- assert.deepEqual(errors,[]);console.log('Group rematch, settings carry-over and automatic shared timer advance passed');
+ put(`rooms/${next}`,null);await notify();for(const p of [host,player,late]){await p.locator('#entry').waitFor({state:'visible'});assert.equal(await p.evaluate(()=>timerState.intervalId),null);assert.equal(await p.evaluate(()=>me.code),'');}
+ assert.deepEqual(errors,[]);console.log('SDK retry, live results without blocking reads, deleted-room recovery, group rematch and automatic shared timer advance passed');
  } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

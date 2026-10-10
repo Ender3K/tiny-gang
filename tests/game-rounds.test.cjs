@@ -23,11 +23,11 @@ test('duplicate host advances cannot skip a slide; finishing retains only opened
 
 test('joining keeps Firebase room data subscribed until its transaction finishes',async()=>{
  let active=false;
- const c=vm.createContext({roomRef:code=>code,window:{
+ const c=vm.createContext({setTimeout,clearTimeout,roomRef:code=>code,window:{
   _onValue(ref,cb){active=true;Promise.resolve().then(()=>cb({exists:()=>true}));return()=>{active=false}},
   async _transaction(ref,apply){assert.equal(active,true);return apply({code:ref})}
  }});
- vm.runInContext('async function transactLoadedRoom'+section('async function transactLoadedRoom','async function reserveRoom').split('async function transactLoadedRoom')[1],c);
+ vm.runInContext(section('function firstSubscribedValue(', 'async function enterExistingRoom(')+'\n'+section('async function transactLoadedRoom','async function reserveRoom'),c);
  assert.equal(await c.transactLoadedRoom('TEST',r=>r.code),'TEST');assert.equal(active,false);
 });
 
@@ -35,7 +35,38 @@ test('resume restores membership and Double Down through subscriptions without b
  const held=new Set();
  const r={state:'waiting',hostId:'a',players:{b:{id:'b',name:'B',active:true}},timerDuration:30};
  let entered=false,saved=false;
- const c=vm.createContext({me:{id:'b',name:'B'},myKey:()=> 'b',roomRef:()=> 'room',roomLink:code=>'/?room='+code,history:{replaceState(_state,_title,url){assert.equal(url,'/?room=TEST')}},stopListeners(){},stopSlideTimer(){},saveSession(){saved=true},enterWaiting(){entered=true;assert(held.has('room'))},window:{_db:{},_ref:()=> 'dd',_get(){throw new Error('one-off read must not run')},_onValue(ref,cb){held.add(ref);Promise.resolve().then(()=>cb({exists:()=>true,val:()=>ref==='room'?r:true}));return()=>held.delete(ref)}}});
+ const c=vm.createContext({setTimeout,clearTimeout,roomEntryRevision:0,me:{id:'b',name:'B'},myKey:()=> 'b',roomRef:()=> 'room',roomLink:code=>'/?room='+code,history:{replaceState(_state,_title,url){assert.equal(url,'/?room=TEST')}},stopListeners(){},stopSlideTimer(){},saveSession(){saved=true},enterWaiting(){entered=true;assert(held.has('room'))},window:{_db:{},_ref:()=> 'dd',_get(){throw new Error('one-off read must not run')},_onValue(ref,cb){held.add(ref);Promise.resolve().then(()=>cb({exists:()=>true,val:()=>ref==='room'?r:true}));return()=>held.delete(ref)}}});
  vm.runInContext(section('function firstSubscribedValue(', 'async function resumeSession('),c);
  await c.enterExistingRoom('TEST');assert.equal(entered,true);assert.equal(saved,true);assert.equal(c.myDoubleDownUsed,true);assert.equal(c.timerCfg.duration,30);assert.equal(c.me.isMaster,false);assert.equal(held.size,0);
+});
+
+test('room read timeouts detach the listener and clear the loading attempt',async()=>{
+ let expire,stopped=false,cleared=false;
+ const c=vm.createContext({setTimeout(fn,ms){assert.equal(ms,15000);expire=fn;return 1;},clearTimeout(){cleared=true;},window:{_onValue(){return()=>{stopped=true;};}}});
+ vm.runInContext(section('function firstSubscribedValue(', 'async function enterExistingRoom('),c);
+ const pending=c.firstSubscribedValue('missing'),rejected=assert.rejects(pending,/timed out/);expire();await rejected;assert(stopped);
+ c.window._onValue=()=>{throw Error('access failed');};await assert.rejects(c.firstSubscribedValue('denied'),/access failed/);assert(cleared);
+});
+
+test('leaving during refresh recovery cannot reopen the abandoned room',async()=>{
+ let deliver;let stopped=false;
+ const c=vm.createContext({setTimeout,clearTimeout,roomEntryRevision:0,roomRef:code=>code,window:{_onValue(_ref,cb){deliver=cb;return()=>{stopped=true;};}}});
+ vm.runInContext(section('function firstSubscribedValue(', 'async function resumeSession('),c);
+ const pending=c.enterExistingRoom('OLD');c.roomEntryRevision++;deliver({exists:()=>true});assert.equal(await pending,false);assert(stopped);
+});
+
+test('a failed obsolete refresh does not interfere with the new session',async()=>{
+ let fail;let stopped=false;
+ const c=vm.createContext({setTimeout,clearTimeout,roomEntryRevision:0,roomRef:code=>code,window:{_onValue(_ref,_cb,onError){fail=onError;return()=>{stopped=true;};}}});
+ vm.runInContext(section('function firstSubscribedValue(', 'async function resumeSession('),c);
+ const pending=c.enterExistingRoom('OLD');c.roomEntryRevision++;fail(Error('permission denied'));assert.equal(await pending,false);assert(stopped);
+});
+
+test('a delayed veto cannot mark the next slide unrated and errors are recoverable',async()=>{
+ const r=room(),messages=[];let apply;
+ const c=vm.createContext({me:{code:'TEST',isMaster:true},connected:true,_latestRoom:r,roomRef:code=>code,isNotesVotingDisabled:()=>false,showToast:msg=>messages.push(msg),window:{_transaction:async(_ref,fn)=>{apply=fn;await new Promise(resolve=>setImmediate(resolve));const next=fn(r);return {committed:!!next,snapshot:{val:()=>next}};}}});
+ vm.runInContext(section('async function toggleVeto(', 'function applyVetoUI('),c);
+ const pending=c.toggleVeto();assert(apply);r.currentSlide=2;await pending;assert.equal(r.vetoed,undefined);assert.equal(messages.length,0);
+ c.window._transaction=async()=>{throw Error('permission denied');};await c.toggleVeto();assert(messages[0].includes('Could not change'));
+ c.connected=false;messages.length=0;await c.toggleVeto();assert.equal(messages.length,0);
 });

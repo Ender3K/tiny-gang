@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
 const section=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 function app(extra={}){
- const c=vm.createContext({roomNow:()=>1000,isSlideUnrated:(r,s)=>r.slideVotingDisabled?.[s]===true || !!r.vetoed?.[s],playedSlides:r=>Object.keys(r.rounds||{}).map(Number),...extra});
+ const c=vm.createContext({roomEntryRevision:0,roomNow:()=>1000,isSlideUnrated:(r,s)=>r.slideVotingDisabled?.[s]===true || !!r.vetoed?.[s],playedSlides:r=>Object.keys(r.rounds||{}).map(Number),...extra});
  vm.runInContext(section('// Audience data never enters','function getPlayerStats('),c);Object.assign(c,extra);return c;
 }
 const room=()=>({state:'playing',currentSlide:1,totalSlides:3,rounds:{1:{}},timer:{slide:1,status:'running',enabled:true,paused:false,dueAt:2000,remainingMs:1000}});
