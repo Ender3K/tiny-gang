@@ -150,20 +150,19 @@ test('leaving a room cancels the network request without treating it as a timeou
   assert.equal(r.timers.size, 0);
 });
 
-test('current-slide timeouts retry once after a short randomized delay',async()=>{
-  const r=request(({options},attempt)=>attempt===1 ? abortRejection(options.signal) : response({ok:true}),true,undefined,
-    {timeoutMs:15000,retries:1,retryTimeouts:true,retryDelayMs:250});
-  assert.equal([...r.timers.values()][0].ms,15000);expire(r);
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(r.calls.length,1);const delay=[...r.timers.values()][0].ms;assert(delay>=250 && delay<500);
-  expire(r);assert.equal((await r.promise).ok,true);assert.equal(r.calls.length,2);assert.equal(r.timers.size,0);
+test('current-slide timeouts do not replace a server execution that may still be running',async()=>{
+  const r=request(({options})=>abortRejection(options.signal),true,undefined,
+    {timeoutMs:45000,retries:1,retryTimeouts:false,retryDelayMs:250});
+  const rejected=assert.rejects(r.promise,/timed out/);
+  assert.equal([...r.timers.values()][0].ms,45000);expire(r);await rejected;
+  assert.equal(r.calls.length,1);assert.equal(r.timers.size,0);
 });
 
 test('background requests allow a cold render to finish but remain bounded without retries',async()=>{
   const r=request(({options})=>abortRejection(options.signal),true,undefined,
-    {timeoutMs:20000,retries:0,retryTimeouts:true,retryDelayMs:250});
+    {timeoutMs:45000,retries:0,retryTimeouts:false,retryDelayMs:250});
   const rejected=assert.rejects(r.promise,/timed out/);
-  assert.equal([...r.timers.values()][0].ms,20000);expire(r);await rejected;
+  assert.equal([...r.timers.values()][0].ms,45000);expire(r);await rejected;
   assert.equal(r.calls.length,1);assert.equal(r.timers.size,0);
 });
 

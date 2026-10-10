@@ -51,6 +51,18 @@ async function anonymous() {
   await denied(await request('rooms/FIXTURE','PATCH',{hostId:attacker.uid},host));
   console.log('Anonymous requests, collection reads, host takeover, other-player edits, ancestor deletes and root bypasses rejected');
 
+  const beforeImages=await (await request('rooms/FIXTURE','GET',undefined,host)).json();
+  const images={1:{pageId:'p1',cacheVersion:'v1',src:'https://lh7-us.googleusercontent.com/fixture',expiresAt:Date.now()+1200000}};
+  await ok(await request('rooms/FIXTURE/sharedSlideImages','PUT',images,host));
+  for(const user of [player,viewer,attacker]){
+    // RTDB serializes dense numeric keys as an array, including a null at zero.
+    assert.deepEqual(await (await request('rooms/FIXTURE/sharedSlideImages','GET',undefined,user)).json(),[null,images[1]]);
+    await denied(await request('rooms/FIXTURE/sharedSlideImages','PUT',images,user));
+  }
+  const afterImages=await (await request('rooms/FIXTURE','GET',undefined,host)).json();
+  delete afterImages.sharedSlideImages;assert.deepEqual(afterImages,beforeImages);
+  console.log('Existing rules let only the host publish shared image URLs; players can read them without changing game data');
+
   const newRoom={...fresh(),code:'NEWROOM',state:'waiting',currentSlide:1,players:{[host.uid]:profile(host,'Host')}};
   delete newRoom.rounds; delete newRoom.timer;
   await ok(await request('rooms/NEWROOM','PUT',newRoom,host));

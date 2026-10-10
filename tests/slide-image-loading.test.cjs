@@ -34,8 +34,8 @@ test('the overall deadline ends a stalled image, releases its queue slot and per
   a.context.Image=class {constructor(){images.push(this);}set src(value){this.source=value;if(value && !stall)queueMicrotask(()=>this.onload?.());}};
   const loading=a.get(),rejected=assert.rejects(loading,/loading timed out/);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(timers.size,2);assert.deepEqual([...timers.values()].map(t=>t.ms),[30000,10000]);
-  [...timers.values()].find(t=>t.ms===30000).callback();await rejected;
+  assert.equal(timers.size,2);assert.deepEqual([...timers.values()].map(t=>t.ms),[55000,10000]);
+  [...timers.values()].find(t=>t.ms===55000).callback();await rejected;
   assert.equal(images[0].source,'');assert.equal(images[0].onload,null);assert.equal(timers.size,0);
   stall=false;assert.equal(await a.get(),'data:image/png;base64,fixture');assert.equal(a.calls.length,2);assert.equal(timers.size,0);
 });
@@ -57,7 +57,7 @@ test('the overall deadline aborts a stalled service request',async()=>{
   const timers=new Map();let nextTimer=0;
   a.context.setTimeout=(callback,ms)=>{timers.set(++nextTimer,{callback,ms});return nextTimer;};a.context.clearTimeout=id=>timers.delete(id);
   const loading=a.get(),rejected=assert.rejects(loading,/loading timed out/);await new Promise(resolve=>setImmediate(resolve));
-  [...timers.values()].find(t=>t.ms===30000).callback();await rejected;
+  [...timers.values()].find(t=>t.ms===55000).callback();await rejected;
   assert.equal(a.calls[0].signal.aborted,true);assert.equal(timers.size,0);
 });
 
@@ -74,17 +74,18 @@ test('a current slide interrupts a real queued preload and the same preload prom
   const first=a.context.fetchSlideImageDataUrl('deck','first','snapshot',2);
   const other=a.context.fetchSlideImageDataUrl('deck','other','snapshot',2);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(a.calls[0].options.timeoutMs,20000);assert.equal(a.calls[0].options.retries,0);
+  assert.equal(a.calls[0].options.timeoutMs,45000);assert.equal(a.calls[0].options.retries,0);
   const current=a.context.fetchSlideImageDataUrl('deck','current','snapshot',0);
   assert.equal(await current,'data:image/png;base64,fixture');
   assert.equal(a.calls[0].signal.aborted,true);assert(a.calls[2].url.includes('pageId=current'));
-  assert.equal(a.calls[2].options.timeoutMs,15000);assert.equal(a.calls[2].options.retries,1);
+  assert.equal(a.calls[2].options.timeoutMs,45000);assert.equal(a.calls[2].options.retries,1);
+  assert.equal(a.calls[2].options.retryTimeouts,false);
   assert.equal(await first,'data:image/png;base64,fixture');releaseOther();await other;
   assert.equal(a.calls.length,4);assert.equal(await a.context.fetchSlideImageDataUrl('deck','first','snapshot',0),'data:image/png;base64,fixture');
   assert.equal(a.calls.length,4);assert.equal(Object.keys(a.context.slideImagePromises).length,0);
 });
 
-test('a valid 11-second cold slide response completes its background preload',async()=>{
+for(const priority of [0,2])test(`a valid 28.3-second service response completes at priority ${priority} without a replacement request`,async()=>{
   const a=app(()=>assert.fail('use the real service request functions'));
   const timers=new Map(),requests=[];let timerId=0,clock=0;
   a.context.setTimeout=(callback,ms)=>{timers.set(++timerId,{callback,due:clock+ms});return timerId;};
@@ -95,13 +96,13 @@ test('a valid 11-second cold slide response completes its background preload',as
     const timer=a.context.setTimeout(()=>{
       signal.removeEventListener('abort',abort);
       resolve({ok:true,status:200,json:async()=>({ok:true,dataUrl:'data:image/png;base64,fixture'})});
-    },11000);
+    },28300);
     signal.addEventListener('abort',abort,{once:true});
   });
   vm.runInContext(html.slice(html.indexOf('async function fetchAppsScript('),html.indexOf('async function fetchSlidePageIdsViaAppsScript(')),a.context);
-  const loading=a.context.prefetchSlide('deck','page','snapshot');await new Promise(resolve=>setImmediate(resolve));
+  const loading=a.context.fetchSlideImageDataUrl('deck','page','snapshot',priority);await new Promise(resolve=>setImmediate(resolve));
   while(true){
-    const entry=[...timers].sort((a,b)=>a[1].due-b[1].due).find(([,timer])=>timer.due<=11000);
+    const entry=[...timers].sort((a,b)=>a[1].due-b[1].due).find(([,timer])=>timer.due<=28300);
     if(!entry)break;
     const [id,timer]=entry;clock=timer.due;timers.delete(id);timer.callback();await new Promise(resolve=>setImmediate(resolve));
   }

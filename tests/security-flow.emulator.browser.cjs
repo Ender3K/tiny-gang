@@ -13,7 +13,8 @@ const html=source
  .replace('const auth = getAuth(app);',`const auth = getAuth(app); const {connectAuthEmulator}=await import('https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js');connectAuthEmulator(auth,'http://${authHost}',{disableWarnings:true});`)
  .replace('const db = getDatabase(app);',`const db = getDatabase(app);const {connectDatabaseEmulator}=await import('https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js');connectDatabaseEmulator(db,'127.0.0.1',${Number(databaseHost.split(':')[1])});`);
 const deck={ok:true,totalSlides:3,slidePageIds:['s1','s2','s3'],slideDurations:{},slideVotingDisabled:{},timingVersion:1,notesRulesVersion:1,imageCacheVersion:'secure-fixture'};
-const image={ok:true,dataUrl:'data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#272730"/></svg>').toString('base64')};
+const svg='<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#272730"/></svg>';
+const image=pageId=>({ok:true,imageUrl:'https://lh7-us.googleusercontent.com/fixture/'+pageId,expiresAt:Date.now()+1200000});
 async function rest(key,method='GET',value,token='owner'){
  return fetch(`http://${databaseHost}/${key}.json?ns=${namespace}${token && token !== 'owner' ? '&auth='+encodeURIComponent(token) : ''}`,{method,headers:{'content-type':'application/json',...(token==='owner'?{Authorization:'Bearer owner'}:{})},...(value===undefined?{}:{body:JSON.stringify(value)})});
 }
@@ -35,15 +36,20 @@ async function denied(response){assert.equal(response.status,401,await response.
  await new Promise(resolve=>site.listen(0,'127.0.0.1',resolve));
  const baseURL=`http://127.0.0.1:${site.address().port}`;
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),headless:true,args:['--no-sandbox']});
- const errors=[],blocked=[];
+ const errors=[],blocked=[],slideServiceCalls=new Map();
  async function page(){
   const p=await browser.newPage({viewport:{width:1000,height:900}});p.setDefaultTimeout(18000);p.on('pageerror',e=>errors.push(e.message));p.on('requestfailed',r=>{const u=new URL(r.url());blocked.push({url:u.origin+u.pathname,error:r.failure()?.errorText});});
+  slideServiceCalls.set(p,[]);
   await p.route('**/*',route=>{
    const url=new URL(route.request().url());
    if(url.origin===baseURL)return route.continue();
    if(url.host===databaseHost || url.host===authHost)return route.continue();
    if(sdk.has(url.href))return route.fulfill({contentType:'text/javascript',body:sdk.get(url.href),headers:{'access-control-allow-origin':'*'}});
-   if(url.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(url.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});
+   if(url.hostname==='lh7-us.googleusercontent.com')return route.fulfill({contentType:'image/svg+xml',body:svg});
+   if(url.hostname==='script.google.com'){
+    const isImage=url.searchParams.get('action')==='image';if(isImage)slideServiceCalls.get(p).push(url.searchParams.get('pageId'));
+    return route.fulfill({contentType:'application/json',body:JSON.stringify(isImage?image(url.searchParams.get('pageId')):deck),headers:{'access-control-allow-origin':'*'}});
+   }
    blocked.push(url.origin+url.pathname);return route.abort(); // Never allow production Firebase or unknown backends.
   });
   return p;
@@ -55,6 +61,7 @@ async function denied(response){assert.equal(response.status,401,await response.
   assert.equal(await host.locator('input[type=password]').count(),0);
   await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');
   await host.getByRole('button',{name:'Create lobby',exact:true}).click();await lobby(host);
+  await host.waitForFunction(()=>!!_latestRoom.sharedSlideImages?.[2]);
   const code=await host.evaluate(()=>me.code),hostId=await host.evaluate(()=>deviceId),saved=await host.evaluate(()=>storageRead('sop-session'));
   const player=await page();await player.goto(baseURL+'/');await player.waitForFunction(()=>dbReady);
   // Copying the host's old device/session identifiers never gives host access.
@@ -66,9 +73,13 @@ async function denied(response){assert.equal(response.status,401,await response.
   await denied(await rest(`rooms/${code}/hostId`,'PUT',playerId,playerToken));
   await denied(await rest(`rooms/${code}/state`,'PUT','done',playerToken));
   await denied(await rest(`rooms/${code}/players/${hostId}`,'PATCH',{kicked:true},playerToken));
-  await host.reload();await host.waitForFunction(()=>_latestRoom?.state==='waiting');assert.equal(await host.evaluate(()=>deviceId),hostId);assert.equal(await host.evaluate(()=>me.isMaster),true);
+  const hostRequestsBeforeRefresh=slideServiceCalls.get(host).length;
+  await host.reload();await host.waitForFunction(()=>_latestRoom?.state==='waiting' && document.getElementById('slidePrepStatus').textContent==='First two slides ready.');assert.equal(await host.evaluate(()=>deviceId),hostId);assert.equal(await host.evaluate(()=>me.isMaster),true);
+  assert.equal(slideServiceCalls.get(host).length,hostRequestsBeforeRefresh);
   await host.locator('#startBtn').click();for(const p of [host,player])await p.waitForFunction(()=>_latestRoom?.timer?.status==='running' && timerState.slideReady);
   await player.evaluate(()=>castDoubleDown());await player.waitForFunction(()=>myDoubleDownUsed && myVotedSlides[1]==='supersmash');
+  await player.reload();await player.waitForFunction(()=>timerState.slideReady && myDoubleDownUsed && myVotedSlides[1]==='supersmash');
+  assert.equal(slideServiceCalls.get(player).length,0);
   assert.equal(await (await rest(`ddused/${code}/${playerId}`)).json(),1);
   await denied(await rest(`votes/${code}/1/${hostId}`,'PUT','smash',playerToken));
   await denied(await rest(`votes/${code}/1/${playerId}`,'PUT','pass',playerToken));
