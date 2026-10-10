@@ -4,28 +4,118 @@
     ".write": false,
     "rooms": {
       "$code": {
-        ".read": true,
-        ".write": true
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('hostId').val() === auth.uid && newData.child('state').val() === 'waiting' && newData.child('currentSlide').val() === 1) || (data.child('securityVersion').val() === 2 && data.child('hostId').val() === auth.uid))",
+        ".validate": "$code.matches(/^[A-Z0-9]{4,12}$/) && newData.hasChildren(['securityVersion','code','hostId','hostName','state','currentSlide','totalSlides','participantAccess','players']) && newData.child('securityVersion').val() === 2 && newData.child('code').val() === $code && (!data.exists() || (newData.child('hostId').val() === data.child('hostId').val() && newData.child('securityVersion').val() === data.child('securityVersion').val()))",
+        "securityVersion": {
+          ".validate": "newData.val() === 2"
+        },
+        "hostId": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 128 && newData.parent().child('players').child(newData.val()).child('id').val() === newData.val()"
+        },
+        "hostName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+        },
+        "state": {
+          ".validate": "newData.val() === 'waiting' || newData.val() === 'playing' || newData.val() === 'done'"
+        },
+        "totalSlides": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 10000 && newData.val() % 1 === 0"
+        },
+        "currentSlide": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= newData.parent().child('totalSlides').val() && newData.val() % 1 === 0"
+        },
+        "participantAccess": {
+          ".validate": "(newData.val() === 'code' || newData.val() === 'invite') && (!data.exists() || newData.val() === data.val() || (root.child('rooms').child($code).child('state').val() === 'waiting' && newData.parent().child('state').val() === 'waiting'))"
+        },
+        "participantInviteHash": {
+          ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{64}$/)"
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('securityVersion').val() === 2 && newData.exists() && data.child('kicked').val() !== true && !root.child('rooms').child($code).child('nextRoomCode').exists() && (data.exists() || ((root.child('rooms').child($code).child('state').val() === 'waiting' || (root.child('rooms').child($code).child('state').val() === 'playing' && root.child('rooms').child($code).child('lockJoins').val() !== true)) && (root.child('rooms').child($code).child('participantAccess').val() === 'code' || (root.child('roomInvites').child($code).isString() && root.child('joinProofs').child($code).child(auth.uid).val() === root.child('roomInvites').child($code).val()))))",
+            ".validate": "newData.hasChildren(['id','name','color','active','joinedSlide']) && newData.child('id').val() === $uid && ((newData.parent().parent().child('hostId').val() === auth.uid) || (newData.child('kicked').val() === data.child('kicked').val() && (!data.exists() || newData.child('joinedSlide').val() === data.child('joinedSlide').val()) && (!newData.child('leftSlide').exists() || (newData.child('active').val() === false && newData.child('leftSlide').val() === newData.parent().parent().child('currentSlide').val()))))",
+            "id": {
+              ".validate": "newData.val() === $uid"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+            },
+            "color": {
+              ".validate": "newData.isString() && newData.val().matches(/^av[0-7]$/)"
+            },
+            "active": {
+              ".validate": "newData.isBoolean()"
+            },
+            "joinedSlide": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 === 0 && newData.val() <= newData.parent().parent().parent().child('currentSlide').val() && (data.exists() || newData.val() === newData.parent().parent().parent().child('currentSlide').val())"
+            },
+            "leftSlide": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= newData.parent().parent().parent().child('totalSlides').val()"
+            },
+            "kicked": {
+              ".validate": "newData.isBoolean()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "rounds": {
+          "$slide": {
+            "eligible": {
+              "$uid": {
+                ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('securityVersion').val() === 2 && root.child('rooms').child($code).child('state').val() === 'playing' && !root.child('rooms').child($code).child('nextRoomCode').exists() && root.child('rooms').child($code).child('currentSlide').val() + '' === $slide && root.child('rooms').child($code).child('rounds').child($slide).exists() && newData.val() === true && newData.parent().parent().parent().parent().child('players').child($uid).child('active').val() === true && newData.parent().parent().parent().parent().child('players').child($uid).child('kicked').val() !== true",
+                ".validate": "newData.val() === true"
+              }
+            }
+          }
+        }
+      }
+    },
+    "roomInvites": {
+      "$code": {
+        ".read": "auth != null && root.child('rooms').child($code).child('securityVersion').val() === 2 && root.child('rooms').child($code).child('hostId').val() === auth.uid",
+        ".write": "auth != null && root.child('rooms').child($code).child('securityVersion').val() === 2 && root.child('rooms').child($code).child('hostId').val() === auth.uid && root.child('rooms').child($code).child('state').val() === 'waiting'",
+        ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{64}$/)"
+      }
+    },
+    "joinProofs": {
+      "$code": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('securityVersion').val() === 2",
+          ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('securityVersion').val() === 2 && (!newData.exists() || (root.child('rooms').child($code).child('participantAccess').val() === 'invite' && !root.child('rooms').child($code).child('nextRoomCode').exists() && (root.child('rooms').child($code).child('state').val() === 'waiting' || (root.child('rooms').child($code).child('state').val() === 'playing' && root.child('rooms').child($code).child('lockJoins').val() !== true)) && root.child('roomInvites').child($code).isString() && newData.val() === root.child('roomInvites').child($code).val()))",
+          ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{64}$/)"
+        }
       }
     },
     "votes": {
       "$code": {
-        ".read": true,
-        ".write": true
+        ".read": "auth != null && root.child('rooms').child($code).child('securityVersion').val() === 2",
+        "$slide": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('rooms').child($code).child('players').child(auth.uid).child('active').val() === true && root.child('rooms').child($code).child('players').child(auth.uid).child('kicked').val() !== true && root.child('rooms').child($code).child('rounds').child($slide).child('eligible').child(auth.uid).val() === true && root.child('rooms').child($code).child('securityVersion').val() === 2 && root.child('rooms').child($code).child('state').val() === 'playing' && !root.child('rooms').child($code).child('nextRoomCode').exists() && root.child('rooms').child($code).child('currentSlide').val() + '' === $slide && root.child('rooms').child($code).child('rounds').child($slide).exists() && root.child('rooms').child($code).child('slideVotingDisabled').child($slide).val() !== true && root.child('rooms').child($code).child('vetoed').child($slide).val() !== true && root.child('rooms').child($code).child('timer').child('slide').val() + '' === $slide && root.child('rooms').child($code).child('timer').child('status').val() === 'running' && (root.child('rooms').child($code).child('timer').child('enabled').val() === false || (root.child('rooms').child($code).child('timer').child('enabled').val() === true && ((root.child('rooms').child($code).child('timer').child('paused').val() === true && root.child('rooms').child($code).child('timer').child('remainingMs').val() > 0) || (root.child('rooms').child($code).child('timer').child('paused').val() === false && root.child('rooms').child($code).child('timer').child('dueAt').isNumber() && root.child('rooms').child($code).child('timer').child('dueAt').val() > now)))) && (newData.val() === 'smash' || newData.val() === 'pass' || (newData.val() === 'supersmash' && !root.child('ddused').child($code).child(auth.uid).exists() && newData.parent().parent().parent().parent().child('ddused').child($code).child(auth.uid).val() + '' === $slide))",
+            ".validate": "newData.isString() && (newData.val() === 'smash' || newData.val() === 'pass' || newData.val() === 'supersmash')"
+          }
+        }
       }
     },
     "ddused": {
       "$code": {
-        ".read": true,
-        ".write": true
+        ".read": "auth != null && root.child('rooms').child($code).child('securityVersion').val() === 2",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && root.child('rooms').child($code).child('securityVersion').val() === 2 && !data.exists() && newData.isNumber() && newData.parent().parent().parent().child('votes').child($code).child(newData.val() + '').child(auth.uid).val() === 'supersmash'",
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() % 1 === 0"
+        }
       }
     },
     "audienceVotes": {
       "$code": {
-        ".read": true,
+        ".read": "auth != null && root.child('rooms').child($code).child('securityVersion').val() === 2",
         "$slide": {
-          "$browser": {
-            ".write": "!data.exists() && newData.isString() && (newData.val() === 'smash' || newData.val() === 'pass') && root.child('rooms').child($code).child('state').val() === 'playing' && !root.child('rooms').child($code).child('nextRoomCode').exists() && root.child('rooms').child($code).child('currentSlide').val() + '' === $slide && root.child('rooms').child($code).child('rounds').child($slide).exists() && root.child('rooms').child($code).child('slideVotingDisabled').child($slide).val() !== true && root.child('rooms').child($code).child('vetoed').child($slide).val() !== true && root.child('rooms').child($code).child('timer').child('slide').val() + '' === $slide && root.child('rooms').child($code).child('timer').child('status').val() === 'running' && (root.child('rooms').child($code).child('timer').child('enabled').val() === false || (root.child('rooms').child($code).child('timer').child('enabled').val() === true && ((root.child('rooms').child($code).child('timer').child('paused').val() === true && root.child('rooms').child($code).child('timer').child('remainingMs').val() > 0) || (root.child('rooms').child($code).child('timer').child('paused').val() === false && root.child('rooms').child($code).child('timer').child('dueAt').isNumber() && root.child('rooms').child($code).child('timer').child('dueAt').val() > now))))"
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.isString() && (newData.val() === 'smash' || newData.val() === 'pass') && root.child('rooms').child($code).child('securityVersion').val() === 2 && root.child('rooms').child($code).child('state').val() === 'playing' && !root.child('rooms').child($code).child('nextRoomCode').exists() && root.child('rooms').child($code).child('currentSlide').val() + '' === $slide && root.child('rooms').child($code).child('rounds').child($slide).exists() && root.child('rooms').child($code).child('slideVotingDisabled').child($slide).val() !== true && root.child('rooms').child($code).child('vetoed').child($slide).val() !== true && root.child('rooms').child($code).child('timer').child('slide').val() + '' === $slide && root.child('rooms').child($code).child('timer').child('status').val() === 'running' && (root.child('rooms').child($code).child('timer').child('enabled').val() === false || (root.child('rooms').child($code).child('timer').child('enabled').val() === true && ((root.child('rooms').child($code).child('timer').child('paused').val() === true && root.child('rooms').child($code).child('timer').child('remainingMs').val() > 0) || (root.child('rooms').child($code).child('timer').child('paused').val() === false && root.child('rooms').child($code).child('timer').child('dueAt').isNumber() && root.child('rooms').child($code).child('timer').child('dueAt').val() > now))))",
+            ".validate": "newData.isString() && (newData.val() === 'smash' || newData.val() === 'pass')"
           }
         }
       }

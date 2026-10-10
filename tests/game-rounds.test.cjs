@@ -21,21 +21,11 @@ test('duplicate host advances cannot skip a slide; finishing retains only opened
 });
 
 
-test('joining keeps Firebase room data subscribed until its transaction finishes',async()=>{
- let active=false;
- const c=vm.createContext({setTimeout,clearTimeout,roomRef:code=>code,window:{
-  _onValue(ref,cb){active=true;Promise.resolve().then(()=>cb({exists:()=>true}));return()=>{active=false}},
-  async _transaction(ref,apply){assert.equal(active,true);return apply({code:ref})}
- }});
- vm.runInContext(section('function firstSubscribedValue(', 'async function enterExistingRoom(')+'\n'+section('async function transactLoadedRoom','async function reserveRoom'),c);
- assert.equal(await c.transactLoadedRoom('TEST',r=>r.code),'TEST');assert.equal(active,false);
-});
-
 test('resume restores membership and Double Down through subscriptions without blocking one-off reads',async()=>{
  const held=new Set();
- const r={state:'waiting',hostId:'a',players:{b:{id:'b',name:'B',active:true}},timerDuration:30};
+ const r={securityVersion:2,state:'waiting',hostId:'a',players:{b:{id:'b',name:'B',active:true}},timerDuration:30};
  let entered=false,saved=false;
- const c=vm.createContext({setTimeout,clearTimeout,roomEntryRevision:0,me:{id:'b',name:'B'},myKey:()=> 'b',roomRef:()=> 'room',roomLink:code=>'/?room='+code,history:{replaceState(_state,_title,url){assert.equal(url,'/?room=TEST')}},stopListeners(){},stopSlideTimer(){},saveSession(){saved=true},enterWaiting(){entered=true;assert(held.has('room'))},window:{_db:{},_ref:()=> 'dd',_get(){throw new Error('one-off read must not run')},_onValue(ref,cb){held.add(ref);Promise.resolve().then(()=>cb({exists:()=>true,val:()=>ref==='room'?r:true}));return()=>held.delete(ref)}}});
+ const c=vm.createContext({setTimeout,clearTimeout,roomEntryRevision:0,deviceId:'b',me:{id:'b',name:'B'},myKey:()=> 'b',roomRef:()=> 'room',roomLink:code=>'/?room='+code,history:{replaceState(_state,_title,url){assert.equal(url,'/?room=TEST')}},stopListeners(){},stopSlideTimer(){},saveSession(){saved=true},enterWaiting(){entered=true;assert(held.has('room'))},window:{_db:{},_ref:()=> 'dd',_get(){throw new Error('one-off read must not run')},_onValue(ref,cb){held.add(ref);Promise.resolve().then(()=>cb({exists:()=>true,val:()=>ref==='room'?r:1}));return()=>held.delete(ref)}}});
  vm.runInContext(section('function firstSubscribedValue(', 'async function resumeSession('),c);
  await c.enterExistingRoom('TEST');assert.equal(entered,true);assert.equal(saved,true);assert.equal(c.myDoubleDownUsed,true);assert.equal(c.timerCfg.duration,30);assert.equal(c.me.isMaster,false);assert.equal(held.size,0);
 });

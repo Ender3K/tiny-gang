@@ -8,6 +8,7 @@ const section = (start, end) => html.slice(html.indexOf(start), html.indexOf(end
 function app(extra = {}) {
   const context = vm.createContext({
     roomEntryRevision:0,
+    audienceEligible:()=>true,
     getPlayers: room => Object.values(room.players || {}),
     safeKey: name => name,
     ...extra

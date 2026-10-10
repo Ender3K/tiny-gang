@@ -4,6 +4,13 @@ const html=fs.readFileSync(root+'/index.html','utf8');
 const deck={ok:true,totalSlides:8,slidePageIds:Array.from({length:8},(_,i)=>'s'+(i+1)),slideDurations:{1:20,5:10},slideVotingDisabled:{5:true},timingVersion:1,notesRulesVersion:1,imageCacheVersion:'fixture'};
 const svg='<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1600" height="900" fill="#272730"/><text x="800" y="450" fill="white" text-anchor="middle" font-size="60">Results test slide</text></svg>';
 const image={ok:true,dataUrl:'data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64')};
+const authModule=`
+export const browserLocalPersistence={};
+export async function setPersistence(){}
+export function getAuth(){return{currentUser:JSON.parse(localStorage.getItem('fixture-auth') || 'null'),authStateReady:async()=>{}}}
+export async function signInAnonymously(auth){const user={uid:crypto.randomUUID()};localStorage.setItem('fixture-auth',JSON.stringify(user));auth.currentUser=user;return{user}}
+export function onAuthStateChanged(auth,cb){cb(auth.currentUser);return()=>{}}
+`;
 const moduleSource=`
 const listeners=new Set();function snapshot(value){return{exists:()=>value!==null,val:()=>value}}
 window.__notify=async()=>{for(const item of [...listeners]){const value=await window.testRead(item.path);if(listeners.has(item))item.cb(snapshot(value))}};
@@ -22,7 +29,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  async function page(width){ const p=await browser.newPage({viewport:{width,height:900}});pages.push(p);p.setDefaultTimeout(12000);p.on('pageerror',e=>errors.push(e.message));
   await p.exposeFunction('testRead',path=>structuredClone(read(path)));
   await p.exposeFunction('testWrite',async(path,value,update)=>{if(update){for(const[k,v]of Object.entries(value))put((path?path+'/':'')+k,v)}else put(path,value);await notify();});
-  await p.route('**/*',route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1'){if(u.pathname.startsWith('/assets/'))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(root+u.pathname)});return route.fulfill({contentType:'text/html',body:html});}if(u.pathname.endsWith('firebase-app.js'))return route.fulfill({contentType:'text/javascript',body:'export function initializeApp(){return {}}'});if(u.pathname.endsWith('firebase-database.js'))return route.fulfill({contentType:'text/javascript',body:moduleSource});if(u.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(u.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});return route.abort();});return p;
+  await p.route('**/*',route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1'){if(u.pathname.startsWith('/assets/'))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(root+u.pathname)});return route.fulfill({contentType:'text/html',body:html});}if(u.pathname.endsWith('firebase-app.js'))return route.fulfill({contentType:'text/javascript',body:'export function initializeApp(){return {}}'});if(u.pathname.endsWith('firebase-auth.js'))return route.fulfill({contentType:'text/javascript',body:authModule});if(u.pathname.endsWith('firebase-database.js'))return route.fulfill({contentType:'text/javascript',body:moduleSource});if(u.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(u.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});return route.abort();});return p;
  }
  try {
  // A failed SDK download has a usable recovery screen and retry action.
@@ -48,7 +55,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.evaluate(()=>toggleTimerPause());await player.waitForFunction(()=>timerState.paused);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
  await host.evaluate(()=>extendTimer(10));await player.waitForFunction(()=>timerState.remaining>=28);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
  await host.evaluate(()=>castVote('smash'));await player.evaluate(()=>castDoubleDown());
- const id=await player.evaluate(()=>myKey());assert.equal(state.ddused[code][id],true);
+ const id=await player.evaluate(()=>myKey());assert.equal(state.ddused[code][id],1);
  await player.reload();await player.waitForFunction(()=>_latestRoom?.state==='playing' && myDoubleDownUsed);assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('#game .vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
  console.log('QR join, stable identity, shared pause/extend and refresh resume passed');
  for(let slide=2;slide<=4;slide++){

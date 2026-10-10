@@ -2,6 +2,13 @@ const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('nod
 const root=require('node:path').resolve(__dirname,'..'),html=fs.readFileSync(root+'/index.html','utf8');
 const deck={ok:true,totalSlides:4,slidePageIds:['s1','s2','s3','s4'],slideDurations:{},slideVotingDisabled:{3:true},timingVersion:1,notesRulesVersion:1,imageCacheVersion:'spectator-fixture'};
 const image={ok:true,dataUrl:'data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#272730"/></svg>').toString('base64')};
+const authModule=`
+export const browserLocalPersistence={};
+export async function setPersistence(){}
+export function getAuth(){return{currentUser:JSON.parse(localStorage.getItem('fixture-auth') || 'null'),authStateReady:async()=>{}}}
+export async function signInAnonymously(auth){const user={uid:crypto.randomUUID()};localStorage.setItem('fixture-auth',JSON.stringify(user));auth.currentUser=user;return{user}}
+export function onAuthStateChanged(auth,cb){cb(auth.currentUser);return()=>{}}
+`;
 const moduleSource=`
 const listeners=new Set();const snapshot=value=>({exists:()=>value!==null,val:()=>value});
 window.__notify=async()=>{for(const item of [...listeners]){const value=await window.testRead(item.path);if(listeners.has(item))item.cb(snapshot(value))}};
@@ -29,7 +36,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
    if(path.startsWith('audienceVotes/')){const[,code,slide]=path.split('/');if(old!==null || !eligible(code,slide) || !['smash','pass'].includes(next))throw Error('PERMISSION_DENIED');}
    writes.push({p,path});put(path,next);await notify();return{ok:true};
   });
-  await p.route('**/*',route=>{const u=new URL(route.request().url());requests.get(p).push(u.href);if(u.hostname==='127.0.0.1'){if(u.pathname.startsWith('/assets/'))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(root+u.pathname)});return route.fulfill({contentType:'text/html',body:html});}if(u.pathname.endsWith('firebase-app.js'))return route.fulfill({contentType:'text/javascript',body:'export function initializeApp(){return {}}'});if(u.pathname.endsWith('firebase-database.js'))return route.fulfill({contentType:'text/javascript',body:moduleSource});if(u.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(u.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});return route.abort();});return p;
+  await p.route('**/*',route=>{const u=new URL(route.request().url());requests.get(p).push(u.href);if(u.hostname==='127.0.0.1'){if(u.pathname.startsWith('/assets/'))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(root+u.pathname)});return route.fulfill({contentType:'text/html',body:html});}if(u.pathname.endsWith('firebase-app.js'))return route.fulfill({contentType:'text/javascript',body:'export function initializeApp(){return {}}'});if(u.pathname.endsWith('firebase-auth.js'))return route.fulfill({contentType:'text/javascript',body:authModule});if(u.pathname.endsWith('firebase-database.js'))return route.fulfill({contentType:'text/javascript',body:moduleSource});if(u.hostname==='script.google.com')return route.fulfill({contentType:'application/json',body:JSON.stringify(u.searchParams.get('action')==='image'?image:deck),headers:{'access-control-allow-origin':'*'}});return route.abort();});return p;
  }
  const isDisabled=async p=>assert.equal(await p.locator('#spectatorSmash').isDisabled(),true);
  try{
@@ -98,7 +105,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
   // Private participant invites never travel in spectator links or public room data.
   await host.evaluate(()=>goHome());await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Private host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');await host.locator('#participantAccess').selectOption('invite');await host.getByRole('button',{name:'Create lobby',exact:true}).click();await host.locator('#waiting').waitFor({state:'visible'});
   const privateCode=await host.evaluate(()=>me.code),invite=await host.evaluate(()=>participantLink()),token=new URLSearchParams(new URL(invite).hash.slice(1)).get('invite');
-  assert.equal(token.length,64);assert(!JSON.stringify(state).includes(token));assert.equal(state.rooms[privateCode].participantAccess,'invite');assert.equal(await host.locator('#displayCode').innerText(),'Invite only');assert(await host.getByRole('button',{name:'Copy participant invite',exact:true}).isVisible());
+  assert.equal(token.length,64);assert(!JSON.stringify(state.rooms).includes(token));assert.equal(state.roomInvites[privateCode],token);assert.equal(state.rooms[privateCode].participantAccess,'invite');assert.equal(await host.locator('#displayCode').innerText(),'Invite only');assert(await host.getByRole('button',{name:'Copy participant invite',exact:true}).isVisible());
   if(await host.evaluate(()=>hideJoinCode))await host.locator('#lobbyCodePrivacy').click();await host.getByRole('button',{name:'Show QR code',exact:true}).click();assert.equal(await host.locator('#shareLink').inputValue(),invite);assert.equal(await host.locator('#joinQR canvas').count(),1);await host.locator('#shareDialog .dialog-close').click();
   const privateSpectator=await host.evaluate(()=>spectatorLink());assert.equal(new URL(privateSpectator).hash,'');assert(!privateSpectator.includes(token));await host.reload();await host.waitForFunction(()=>_latestRoom?.state==='waiting');assert.equal(await host.evaluate(()=>participantLink()),invite);
   const uninvited=await page();await uninvited.goto('http://127.0.0.1:8000/?room='+privateCode);await uninvited.waitForFunction(()=>dbReady);await uninvited.locator('#joinName').fill('Uninvited');await uninvited.getByRole('button',{name:'Join game',exact:true}).click();await uninvited.waitForFunction(()=>document.getElementById('joinErr').textContent.includes('invite only'));assert.equal(Object.keys(state.rooms[privateCode].players).length,1);

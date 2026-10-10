@@ -4,7 +4,7 @@
   "scripts": {
     "test": "node --test tests/*.test.cjs",
     "test:browser": "node tests/game-flow.browser.cjs && node tests/spectator-flow.browser.cjs",
-    "test:rules": "firebase emulators:exec --only database --project demo-tiny-gang 'node tests/spectator-rules.emulator.cjs'"
+    "test:rules": "firebase emulators:exec --only auth,database --project demo-tiny-gang 'node tests/spectator-rules.emulator.cjs && node tests/security-flow.emulator.browser.cjs'"
   },
   "devDependencies": {
     "firebase-tools": "15.0.0",

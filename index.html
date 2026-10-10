@@ -11,9 +11,10 @@
 <script type="module">
   try {
     // Dynamic imports keep network/module failures inside the recovery path.
-    const [{ initializeApp }, { getDatabase, ref, set, get, update, onValue, runTransaction }] = await Promise.all([
+    const [{ initializeApp }, { getDatabase, ref, set, get, update, onValue, runTransaction }, { getAuth, setPersistence, browserLocalPersistence, signInAnonymously, onAuthStateChanged }] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js"),
-      import("https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js")
+      import("https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js"),
+      import("https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js")
     ]);
     const firebaseConfig = {
       apiKey:            "AIzaSyAvORsMuKGubMXQ3VdkSdu2iNAK04RZxN4",
@@ -26,6 +27,15 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    await setPersistence(auth, browserLocalPersistence);
+    await auth.authStateReady();
+    const user = auth.currentUser || (await signInAnonymously(auth)).user;
+    window._uid = user.uid;
+    onAuthStateChanged(auth, current => {
+      // A changed identity must never inherit a saved host/player session.
+      if(!current || current.uid !== window._uid) location.reload();
+    });
     const db = getDatabase(app);
 
     window._db = db;
@@ -1865,7 +1875,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
         </div>
         <div class="field">
           <label for="joinName">Your name</label>
-          <input type="text" id="joinName" placeholder="What should we call you?" autocomplete="nickname" />
+          <input type="text" id="joinName" maxlength="40" placeholder="What should we call you?" autocomplete="nickname" />
         </div>
         <button class="btn btn-ice" type="submit">Join game</button>
         <div class="error" id="joinErr" role="alert"></div>
@@ -1881,7 +1891,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
       <form onsubmit="event.preventDefault(); createRoom()">
         <div class="field">
           <label for="hostName">Your name</label>
-          <input type="text" id="hostName" placeholder="What should we call you?" autocomplete="nickname" />
+          <input type="text" id="hostName" maxlength="40" placeholder="What should we call you?" autocomplete="nickname" />
         </div>
         <div class="field">
           <label for="slidesUrl">Google Slides share link</label>
@@ -2303,6 +2313,7 @@ let myDoubleDownUsed = false;
 let vetoedSlides = {};
 
 document.addEventListener('fb-ready', () => {
+  deviceId = window._uid;
   dbReady = true;
   window._onValue(window._ref(window._db,'.info/serverTimeOffset'), snap => { serverOffset = Number(snap.val()) || 0; });
   window._onValue(window._ref(window._db,'.info/connected'), snap => {
@@ -2313,6 +2324,7 @@ document.addEventListener('fb-ready', () => {
   resumeSession();
 });
 document.addEventListener('fb-error', () => {
+  dbReady = false;
   const msg = window._fbError || 'Unknown error';
   const warn = document.getElementById('cfgWarn');
   warn.style.display = 'block';
@@ -2886,13 +2898,13 @@ async function createRoom(){
       notesTimingAvailable:deck.timingVersion === 1,
       notesTimingWarnings:Array.isArray(deck.timingWarnings) ? deck.timingWarnings.filter(w => typeof w === 'string') : [],
       state:'waiting', currentSlide:1,
-      players:{ [deviceId]:{ id:deviceId, name, color:avatarClass(name), active:true } },
+      players:{ [deviceId]:{ id:deviceId, name, color:avatarClass(name), active:true, joinedSlide:1 } },
       vetoed: {},
       lockJoins: false,
       participantAccess:inviteOnly ? 'invite' : 'code',
       participantInviteHash:inviteOnly ? await hashInviteToken(inviteToken) : null,
     };
-    const created = await reserveRoom(room);
+    const created = await reserveRoom(room, inviteToken);
     if(revision!==roomEntryRevision) return;
     me = { id:deviceId, name, code:created.code, isMaster:true, inviteToken };
     _latestRoom=created;
@@ -2991,8 +3003,9 @@ let serverOffset=0, connected=true, advancing=false, votePending=false, followin
 function roomNow(){ return Date.now()+serverOffset; }
 function storageRead(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function storageWrite(k,v){ try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k,JSON.stringify(v)); } catch {} }
-const deviceId = storageRead('sop-device') || (crypto.randomUUID ? crypto.randomUUID() : 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2));
-storageWrite('sop-device',deviceId);
+// Firebase supplies this identity before room/session operations start.
+// Ignore the old sop-device value: it was user-controlled.
+let deviceId = '';
 let hideJoinCode=storageRead('sop-hide-join-code') === true;
 // Keep the invitation itself out of public room data and spectator links.
 function newInviteToken(){
@@ -3015,12 +3028,11 @@ async function changeParticipantAccess(access){
   try {
     const inviteToken=access==='invite' ? newInviteToken() : '';
     const hash=inviteToken ? await hashInviteToken(inviteToken) : null;
-    const changed=await window._transaction(roomRef(me.code),room=>{
-      if(!room || room.state!=='waiting') return;
-      room.participantAccess=access==='invite' ? 'invite' : 'code';
-      room.participantInviteHash=hash; return room;
+    await window._update(window._ref(window._db),{
+      [`roomInvites/${me.code}`]:inviteToken || null,
+      [`rooms/${me.code}/participantAccess`]:access==='invite' ? 'invite' : 'code',
+      [`rooms/${me.code}/participantInviteHash`]:hash,
     });
-    if(!changed.committed) throw new Error('The lobby has already started.');
     me.inviteToken=inviteToken; saveSession(); applyJoinCodePrivacy();
     showToast(access==='invite' ? 'Invite only enabled. Copy the new participant invite.' : 'Joining by code enabled');
   } catch(e){ showToast('Could not change participant access: '+e.message,4000); }
@@ -3090,22 +3102,18 @@ function showShareDialog(){
   renderJoinQR();
   dialog.showModal();
 }
-// Keep the listener alive until the transaction commits: Firebase can discard
-// the cached room as soon as its last value listener is detached.
-async function transactLoadedRoom(code,apply){
-  let loaded;
-  try {
-    loaded=await firstSubscribedValue(roomRef(code));
-    if(!loaded.snapshot.exists()) throw new Error('Room not found.');
-    return await window._transaction(roomRef(code),apply);
-  } finally { loaded?.stop(); }
-}
-async function reserveRoom(room){
+async function reserveRoom(room, inviteToken=''){
+  if(room.participantAccess==='invite' && !/^[a-f0-9]{64}$/.test(inviteToken)) throw new Error('Create a new participant invite.');
   for(let attempt=0;attempt<8;attempt++){
     const code=genCode();
-    const candidate={...room,code,imageCacheVersion:room.imageCacheVersion || code};
+    const candidate={...room,securityVersion:2,code,imageCacheVersion:room.imageCacheVersion || code};
     const result=await window._transaction(roomRef(code),current=>current === null ? candidate : undefined);
-    if(result.committed) return candidate;
+    if(result.committed){
+      if(candidate.participantAccess==='invite'){
+        await window._set(window._ref(window._db,`roomInvites/${code}`),inviteToken);
+      }
+      return candidate;
+    }
   }
   throw new Error('Could not reserve a room code. Try again.');
 }
@@ -3133,9 +3141,15 @@ async function enterExistingRoom(code){
     const snap=loaded.snapshot;
     if(!snap.exists()) throw new Error('This room is no longer available.');
     const room=snap.val(), p=room.players?.[myKey()];
+    if(room.securityVersion!==2) throw new Error('This lobby uses the old security setup. Ask the host to create a new lobby.');
     if(!p || p.kicked || p.active === false) throw new Error('Your place in this room is no longer active.');
     stopListeners(); stopSlideTimer(); lastSlide=-1; myVotedSlides={}; _latestVotes={}; _latestAudienceVotes={}; votePending=false;
-    me={...me,code,name:p.name,isMaster:room.hostId ? room.hostId===myKey() : room.hostName===p.name};
+    me={...me,id:deviceId,code,name:p.name,isMaster:room.hostId===myKey()};
+    if(me.isMaster && room.participantAccess==='invite'){
+      const invite=await window._get(window._ref(window._db,`roomInvites/${code}`));
+      if(revision!==roomEntryRevision) return false;
+      me.inviteToken=invite.val() || '';
+    }
     _latestRoom=room;
     timerCfg={enabled:!!room.timerEnabled,duration:room.timerDuration || 15};
     if(room.emojiSmash?.length){
@@ -3145,7 +3159,7 @@ async function enterExistingRoom(code){
     }
     dd=await firstSubscribedValue(window._ref(window._db,`ddused/${code}/${myKey()}`));
     if(revision!==roomEntryRevision) return false;
-    myDoubleDownUsed=dd.snapshot.val() === true;
+    myDoubleDownUsed=Number.isInteger(dd.snapshot.val()) && dd.snapshot.val()>0;
     saveSession();
     history.replaceState(null,'',roomLink(code));
     if(room.state==='waiting') enterWaiting(); else enterGame();
@@ -3163,11 +3177,11 @@ async function resumeSession(){
   configureJoinEntry(!!requested && !!incomingInviteToken());
   const saved=storageRead('sop-session');
   if(saved?.code && (!requested || requested===saved.code)){
-    me=saved;
+    me={...saved,id:deviceId,isMaster:false};
     document.getElementById('resumeStatus').hidden=false;
     try { if(await enterExistingRoom(saved.code)) showToast('Welcome back'); return; }
     catch(e) {
-      if(e.message==='This room is no longer available.' || e.message==='Your place in this room is no longer active.') storageWrite('sop-session',null);
+      if(e.message==='This room is no longer available.' || e.message==='Your place in this room is no longer active.' || e.message.includes('old security setup')) storageWrite('sop-session',null);
       me={name:'',code:'',isMaster:false};
       document.getElementById('joinCode').value=saved.code;
       showErr('joinErr','Could not resume: '+e.message+' You can try joining again.');
@@ -3217,24 +3231,34 @@ async function joinRoom(){
   try {
     const inviteToken=new URL(location.href).searchParams.get('room')?.toUpperCase()===code ? incomingInviteToken() : '';
     const inviteHash=await hashInviteToken(inviteToken);
-    let reason='Room not found.';
-    const joined=await transactLoadedRoom(code,room=>{
-      if(!room) return;
+    let loaded;
+    try {
+      loaded=await firstSubscribedValue(roomRef(code));
+      const room=loaded.snapshot.val();
+      if(!room) throw new Error('Room not found.');
+      if(room.securityVersion!==2) throw new Error('This lobby uses the old security setup. Ask the host to create a new lobby.');
       const existing=room.players?.[deviceId];
-      if(existing?.kicked){ reason='You were removed from this room.'; return; }
+      if(existing?.kicked) throw new Error('You were removed from this room.');
       if(room.participantAccess==='invite' && !existing && (!inviteHash || inviteHash!==room.participantInviteHash)){
-        reason='This game is invite only. Ask the host for a participant invite.'; return;
+        throw new Error('This game is invite only. Ask the host for a participant invite.');
       }
-      if(room.state==='done' && !existing){ reason='This game has ended.'; return; }
-      if(room.state==='playing' && room.lockJoins && !existing){ reason='Late joining is disabled.'; return; }
-      if(getActivePlayers(room).some(p=>playerKey(p)!==deviceId && p.name.toLowerCase()===name.toLowerCase())){ reason='That name is in use. Choose another name.'; return; }
-      room.players ||= {};
-      room.players[deviceId]={...existing,id:deviceId,name,color:avatarClass(name),active:true,joinedSlide:existing?.joinedSlide || room.currentSlide || 1};
-      if(room.rounds?.[room.currentSlide]){ room.rounds[room.currentSlide].eligible ||= {}; room.rounds[room.currentSlide].eligible[deviceId]=true; }
-      return room;
-    });
+      if(room.state==='done' && !existing) throw new Error('This game has ended.');
+      if(room.state==='playing' && room.lockJoins && !existing) throw new Error('Late joining is disabled.');
+      if(getActivePlayers(room).some(p=>playerKey(p)!==deviceId && p.name.toLowerCase()===name.toLowerCase())) throw new Error('That name is in use. Choose another name.');
+      if(revision!==roomEntryRevision) return;
+      if(room.participantAccess==='invite' && !existing){
+        // Firebase compares this proof with a host-only token, independently
+        // of the public hash and the checks above. Other users cannot read it.
+        await window._set(window._ref(window._db,`joinProofs/${code}/${deviceId}`),inviteToken);
+      }
+      if(revision!==roomEntryRevision) return;
+      const player={...existing,id:deviceId,name,color:avatarClass(name),active:true,joinedSlide:existing?.joinedSlide || room.currentSlide || 1};
+      delete player.leftSlide;
+      const changes={[`rooms/${code}/players/${deviceId}`]:player};
+      if(room.state==='playing' && room.rounds?.[room.currentSlide]) changes[`rooms/${code}/rounds/${room.currentSlide}/eligible/${deviceId}`]=true;
+      await window._update(window._ref(window._db),changes);
+    } finally { loaded?.stop(); }
     if(revision!==roomEntryRevision) return;
-    if(!joined.committed) throw new Error(reason);
     me={id:deviceId,name,code,isMaster:false}; await enterExistingRoom(code);
   } catch(e){ showErr('joinErr',e.message); }
   finally { if(btn) btn.disabled=false; }
@@ -3258,9 +3282,9 @@ function enterWaiting(){
   listenRoom();
 }
 
-async function kickPlayer(playerName){
+async function kickPlayer(playerId){
   if(!me.isMaster) return;
-  const p=getActivePlayers(_latestRoom).find(p=>p.name===playerName);
+  const p=getActivePlayers(_latestRoom).find(p=>playerKey(p)===playerId);
   if(!p || playerKey(p)===myKey()) return;
   try { await window._update(window._ref(window._db,`rooms/${me.code}/players/${playerKey(p)}`),{active:false,kicked:true,leftSlide:_latestRoom.currentSlide}); showToast(`${escapeHtml(p.name)} was removed`); }
   catch { showToast('Could not remove player'); }
@@ -3284,9 +3308,9 @@ function renderWaiting(room){
   grid.innerHTML = '';
   players.forEach(p => {
     const chip = document.createElement('div');
-    chip.className = 'player-chip'+(p.name===room.hostName?' is-master':'');
+    chip.className = 'player-chip'+(playerKey(p)===room.hostId?' is-master':'');
 
-    const crown = p.name===room.hostName ? '<span style="font-size:.72rem">👑</span>' : '';
+    const crown = playerKey(p)===room.hostId ? '<span style="font-size:.72rem">👑</span>' : '';
 
     chip.innerHTML = `
       <div class="player-avatar ${p.color}">${escapeHtml(initials(p.name))}</div>
@@ -3437,7 +3461,7 @@ function renderVoters(room, votesData){
 
     const row = document.createElement('div');
     row.className = 'voter-row';
-    const canKick = me.isMaster && p.name!==room.hostName && p.name!==me.name;
+    const canKick = me.isMaster && key!==room.hostId && key!==myKey();
     row.innerHTML = `
       <div class="voter-name-wrap">
         <div class="player-avatar ${p.color}" style="width:22px;height:22px;font-size:.58rem">${escapeHtml(initials(p.name))}</div>
@@ -3445,7 +3469,7 @@ function renderVoters(room, votesData){
       </div>
       <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto">
         ${badgeHtml}
-        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(p.name)}" aria-label="Kick ${escapeHtml(p.name)}" title="Remove ${escapeHtml(p.name)} from the game"><span>✕</span><span>Kick</span></button>` : ``}
+        ${canKick ? `<button class="kick-btn" data-kick-player="${encodeURIComponent(key)}" aria-label="Kick ${escapeHtml(p.name)}" title="Remove ${escapeHtml(p.name)} from the game"><span>✕</span><span>Kick</span></button>` : ``}
       </div>
     `;
     const kickBtn = row.querySelector('[data-kick-player]');
@@ -3501,11 +3525,11 @@ async function submitVote(choice){
     const room=snap.val();
     const p=getPlayers(room).find(p=>playerKey(p)===key);
     if(room.state!=='playing' || room.nextRoomCode || room.currentSlide!==slide || !p || p.active===false || p.kicked || !eligible(p,room,slide) || isSlideUnrated(room,slide) || myVotedSlides[slide]) return;
-    if(room.timer?.enabled && room.timer.dueAt && !room.timer.paused && remainingMs(room.timer)<=0) return;
+    if(!audienceEligible(room,slide)) return;
     if(choice==='supersmash' && myDoubleDownUsed) return;
     submittedSlide=slide;
     const changes={ [`votes/${code}/${slide}/${key}`]:choice };
-    if(choice==='supersmash') changes[`ddused/${code}/${key}`]=true;
+    if(choice==='supersmash') changes[`ddused/${code}/${key}`]=slide;
     await window._update(window._ref(window._db),changes);
     if(!inSameRoom()) return;
     myVotedSlides[slide]=choice;
@@ -3858,7 +3882,7 @@ async function rematch(){
   try {
     const old=_latestRoom,deck=await fetchSlidePageIdsViaAppsScript(old.slidesUrl);
     if(me.code!==old.code || !me.isMaster || !connected) return;
-    const room=await reserveRoom({hostName:me.name,hostId:myKey(),slidesUrl:old.slidesUrl,totalSlides:deck.totalSlides,slidePageIds:deck.slidePageIds,slideDurations:deck.slideDurations,slideVotingDisabled:deck.slideVotingDisabled,imageCacheVersion:deck.imageCacheVersion || '',notesVotingAvailable:deck.notesRulesVersion===1,notesTimingAvailable:deck.timingVersion===1,notesTimingWarnings:deck.timingWarnings || [],state:'waiting',currentSlide:1,timerEnabled:old.timerEnabled || false,timerDuration:old.timerDuration || 15,emojiSmash:old.emojiSmash || activeSmashEmojis,emojiPass:old.emojiPass || activePassEmojis,lockJoins:old.lockJoins || false,participantAccess:old.participantAccess || 'code',participantInviteHash:old.participantInviteHash || null,players:Object.fromEntries(getActivePlayers(old).map(p=>[playerKey(p),{id:playerKey(p),name:p.name,color:p.color,active:true}]))});
+    const room=await reserveRoom({hostName:me.name,hostId:myKey(),slidesUrl:old.slidesUrl,totalSlides:deck.totalSlides,slidePageIds:deck.slidePageIds,slideDurations:deck.slideDurations,slideVotingDisabled:deck.slideVotingDisabled,imageCacheVersion:deck.imageCacheVersion || '',notesVotingAvailable:deck.notesRulesVersion===1,notesTimingAvailable:deck.timingVersion===1,notesTimingWarnings:deck.timingWarnings || [],state:'waiting',currentSlide:1,timerEnabled:old.timerEnabled || false,timerDuration:old.timerDuration || 15,emojiSmash:old.emojiSmash || activeSmashEmojis,emojiPass:old.emojiPass || activePassEmojis,lockJoins:old.lockJoins || false,participantAccess:old.participantAccess || 'code',participantInviteHash:old.participantInviteHash || null,players:Object.fromEntries(getActivePlayers(old).map(p=>[playerKey(p),{id:playerKey(p),name:p.name,color:p.color,active:true,joinedSlide:1}]))},me.inviteToken || '');
     if(me.code!==old.code || !me.isMaster || !connected) return;
     await window._update(roomRef(old.code),{nextRoomCode:room.code});
   } catch(e){ showToast('Could not prepare rematch: '+e.message,4000); }
