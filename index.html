@@ -2291,6 +2291,7 @@ let slideImageCache = {};
 let slideImagePromises = {};
 const slideImageQueue = createSlideImageQueue(2);
 let lobbyPreloadKey = "";
+let nextSlidePreloadRetry = null;
 let dbReady = false;
 let slideLoadToken = 0;
 
@@ -2655,9 +2656,40 @@ async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priorit
   return promises[cacheKey];
 }
 
-async function prefetchSlide(rawUrl, pageId, cacheVersion = "") {
+async function prefetchSlide(rawUrl, pageId, cacheVersion = "", priority = 2) {
   if(!getSlideId(rawUrl) || !pageId) return null;
-  return fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion, 2).catch(() => null);
+  return fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion, priority).catch(() => null);
+}
+
+function cancelNextSlidePreloadRetry(){
+  nextSlidePreloadRetry?.abort();
+  nextSlidePreloadRetry=null;
+}
+
+function preloadGameSlides(room){
+  cancelNextSlidePreloadRetry();
+  const slide=room.currentSlide, code=room.code, version=room.imageCacheVersion || code;
+  const next=room.slidePageIds?.[slide], later=room.slidePageIds?.[slide+1];
+  if(!next) return;
+  const revision=roomEntryRevision, controller=new AbortController();
+  nextSlidePreloadRetry=controller;
+  const stillRelevant=()=>!controller.signal.aborted && connected && !me.spectator &&
+    roomEntryRevision===revision && me.code===code && _latestRoom?.code===code &&
+    _latestRoom.state==='playing' && _latestRoom.currentSlide===slide && !_latestRoom.nextRoomCode &&
+    (_latestRoom.imageCacheVersion || code)===version && _latestRoom.slidePageIds?.[slide]===next;
+  prefetchSlide(room.slidesUrl,next,version,1).then(async src=>{
+    if(src || !stillRelevant()) return;
+    // Recover the nearest failed preload once while this round is still open.
+    // The delay spreads requests across browsers; a new slide cancels the wait.
+    await waitForAppsScriptRetry(1500+Math.random()*1000,controller.signal);
+    if(!stillRelevant()) return;
+    const timer=_latestRoom.timer;
+    if(timer?.enabled && timer.status==='running' && !timer.paused && remainingMs(timer)<=3000) return;
+    await prefetchSlide(room.slidesUrl,next,version,1);
+  }).catch(()=>{}).finally(()=>{
+    if(nextSlidePreloadRetry===controller) nextSlidePreloadRetry=null;
+  });
+  if(later) prefetchSlide(room.slidesUrl,later,version);
 }
 
 function prepareLobbySlides(room){
@@ -3277,6 +3309,7 @@ function renderSmashBoard(targetId, room, votesData){
 }
 
 function stopListeners(){
+  cancelNextSlidePreloadRetry();
   if(unsubRoom){ unsubRoom(); unsubRoom=null; }
   if(unsubVotes){ unsubVotes(); unsubVotes=null; }
   if(unsubAudience){ unsubAudience(); unsubAudience=null; }
@@ -3469,10 +3502,7 @@ function renderGame(room){
     const wanted = new Set((room.slidePageIds || []).slice(s-1, s+2).map(pid => slideCacheKey(room.slidesUrl, pid, version)));
     slideImageQueue.prune(wanted);
     loadGameSlide(room);
-    for(let offset=0;offset<2;offset++){
-      const pid = room.slidePageIds?.[s+offset];
-      if(pid) prefetchSlide(room.slidesUrl, pid, version);
-    }
+    preloadGameSlides(room);
 
     if(!myVotedSlides[s] && !isUnrated){
       document.getElementById('votedBanner').className = 'voted-banner';
@@ -3674,6 +3704,7 @@ function listenRoom(){
       renderGame(room);
       renderVoters(room, _latestVotes);
     } else if(room.state==='done'){
+      cancelNextSlidePreloadRetry();
       showResultsScreen(room,_latestVotes);
     }
   }, () => {

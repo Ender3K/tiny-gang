@@ -46,10 +46,24 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.getByRole('button',{name:'Show QR code',exact:true}).click();assert.equal(await host.locator('#joinQR canvas').count(),1);assert((await host.locator('#shareLink').inputValue()).includes('?room='+code));await host.locator('#shareDialog .dialog-close').click();
  const player=await page(390);await player.goto('http://127.0.0.1:8000/?room='+code);await player.waitForFunction(()=>dbReady);await player.waitForFunction(code=>document.getElementById('joinCode').value===code,code);await player.locator('#joinName').fill('Player');await player.getByRole('button',{name:'Join game',exact:true}).click();await player.locator('#waiting').waitFor({state:'visible'});
  assert.equal(await player.locator('#displayCode').innerText(),code);assert.equal(await player.locator('#lobbyCodePrivacy').isVisible(),false);
+ // A failed next-slide preload recovers during the current round, before advance.
+ await player.waitForFunction(()=>!!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
+ await player.evaluate(()=>{delete slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)];});
+ let nextPreloadAttempts=0;
+ await player.route('https://script.google.com/**',route=>{
+  const u=new URL(route.request().url());
+  if(u.searchParams.get('action')==='image' && u.searchParams.get('pageId')==='s2'){
+   nextPreloadAttempts++;
+   if(nextPreloadAttempts===1)return route.fulfill({status:503,contentType:'application/json',body:'{}',headers:{'access-control-allow-origin':'*'}});
+  }
+  return route.fallback();
+ });
  // A failed host image keeps the shared clock waiting; retry recovers the round.
  await host.evaluate(()=>{const original=fetchSlideImageDataUrl;fetchSlideImageDataUrl=async()=>{fetchSlideImageDataUrl=original;throw Error('Temporary image failure');};});
  await host.locator('#startBtn').click();await host.locator('#slideError').waitFor({state:'visible'});assert.equal(await host.evaluate(()=>_latestRoom.timer.status),'loading');
  await host.getByRole('button',{name:'Retry slide',exact:true}).click();for(const p of [host,player])await p.waitForFunction(()=>lastSlide===1 && timerState.slideReady && _latestRoom.timer.status==='running');
+ await player.waitForFunction(()=>!!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
+ assert.equal(nextPreloadAttempts,2);assert.equal(await player.evaluate(()=>lastSlide),1);
  await host.locator('#gameCodePrivacy').click();assert.equal(await host.locator('#gameCodePrivacy').innerText(),'Show join code');assert.equal(await player.locator('#gameCodePrivacy').isVisible(),false);
  assert.equal(await host.evaluate(()=>_latestRoom.timer.dueAt),await player.evaluate(()=>_latestRoom.timer.dueAt));
  await host.evaluate(()=>toggleTimerPause());await player.waitForFunction(()=>timerState.paused);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
@@ -57,7 +71,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.evaluate(()=>castVote('smash'));await player.evaluate(()=>castDoubleDown());
  const id=await player.evaluate(()=>myKey());assert.equal(state.ddused[code][id],1);
  await player.reload();await player.waitForFunction(()=>_latestRoom?.state==='playing' && myDoubleDownUsed);assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('#game .vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
- console.log('QR join, stable identity, shared pause/extend and refresh resume passed');
+ console.log('Failed next-slide preload recovery, QR join, stable identity, shared pause/extend and refresh resume passed');
  for(let slide=2;slide<=4;slide++){
   await host.evaluate(()=>masterNext());for(const p of [host,player])await p.waitForFunction(slide=>lastSlide===slide && timerState.slideReady,slide);
   await host.evaluate(()=>castVote('smash'));await player.evaluate(slide=>castVote(slide===3?'smash':'pass'),slide);

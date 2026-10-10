@@ -25,6 +25,13 @@ The current slide takes priority over queued background loads and can interrupt
 a running background load when both slots are occupied. Interrupted preloads
 resume later through their original promise. Advancing slides cancels obsolete
 queued and running loads; leaving a room cancels all that browser's pending work.
+During gameplay, the nearest upcoming slide has priority over the farther
+preload. If that nearest preload fails, the browser tries it once more after a
+randomized 1.5–2.5 second delay while the same slide is still showing. The retry
+is skipped when three seconds or less remain on an unpaused running countdown.
+Pending retry waits are cancelled on slide changes, game end or leaving the room.
+It remains background work that the current slide can interrupt. The lookahead
+stays at two slides.
 
 New clients request `action=image&format=url&cacheVersion=…`. The response
 contains `imageUrl` and `expiresAt`. Apps Script caches the small Google Slides
@@ -61,7 +68,9 @@ cross-origin GET requests. Each request bypasses cached redirects and has a
 retries once. Slide image requests use 15-second service timeouts for the current
 slide and 8-second service timeouts for background preloads. Current service
 requests retry once, including timeouts, after a randomized 250–500 ms delay;
-background service requests do not retry. Image downloads time out after
+individual background service requests do not retry. The nearest failed
+gameplay preload can make the separate delayed retry described above.
+Image downloads time out after
 10 seconds for the current slide or 8 seconds for a preload. A slow current
 download retries the same URL once; a failed URL refreshes the thumbnail once
 instead. Each queued image load has a 30-second total budget covering service
