@@ -2599,12 +2599,92 @@ function decodeSlideSource(src, signal, timeoutMs = 10000){
   });
 }
 
+function roomSlideImageContext(rawUrl,pageId,cacheVersion){
+  const room=typeof _latestRoom==='undefined' ? null : _latestRoom;
+  if(!room || typeof me==='undefined' || me.spectator || me.code!==room.code ||
+    getSlideId(room.slidesUrl)!==getSlideId(rawUrl) || (room.imageCacheVersion || room.code)!==cacheVersion) return null;
+  const slide=(room.slidePageIds || []).indexOf(pageId)+1;
+  if(!slide) return null;
+  return {code:room.code,slide,pageId,cacheVersion,revision:roomEntryRevision};
+}
+
+function usableRoomSlideImage(entry,context){
+  if(!entry || entry.pageId!==context.pageId || entry.cacheVersion!==context.cacheVersion ||
+    !Number.isFinite(entry.expiresAt) || entry.expiresAt<=Date.now()+60000) return false;
+  try {
+    const url=new URL(entry.src);
+    return url.protocol==='https:' && url.hostname.endsWith('.googleusercontent.com');
+  } catch { return false; }
+}
+
+function waitForRoomSlideImage(context,signal,job){
+  if(!context) return Promise.resolve(null);
+  const cached=_latestRoom?.sharedSlideImages?.[context.slide];
+  if(usableRoomSlideImage(cached,context)) return Promise.resolve(cached);
+  if(me.isMaster) return Promise.resolve(null);
+  // A refreshed player can immediately reuse the host's published URL. Give
+  // preloads longer to share the host's export; a visible cache miss falls back
+  // within three seconds, including when the host still uses the older page.
+  return new Promise((resolve,reject)=>{
+    const started=Date.now(),visibleWait=2000+Math.random()*1000;
+    let timer;
+    function cleanup(){clearTimeout(timer);signal.removeEventListener('abort',abort);}
+    function finish(entry){cleanup();resolve(entry);}
+    function abort(){cleanup();const error=new Error('Slide loading cancelled.');error.name='AbortError';reject(error);}
+    function check(){
+      if(signal.aborted) return abort();
+      const room=_latestRoom;
+      if(!connected || roomEntryRevision!==context.revision || me.code!==context.code ||
+        !room || room.code!==context.code || room.nextRoomCode ||
+        (room.imageCacheVersion || room.code)!==context.cacheVersion ||
+        room.slidePageIds?.[context.slide-1]!==context.pageId) return finish(null);
+      const entry=room.sharedSlideImages?.[context.slide];
+      if(usableRoomSlideImage(entry,context)) return finish(entry);
+      const waitMs=job.priority===0 || !room.sharedSlideImages ? visibleWait : 30000;
+      if(room.state==='done' || Date.now()-started>=waitMs) return finish(null);
+      timer=setTimeout(check,250);
+    }
+    signal.addEventListener('abort',abort,{once:true});
+    check();
+  });
+}
+
+function publishRoomSlideImage(context,entry){
+  if(!context || !usableRoomSlideImage(entry,context) || !me.isMaster || !connected ||
+    _latestRoom?.hostId!==myKey() || typeof window._transaction!=='function') return;
+  // Only add image metadata. Existing host permissions cover this path, and
+  // players using the older page simply ignore it. Never wait on this write to
+  // show the host's slide, and retain only the current slide plus two ahead.
+  try { window._transaction(window._ref(window._db,`rooms/${context.code}/sharedSlideImages`),images=>{
+    const room=_latestRoom;
+    if(!me.isMaster || !connected || me.code!==context.code || roomEntryRevision!==context.revision ||
+      !room || room.hostId!==myKey() || room.nextRoomCode || !['waiting','playing'].includes(room.state) ||
+      (room.imageCacheVersion || room.code)!==context.cacheVersion ||
+      room.slidePageIds?.[context.slide-1]!==context.pageId ||
+      context.slide<room.currentSlide || context.slide>room.currentSlide+2) return;
+    const kept={};
+    for(let slide=room.currentSlide;slide<=room.currentSlide+2;slide++){
+      const candidate=images?.[slide];
+      if(usableRoomSlideImage(candidate,{...context,pageId:room.slidePageIds?.[slide-1]})) kept[slide]=candidate;
+    }
+    const previous=kept[context.slide];
+    if(previous?.src===entry.src && previous.expiresAt===entry.expiresAt &&
+      Object.keys(kept).length===Object.keys(images || {}).filter(key=>images[key]!=null).length) return;
+    kept[context.slide]=entry;
+    return kept;
+  }).catch(()=>{}); } catch { /* Sharing is optional; the host still shows its image. */ }
+}
+
 async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priority = 0) {
   const presentationId = getSlideId(rawUrl);
   if (!presentationId) throw new Error("Invalid Google Slides URL.");
   const cacheKey = slideCacheKey(rawUrl, pageId, cacheVersion);
+  const roomContext=roomSlideImageContext(rawUrl,pageId,cacheVersion);
   const entry = slideImageCache[cacheKey];
-  if(entry && entry.expiresAt > Date.now() + 60000) return entry.src;
+  if(entry && entry.expiresAt > Date.now() + 60000){
+    publishRoomSlideImage(roomContext,{...entry,pageId,cacheVersion});
+    return entry.src;
+  }
   if(slideImagePromises[cacheKey]){
     slideImageQueue.promote(cacheKey, priority);
     return slideImagePromises[cacheKey];
@@ -2617,17 +2697,30 @@ async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priorit
     const cancel=()=>controller.abort();
     queueSignal.addEventListener('abort',cancel,{once:true});
     if(queueSignal.aborted) controller.abort();
-    // This covers service calls, retry delays and image downloads together.
-    let timedOut=false;
-    const deadline=setTimeout(()=>{timedOut=true;controller.abort();},30000);
+    // Once sharing has fallen back, bound service calls and downloads together.
+    let timedOut=false,deadline;
     const options={
-      // An uncached thumbnail can take longer than a foreground cache lookup.
-      // Let preloads use their lookahead time rather than aborting valid exports.
-      get timeoutMs(){return job.priority===0 ? 15000 : 20000;},
+      // Even cached Apps Script responses can take nearly 30 seconds under load.
+      // Aborting a browser request does not stop the server execution, so don't
+      // replace a slow request with a second execution while it is still running.
+      timeoutMs:45000,
       get retries(){return job.priority===0 ? 1 : 0;},
-      retryTimeouts:true, retryDelayMs:250
+      retryTimeouts:false, retryDelayMs:250
     };
     try {
+      const shared=await waitForRoomSlideImage(roomContext,signal,job);
+      deadline=setTimeout(()=>{timedOut=true;controller.abort();},55000);
+      if(shared){
+        try {
+          await decodeSlideSource(shared.src,signal,job.priority===0 ? 10000 : 8000);
+          if(signal.aborted) throw new Error('Slide loading cancelled.');
+          cache[cacheKey]={src:shared.src,expiresAt:shared.expiresAt};
+          return shared.src;
+        } catch(error){
+          if(signal.aborted) throw error;
+          // A stale or unreachable shared image must not prevent direct recovery.
+        }
+      }
       let data = await requestAppsScript(url, signal, options);
       if(!data?.ok || !(data.imageUrl || data.dataUrl)) throw new Error(data?.error || "Could not fetch slide image.");
       let src = data.imageUrl || data.dataUrl;
@@ -2647,6 +2740,7 @@ async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priorit
       }
       if(signal.aborted) throw new Error('Slide loading cancelled.');
       cache[cacheKey] = {src, expiresAt:data.imageUrl ? data.expiresAt : Infinity};
+      if(data.imageUrl) publishRoomSlideImage(roomContext,{src,expiresAt:data.expiresAt,pageId,cacheVersion});
       return src;
     } catch(error){
       if(timedOut) throw new Error('Slide loading timed out. Please retry.');
@@ -3063,7 +3157,12 @@ function loadGameSlide(room){
   return loading.then(loaded => {
     if(token!==slideLoadToken || me.code!==code || slide!==lastSlide || _latestRoom?.state!=='playing') return;
     timerState.slideReady=loaded;
-    if(loaded) armSharedTimer(slide);
+    if(loaded){
+      armSharedTimer(slide);
+      // Refresh starts with an empty cache. Finish the visible slide before
+      // sending background requests that compete with it at the slide service.
+      preloadGameSlides(_latestRoom);
+    }
     updateTimerUI();
   });
 }
@@ -3508,8 +3607,8 @@ function renderGame(room){
     const version = room.imageCacheVersion || room.code;
     const wanted = new Set((room.slidePageIds || []).slice(s-1, s+2).map(pid => slideCacheKey(room.slidesUrl, pid, version)));
     slideImageQueue.prune(wanted);
+    cancelNextSlidePreloadRetry();
     loadGameSlide(room);
-    preloadGameSlides(room);
 
     if(!myVotedSlides[s] && !isUnrated){
       document.getElementById('votedBanner').className = 'voted-banner';

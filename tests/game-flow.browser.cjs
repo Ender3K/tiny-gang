@@ -68,10 +68,25 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  await host.locator('#gameCodePrivacy').click();assert.equal(await host.locator('#gameCodePrivacy').innerText(),'Show join code');assert.equal(await player.locator('#gameCodePrivacy').isVisible(),false);
  assert.equal(await host.evaluate(()=>_latestRoom.timer.dueAt),await player.evaluate(()=>_latestRoom.timer.dueAt));
  await host.evaluate(()=>toggleTimerPause());await player.waitForFunction(()=>timerState.paused);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
- await host.evaluate(()=>extendTimer(10));await player.waitForFunction(()=>timerState.remaining>=28);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
+ const beforeExtend=await host.evaluate(()=>_latestRoom.timer.remainingMs);
+ await host.evaluate(()=>extendTimer(10));await player.waitForFunction(expected=>_latestRoom.timer.remainingMs===expected,beforeExtend+10000);assert.equal(await player.locator('#timerDisplay').innerText(),await host.locator('#timerDisplay').innerText());
  await host.evaluate(()=>castVote('smash'));await player.evaluate(()=>castDoubleDown());
  const id=await player.evaluate(()=>myKey());assert.equal(state.ddused[code][id],1);
- await player.reload();await player.waitForFunction(()=>_latestRoom?.state==='playing' && myDoubleDownUsed);assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('#game .vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
+ // Refresh must finish the current image before competing background requests.
+ let releaseCurrent,holdCurrent=true;const reloadRequests=[],currentGate=new Promise(resolve=>{releaseCurrent=resolve});
+ await player.route('https://script.google.com/**',async route=>{
+  const u=new URL(route.request().url()),pageId=u.searchParams.get('pageId');
+  if(holdCurrent && u.searchParams.get('action')==='image'){
+   reloadRequests.push(pageId);if(pageId==='s1')await currentGate;
+  }
+  return route.fallback();
+ });
+ const requestedCurrent=player.waitForRequest(request=>new URL(request.url()).searchParams.get('pageId')==='s1');
+ await player.reload();await requestedCurrent;await player.waitForFunction(()=>_latestRoom?.state==='playing' && myDoubleDownUsed);
+ await player.waitForFunction(()=>Object.keys(slideImagePromises).length===1);
+ assert.deepEqual(reloadRequests,['s1']);assert.equal(await player.locator('#slideLoader').isVisible(),true);
+ assert.equal(await player.evaluate(()=>myKey()),id);assert.equal(await player.locator('#game .vbtn-smash').isDisabled(),true);assert.equal(await player.evaluate(()=>timerState.paused),true);
+ holdCurrent=false;releaseCurrent();await player.waitForFunction(()=>timerState.slideReady && !!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
  console.log('Failed next-slide preload recovery, QR join, stable identity, shared pause/extend and refresh resume passed');
  for(let slide=2;slide<=4;slide++){
   await host.evaluate(()=>masterNext());for(const p of [host,player])await p.waitForFunction(slide=>lastSlide===slide && timerState.slideReady,slide);
@@ -98,6 +113,9 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  assert.equal(await host.locator('#displayCode').innerText(),'••••••');assert.equal(await host.locator('#lobbyCodePrivacy').getAttribute('aria-pressed'),'true');
  const next=await host.evaluate(()=>me.code);assert.equal(await player.evaluate(()=>me.code),next);assert.equal(await host.evaluate(()=>me.isMaster),true);assert.equal(await player.evaluate(()=>myDoubleDownUsed),false);assert.equal(Object.keys(state.rooms[next].players).length,3);await host.locator('#startBtn').click();await host.waitForFunction(()=>lastSlide===1 && _latestRoom.timer.status==='running');
  const deadline=state.rooms[next].timer.dueAt;put(`rooms/${next}/timer/dueAt`,Date.now()+500);await notify();await host.waitForFunction(()=>lastSlide===2);await player.waitForFunction(()=>lastSlide===2);
+ // Finish the round's startup transaction before deleting its room; the mock
+ // transaction adapter does not implement Firebase's conflict retries.
+ for(const p of [host,player])await p.waitForFunction(()=>lastSlide===2 && timerState.slideReady && _latestRoom.timer.status==='running');
  put(`rooms/${next}`,null);await notify();for(const p of [host,player,late]){await p.locator('#entry').waitFor({state:'visible'});assert.equal(await p.evaluate(()=>timerState.intervalId),null);assert.equal(await p.evaluate(()=>me.code),'');}
  assert.deepEqual(errors,[]);console.log('SDK retry, live results without blocking reads, deleted-room recovery, group rematch and automatic shared timer advance passed');
  } finally {await browser.close();}
