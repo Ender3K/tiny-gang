@@ -605,6 +605,9 @@ input:focus{
   background:rgba(10,10,12,.9);
 }
 .slide-error.visible{display:flex}
+.slide-error{overflow-y:auto}
+.slide-error-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.slide-error-actions .slide-error-link{margin-top:0}
 .slide-error-icon{font-size:2rem}
 .slide-error-title{
   font-family:var(--font-sans);
@@ -1799,6 +1802,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 .dialog-close{float:right;background:none;border:0;color:inherit;font-size:1.3rem;cursor:pointer}
 .game-dialog h2{margin-bottom:1rem}
 .game-dialog input{width:100%;margin:.75rem 0}
+.game-dialog textarea{width:100%;height:14rem;max-height:40vh;margin:.75rem 0;font:12px var(--font-mono);resize:vertical}
 #joinQR{background:white;padding:12px;width:244px;margin:1rem auto}
 #joinQR img{max-width:100%}
 .slide-dialog{width:min(1100px,96vw)}
@@ -2055,8 +2059,11 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
               <div class="slide-error-hint" id="slideErrorHint">
                 Make sure the presentation is set to <strong>Anyone with the link can view</strong>.
               </div>
-              <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
-              <button type="button" class="slide-error-link" onclick="retryCurrentSlide()">Retry slide</button>
+              <div class="slide-error-actions">
+                <a id="slideErrorLink" href="#" target="_blank" rel="noopener" class="slide-error-link">Open presentation ↗</a>
+                <button type="button" class="slide-error-link" onclick="retryCurrentSlide()">Retry slide</button>
+                <button id="copySlideLoadError" type="button" class="slide-error-link" onclick="copySlideLoadingDetails()">Copy loading details</button>
+              </div>
             </div>
             <!-- Veto overlay on slide -->
             <div class="veto-overlay" id="vetoOverlay">
@@ -2175,6 +2182,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 
             <button class="btn-end" onclick="masterEnd()">END GAME</button>
           </div>
+          <button id="copySlideLoadDetails" type="button" class="code-privacy-btn" onclick="copySlideLoadingDetails()">Copy loading details</button>
         </div>
       </div>
     </div>
@@ -2282,6 +2290,7 @@ body.focus-slides #game .slide-wrap{max-height:calc(100dvh - 150px)}
 <div id="connectionStatus" class="connection-status" role="status" hidden>Reconnecting… Votes will be available when the connection returns.</div>
 <dialog id="shareDialog" class="game-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2>Join <span id="shareCode"></span></h2><div id="joinQR"></div><label for="shareLink">Join link</label><input id="shareLink" readonly onclick="this.select()"><button class="restart-btn" onclick="copyJoinLink()">Copy link</button></dialog>
 <dialog id="slideDetail" class="game-dialog slide-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2 id="detailTitle"></h2><p id="detailStatus" role="status"></p><img id="detailImage" alt="Selected slide" hidden><div id="detailVotes"></div></dialog>
+<dialog id="slideLoadingDetails" class="game-dialog"><form method="dialog"><button class="dialog-close" aria-label="Close">✕</button></form><h2>Loading details</h2><p class="recap-muted">Copy this text when reporting a slide problem. Account details and presentation links are excluded.</p><label for="slideLoadingDetailsText">Details to copy</label><textarea id="slideLoadingDetailsText" readonly></textarea></dialog>
 <div id="resumeStatus" class="resume-status" role="status" hidden>Rejoining your game…</div>
 <div class="toast" id="toast"></div>
 
@@ -2577,6 +2586,58 @@ function createSlideImageQueue(limit){
   };
 }
 
+const slideLoadDiagnostics=[];
+
+function slideLoadFailureCode(error){
+  const message=String(error?.message || '');
+  if(error?.name==='AbortError' || /cancelled|no longer needed/i.test(message)) return 'cancelled';
+  if(error?.name==='TimeoutError' || /timed out/i.test(message)) return 'timeout';
+  const http=message.match(/HTTP\s+(\d{3})/i);
+  if(http) return 'http_'+http[1];
+  if(/Could not load slide image/i.test(message)) return 'image_error';
+  if(/unexpected response/i.test(message)) return 'service_response';
+  if(/Could not reach/i.test(message)) return 'network_error';
+  return 'load_error';
+}
+
+function startSlideLoadDiagnostic(context,priority,queueMs=0){
+  const record={slide:context?.slide || null,priority,startedAt:Date.now(),queueMs,
+    status:'loading',source:null,elapsedMs:null,events:[]};
+  slideLoadDiagnostics.push(record);
+  if(slideLoadDiagnostics.length>20) slideLoadDiagnostics.shift();
+  return record;
+}
+
+function finishSlideLoadDiagnostic(record,status,source,error){
+  record.status=status; record.source=source || null;
+  record.elapsedMs=Math.max(0,Date.now()-record.startedAt);
+  if(error) record.failure=slideLoadFailureCode(error);
+}
+
+async function measureSlideLoadStep(record,stage,signal,task){
+  const started=Date.now();let outcome='ok',failure;
+  try { return await task(); }
+  catch(error){outcome=signal?.aborted ? 'cancelled' : 'failed';failure=slideLoadFailureCode(error);throw error;}
+  finally {
+    if(record.events.length<12) record.events.push({stage,outcome,elapsedMs:Math.max(0,Date.now()-started),...(failure ? {failure} : {})});
+  }
+}
+
+function getSlideLoadingDetails(){
+  // Only fixed fields and failure codes are recorded: no URLs, IDs, names, or
+  // arbitrary server error text. Diagnostics stay in memory until copied.
+  return JSON.stringify({version:2,capturedAt:Date.now(),loads:slideLoadDiagnostics},null,2);
+}
+
+async function copySlideLoadingDetails(){
+  const details=getSlideLoadingDetails();
+  try { await navigator.clipboard.writeText(details);showToast('Loading details copied'); }
+  catch {
+    const text=document.getElementById('slideLoadingDetailsText');text.value=details;
+    document.getElementById('slideLoadingDetails').showModal();text.focus();text.select();
+  }
+}
+
 function slideCacheKey(rawUrl, pageId, cacheVersion = ""){
   return `${getSlideId(rawUrl)}::${cacheVersion}::${pageId}`;
 }
@@ -2617,11 +2678,21 @@ function usableRoomSlideImage(entry,context){
   } catch { return false; }
 }
 
-function waitForRoomSlideImage(context,signal,job){
+function currentRoomSlideImage(context){
+  if(!context) return null;
+  const room=_latestRoom;
+  if(!room || roomEntryRevision!==context.revision || me.code!==context.code || room.code!==context.code ||
+    room.nextRoomCode || (room.imageCacheVersion || room.code)!==context.cacheVersion ||
+    room.slidePageIds?.[context.slide-1]!==context.pageId) return null;
+  const entry=room.sharedSlideImages?.[context.slide];
+  return usableRoomSlideImage(entry,context) ? entry : null;
+}
+
+function waitForRoomSlideImage(context,signal,job,excluded=new Set(),late=false){
   if(!context) return Promise.resolve(null);
-  const cached=_latestRoom?.sharedSlideImages?.[context.slide];
-  if(usableRoomSlideImage(cached,context)) return Promise.resolve(cached);
-  if(me.isMaster) return Promise.resolve(null);
+  const cached=currentRoomSlideImage(context);
+  if(cached && !excluded.has(cached.src)) return Promise.resolve(cached);
+  if(me.isMaster && !late) return Promise.resolve(null);
   // A refreshed player can immediately reuse the host's published URL. Give
   // preloads longer to share the host's export; a visible cache miss falls back
   // within three seconds, including when the host still uses the older page.
@@ -2638,10 +2709,10 @@ function waitForRoomSlideImage(context,signal,job){
         !room || room.code!==context.code || room.nextRoomCode ||
         (room.imageCacheVersion || room.code)!==context.cacheVersion ||
         room.slidePageIds?.[context.slide-1]!==context.pageId) return finish(null);
-      const entry=room.sharedSlideImages?.[context.slide];
-      if(usableRoomSlideImage(entry,context)) return finish(entry);
+      const entry=currentRoomSlideImage(context);
+      if(entry && !excluded.has(entry.src)) return finish(entry);
       const waitMs=job.priority===0 || !room.sharedSlideImages ? visibleWait : 30000;
-      if(room.state==='done' || Date.now()-started>=waitMs) return finish(null);
+      if(room.state==='done' || (!late && Date.now()-started>=waitMs)) return finish(null);
       timer=setTimeout(check,250);
     }
     signal.addEventListener('abort',abort,{once:true});
@@ -2675,6 +2746,71 @@ function publishRoomSlideImage(context,entry){
   }).catch(()=>{}); } catch { /* Sharing is optional; the host still shows its image. */ }
 }
 
+async function loadSlideImageFromService(url,signal,job,record){
+  const options={timeoutMs:45000,get retries(){return job.priority===0 ? 1 : 0;},retryTimeouts:false,retryDelayMs:250};
+  let data=await measureSlideLoadStep(record,'service',signal,async()=>{
+    const result=await requestAppsScript(url,signal,options);
+    if(!result?.ok || !(result.imageUrl || result.dataUrl)) throw new Error(result?.error || 'Could not fetch slide image.');
+    return result;
+  });
+  let src=data.imageUrl || data.dataUrl;
+  try { await measureSlideLoadStep(record,'service-image',signal,()=>decodeSlideSource(src,signal,job.priority===0 ? 10000 : 8000)); }
+  catch(error){
+    if(signal.aborted || job.priority!==0 || (!data.imageUrl && error.name!=='TimeoutError')) throw error;
+    if(error.name==='TimeoutError'){
+      await waitForAppsScriptRetry(250*(1+Math.random()),signal);
+    } else {
+      data=await measureSlideLoadStep(record,'service-refresh',signal,async()=>{
+        const result=await requestAppsScript(url+'&refresh=1',signal,{...options,retries:0});
+        if(!result?.ok || !result.imageUrl) throw new Error(result?.error || 'Could not refresh slide image.');
+        return result;
+      });
+      src=data.imageUrl;
+    }
+    await measureSlideLoadStep(record,'service-image-retry',signal,()=>decodeSlideSource(src,signal));
+  }
+  if(signal.aborted) throw new Error('Slide loading cancelled.');
+  return {src,expiresAt:data.imageUrl ? data.expiresAt : Infinity,source:'service'};
+}
+
+function recoverSlideImageFromEitherSource(url,context,signal,job,excluded,record){
+  return new Promise((resolve,reject)=>{
+    const serviceController=new AbortController(),sharedController=new AbortController();
+    let finished=false,sharedImageLoading=false,serviceFailed=false,serviceError;
+    function finish(result,error){
+      if(finished) return;
+      finished=true;signal.removeEventListener('abort',cancel);
+      serviceController.abort();sharedController.abort();
+      if(error) reject(error);else resolve(result);
+    }
+    function cancel(){const error=new Error('Slide loading cancelled.');error.name='AbortError';finish(null,error);}
+    if(signal.aborted) return cancel();
+    signal.addEventListener('abort',cancel,{once:true});
+    loadSlideImageFromService(url,serviceController.signal,job,record).then(result=>finish(result),error=>{
+      if(finished) return;
+      serviceFailed=true;serviceError=error;
+      // Don't delay a definitive service failure just hoping for a host URL.
+      // An already-downloading host image may still complete successfully.
+      if(!sharedImageLoading) finish(null,error);
+    });
+    (async()=>{
+      while(!finished){
+        const entry=await waitForRoomSlideImage(context,sharedController.signal,job,excluded,true);
+        if(finished || !entry) return;
+        sharedImageLoading=true;
+        try {
+          await measureSlideLoadStep(record,'late-shared-image',sharedController.signal,()=>decodeSlideSource(entry.src,sharedController.signal,job.priority===0 ? 10000 : 8000));
+          finish({...entry,source:'late-room-share'});
+        } catch(error){
+          if(finished) return;
+          excluded.add(entry.src);
+          if(serviceFailed) finish(null,serviceError);
+        } finally { sharedImageLoading=false; }
+      }
+    })().catch(error=>{if(!finished && signal.aborted) finish(null,error);});
+  });
+}
+
 async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priority = 0) {
   const presentationId = getSlideId(rawUrl);
   if (!presentationId) throw new Error("Invalid Google Slides URL.");
@@ -2682,6 +2818,7 @@ async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priorit
   const roomContext=roomSlideImageContext(rawUrl,pageId,cacheVersion);
   const entry = slideImageCache[cacheKey];
   if(entry && entry.expiresAt > Date.now() + 60000){
+    finishSlideLoadDiagnostic(startSlideLoadDiagnostic(roomContext,priority),'loaded','memory-cache');
     publishRoomSlideImage(roomContext,{...entry,pageId,cacheVersion});
     return entry.src;
   }
@@ -2691,59 +2828,42 @@ async function fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion = "", priorit
   }
   const cache = slideImageCache;
   const promises = slideImagePromises;
+  const queuedAt=Date.now();
   const url = `${APPS_SCRIPT_WEBAPP_URL}?action=image&format=url&presentationId=${encodeURIComponent(presentationId)}&pageId=${encodeURIComponent(pageId)}&cacheVersion=${encodeURIComponent(cacheVersion || 'legacy')}`;
   promises[cacheKey] = slideImageQueue.add(cacheKey, priority, async (queueSignal,job) => {
+    const record=startSlideLoadDiagnostic(roomContext,job.priority,Math.max(0,Date.now()-queuedAt));
     const controller=new AbortController(), signal=controller.signal;
     const cancel=()=>controller.abort();
     queueSignal.addEventListener('abort',cancel,{once:true});
     if(queueSignal.aborted) controller.abort();
     // Once sharing has fallen back, bound service calls and downloads together.
     let timedOut=false,deadline;
-    const options={
-      // Even cached Apps Script responses can take nearly 30 seconds under load.
-      // Aborting a browser request does not stop the server execution, so don't
-      // replace a slow request with a second execution while it is still running.
-      timeoutMs:45000,
-      get retries(){return job.priority===0 ? 1 : 0;},
-      retryTimeouts:false, retryDelayMs:250
-    };
     try {
-      const shared=await waitForRoomSlideImage(roomContext,signal,job);
+      const excluded=new Set();
+      const shared=await measureSlideLoadStep(record,'sharing-wait',signal,()=>waitForRoomSlideImage(roomContext,signal,job));
       deadline=setTimeout(()=>{timedOut=true;controller.abort();},55000);
       if(shared){
         try {
-          await decodeSlideSource(shared.src,signal,job.priority===0 ? 10000 : 8000);
+          await measureSlideLoadStep(record,'shared-image',signal,()=>decodeSlideSource(shared.src,signal,job.priority===0 ? 10000 : 8000));
           if(signal.aborted) throw new Error('Slide loading cancelled.');
           cache[cacheKey]={src:shared.src,expiresAt:shared.expiresAt};
+          finishSlideLoadDiagnostic(record,'loaded','room-share');
           return shared.src;
         } catch(error){
           if(signal.aborted) throw error;
+          excluded.add(shared.src);
           // A stale or unreachable shared image must not prevent direct recovery.
         }
       }
-      let data = await requestAppsScript(url, signal, options);
-      if(!data?.ok || !(data.imageUrl || data.dataUrl)) throw new Error(data?.error || "Could not fetch slide image.");
-      let src = data.imageUrl || data.dataUrl;
-      try { await decodeSlideSource(src, signal, job.priority===0 ? 10000 : 8000); }
-      catch(error){
-        if(signal.aborted || job.priority!==0 || (!data.imageUrl && error.name!=='TimeoutError')) throw error;
-        if(error.name==='TimeoutError'){
-          // A slow download doesn't mean the URL expired. Retry the same image.
-          await waitForAppsScriptRetry(250*(1+Math.random()),signal);
-        } else {
-          // A thumbnail can expire early after sharing changes. Refresh it once.
-          data = await requestAppsScript(url + '&refresh=1', signal, {...options,retries:0});
-          if(!data?.ok || !data.imageUrl) throw new Error(data?.error || "Could not refresh slide image.");
-          src = data.imageUrl;
-        }
-        await decodeSlideSource(src, signal);
-      }
+      const result=await recoverSlideImageFromEitherSource(url,roomContext,signal,job,excluded,record);
       if(signal.aborted) throw new Error('Slide loading cancelled.');
-      cache[cacheKey] = {src, expiresAt:data.imageUrl ? data.expiresAt : Infinity};
-      if(data.imageUrl) publishRoomSlideImage(roomContext,{src,expiresAt:data.expiresAt,pageId,cacheVersion});
-      return src;
+      cache[cacheKey] = {src:result.src,expiresAt:result.expiresAt};
+      if(Number.isFinite(result.expiresAt)) publishRoomSlideImage(roomContext,{src:result.src,expiresAt:result.expiresAt,pageId,cacheVersion});
+      finishSlideLoadDiagnostic(record,'loaded',result.source);
+      return result.src;
     } catch(error){
-      if(timedOut) throw new Error('Slide loading timed out. Please retry.');
+      if(timedOut) error=new Error('Slide loading timed out. Please retry.');
+      finishSlideLoadDiagnostic(record,signal.aborted && !timedOut ? 'cancelled' : 'failed',null,error);
       throw error;
     } finally {
       clearTimeout(deadline); queueSignal.removeEventListener('abort',cancel);
@@ -3123,23 +3243,27 @@ async function loadSlide(rawUrl, slideNumber, totalSlides=50, slidePageIds=[], c
   errLink.href = rawUrl;
 
   const pageId = slidePageIds[slideNumber-1];
+  const displayRecord=startSlideLoadDiagnostic({slide:slideNumber},0);displayRecord.kind='display';
   if(!pageId){
+    finishSlideLoadDiagnostic(displayRecord,'failed','display',new Error('Missing slide page.'));
     errHint.textContent='This slide is missing from the loaded deck. Open the presentation to check it.';
     loader.classList.add('hidden'); img.style.display='none'; errEl.classList.add('visible'); return false;
   }
 
   try {
-    const dataUrl = await fetchSlideImageDataUrl(rawUrl, pageId, cacheVersion);
-    if(token!==slideLoadToken) return false;
-    await decodeSlideSource(dataUrl);
-    if(token!==slideLoadToken) return false;
+    const dataUrl = await measureSlideLoadStep(displayRecord,'image-source',null,()=>fetchSlideImageDataUrl(rawUrl,pageId,cacheVersion));
+    if(token!==slideLoadToken){finishSlideLoadDiagnostic(displayRecord,'cancelled','display');return false;}
+    await measureSlideLoadStep(displayRecord,'display-image',null,()=>decodeSlideSource(dataUrl));
+    if(token!==slideLoadToken){finishSlideLoadDiagnostic(displayRecord,'cancelled','display');return false;}
     img.onload=null; img.onerror=null;
     img.src = dataUrl;
     img.classList.remove('loading');
     loader.classList.add('hidden');
     errEl.classList.remove('visible');
+    finishSlideLoadDiagnostic(displayRecord,'loaded','display');
     return true;
   } catch(e) {
+    finishSlideLoadDiagnostic(displayRecord,token!==slideLoadToken ? 'cancelled' : 'failed','display',e);
     if(token!==slideLoadToken) return false;
     errHint.textContent=e?.message || 'Could not load this slide. Check your connection and retry.';
     loader.classList.add('hidden');

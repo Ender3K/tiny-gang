@@ -91,7 +91,36 @@ async function denied(response){assert.equal(response.status,401,await response.
   // A real late join writes just its profile and eligibility, not the whole room.
   const late=await page();await late.goto(`${baseURL}/?room=${code}`);await late.waitForFunction(()=>dbReady);await late.locator('#joinName').fill('Late');await late.getByRole('button',{name:'Join game',exact:true}).click();await late.locator('#game').waitFor({state:'visible'});
   await late.waitForFunction(()=>timerState.slideReady);await late.evaluate(()=>castVote('pass'));await late.waitForFunction(()=>myVotedSlides[1]==='pass');
-  await host.evaluate(()=>masterNext());await player.waitForFunction(()=>_latestRoom?.currentSlide===2 && _latestRoom.timer.status==='running');
+  // Publish the host URL only after the player has started a stalled fallback.
+  // All reads/writes stay on the emulator, using the real Firebase SDK/rules.
+  await player.waitForFunction(()=>!!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)] && !slideImagePromises[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
+  await host.evaluate(()=>{const publish=publishRoomSlideImage;window.__restorePublisher=()=>{publishRoomSlideImage=publish;};publishRoomSlideImage=(context,entry)=>{if(context?.slide===2)window.__pendingSharedImage={context,entry,publish};else publish(context,entry);};});
+  await accepted(await rest(`rooms/${code}/sharedSlideImages/2`,'DELETE'));
+  await player.waitForFunction(()=>!_latestRoom.sharedSlideImages?.[2]);
+  await player.evaluate(()=>{delete slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)];});
+  let releaseFallback,holdFallback=true;const fallbackGate=new Promise(resolve=>{releaseFallback=resolve});
+  await player.route('https://script.google.com/**',async route=>{
+    const url=new URL(route.request().url());
+    if(holdFallback && url.searchParams.get('pageId')==='s2'){
+      slideServiceCalls.get(player).push('s2-held');await fallbackGate;
+      try{await route.abort();}catch{ /* The recovery has already cancelled this request. */ }
+      return;
+    }
+    return route.fallback();
+  });
+  const fallbackStarted=player.waitForRequest(request=>new URL(request.url()).searchParams.get('pageId')==='s2');
+  await host.evaluate(()=>masterNext());await host.waitForFunction(()=>lastSlide===2 && timerState.slideReady && _latestRoom.timer.status==='running');
+  await host.evaluate(()=>toggleTimerPause());await player.waitForFunction(()=>lastSlide===2 && timerState.paused);
+  await fallbackStarted;assert.equal(await player.evaluate(()=>timerState.slideReady),false);
+  const fallbackAborted=player.waitForEvent('requestfailed',{predicate:request=>new URL(request.url()).searchParams.get('pageId')==='s2'});
+  await host.evaluate(()=>{const{context,entry,publish}=window.__pendingSharedImage;publish(context,entry);window.__restorePublisher();});
+  await player.waitForFunction(()=>lastSlide===2 && timerState.slideReady);await fallbackAborted;
+  holdFallback=false;releaseFallback();
+  const recoveredDetails=JSON.parse(await player.evaluate(()=>getSlideLoadingDetails()));
+  assert(recoveredDetails.loads.some(r=>r.slide===2 && r.status==='loaded' && r.source==='late-room-share'));
+  assert.equal(await player.evaluate(()=>timerState.paused),true);assert.equal(await player.evaluate(()=>myVotedSlides[1]),'supersmash');
+  assert.equal(await (await rest(`ddused/${code}/${playerId}`)).json(),1);
+  console.log('Real SDK: late host URL recovered a stalled player fallback, cancelled it, and preserved the paused round and votes');
   await denied(await rest('', 'PATCH',{[`votes/${code}/2/${playerId}`]:'supersmash',[`ddused/${code}/${playerId}`]:2},playerToken));
   await player.evaluate(()=>castVote('smash'));await player.waitForFunction(()=>myVotedSlides[2]==='smash');
   host.once('dialog',d=>d.accept());await host.evaluate(()=>masterEnd());await host.locator('#results').waitFor({state:'visible'});

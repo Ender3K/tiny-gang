@@ -41,6 +41,23 @@ new games reflect edited slides. Cached URLs refresh before expiry, and a
 failed image URL is refreshed once. Google's image download is separate from
 Apps Script; no full slide images are stored in Firebase or CacheService.
 
+The host also publishes verified, expiring thumbnail URLs into the existing
+room subscription for the current slide and the next two. Refreshed hosts and
+players can reuse these URLs immediately. On a cache miss, a visible slide waits
+about 2–3 seconds for sharing before falling back to Apps Script. Background
+preloads wait up to 30 seconds when the room already supports sharing, with a
+shorter wait when promoted to the current slide. Older hosts remain supported.
+The current slide finishes before the browser starts its next two preloads.
+
+After a fallback starts, the browser keeps watching the existing room data.
+Whichever source first finishes loading a valid image wins, including a late
+host URL arriving during the fallback's service request or image download.
+The losing browser request/download is cancelled; this does not stop an Apps
+Script execution already running on Google's server. A failed shared image
+does not discard a working fallback. A definitive service error is shown
+without an extra wait for an absent host image; an already-downloading shared
+image can still finish, within the existing overall budget.
+
 Apps Script's cache can evict entries early, in which case the thumbnail is
 generated again. Older clients can still request the original base64 PNG
 response without `format=url`. New clients also accept that older response,
@@ -65,20 +82,32 @@ public deployment independent of a player's signed-in Google accounts. Both
 the Google redirect and its ContentService response support these anonymous
 cross-origin GET requests. Each request bypasses cached redirects and has a
 75-second timeout for deck metadata; a failed connection or temporary HTTP error
-retries once. Slide image requests use 15-second service timeouts for the current
-slide and 20-second service timeouts for background preloads. This gives cold
-thumbnail generation time to finish inside the two-slide lookahead. Current service
-requests retry once, including timeouts, after a randomized 250–500 ms delay;
+retries once. Slide image requests use 45-second service timeouts, allowing valid
+slow responses to finish. Current service requests can retry temporary connection
+or HTTP failures once after a randomized 250–500 ms delay, but do not retry timeouts;
 individual background service requests do not retry. The nearest failed
 gameplay preload can make the separate delayed retry described above.
 Image downloads time out after
 10 seconds for the current slide or 8 seconds for a preload. A slow current
 download retries the same URL once; a failed URL refreshes the thumbnail once
-instead. Each queued image load has a 30-second total budget covering service
-requests, retry delays and image downloads. Cancellation stops retries and
+instead. After the initial sharing wait, each queued image load has a 55-second
+budget covering service requests, retry delays and image downloads, including
+late-host recovery. Cancellation stops retries and
 clears timers. These frontend limits need no Apps Script redeployment.
 The slide error panel displays the actual failure reason rather than always
 suggesting that the presentation's sharing settings are wrong.
+Players and hosts can use **Copy loading details** from the game sidebar or
+slide error panel. The most recent 20 local records include queue, sharing,
+service and image timings, the successful source, cancellation, and fixed
+failure codes. They exclude account/room/deck IDs, names, URLs and raw server
+error messages. Nothing is sent to a server or saved in browser storage.
+If clipboard access fails, a dialog provides selectable text. Copy details
+before refreshing, since a refresh clears the in-memory history.
+
+These frontend changes can be rolled out without replacing the room or changing
+its slides, votes, timers, ownership, Firebase rules, or Apps Script deployment.
+For an active game, pause during a break, refresh the host first, and then let
+players refresh individually in the same browser/profile after its slide appears.
 No callback parameter is required by the frontend. The script still supports
 JSONP for older versions of the app.
 
