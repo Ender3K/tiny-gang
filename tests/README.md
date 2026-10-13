@@ -1,5 +1,7 @@
 Run the unit checks with `node --test tests/*.test.cjs`.
 
+The game lives in `smash-or-pass.html`; `index.html` is the activity home page. Run `node tests/activity-hub.browser.cjs` for both activity links, keyboard access, GitHub Pages subpaths, legacy room/private/spectator links, origin draft persistence and vision refunds, and mobile layouts. The suite serves local pages and mocks all external services. It supports `CHROMIUM_PATH` like the game browser checks.
+
 The multiplayer browser check uses three isolated browser contexts and mocked Firebase and slide services. It creates no live rooms. With Playwright and Chromium installed, run `node tests/game-flow.browser.cjs`; set `CHROMIUM_PATH` if Chromium is installed elsewhere. It covers QR joining, persisted lobby settings, shared timers, refresh recovery, late joining, results, CSV exports, mobile layout and rematches. Screenshots are written under `/tmp`.
 
 Install the pinned prerequisites with `pnpm install --frozen-lockfile` and `pnpm exec playwright install chromium`. Both browser checks support `CHROMIUM_PATH`, use `/usr/bin/chromium` if available, or otherwise use Playwright's downloaded browser.

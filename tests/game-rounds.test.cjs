@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../smash-or-pass.html'),'utf8');
 function section(a,b){return html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)))}
 function app(room){
  const c=vm.createContext({Date:{now:()=>10000},serverOffset:0,connected:true,advancing:false,me:{id:'a',name:'A',code:'TEST',isMaster:true},_latestRoom:room,roomRef:()=>null,showToast(){},window:{_transaction:async(ref,fn)=>{const next=fn(room);if(next)Object.assign(room,next);return {committed:!!next}}},setInterval(){},clearInterval(){},timerState:{enabled:true,slideReady:true},document:{getElementById:()=>({checked:true})}});

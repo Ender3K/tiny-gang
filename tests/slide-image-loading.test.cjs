@@ -1,5 +1,5 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');const path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../smash-or-pass.html'),'utf8');
 function app(implementation,failImage){
   let now=1000000;const calls=[];
   class Image {set src(value){queueMicrotask(()=>{if(failImage?.(value)){this.onerror?.()}else this.onload?.()})}}

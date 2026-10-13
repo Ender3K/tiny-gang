@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../smash-or-pass.html'),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 
 function app(load){
