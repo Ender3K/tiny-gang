@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '../smash-or-pass.html'), 'utf8');
 const section = (start, end) => html.slice(html.indexOf(start), html.indexOf(end, html.indexOf(start)));
 function app(extra = {}) {
   const context = vm.createContext({

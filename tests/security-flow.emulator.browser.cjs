@@ -6,7 +6,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const databaseHost=process.env.FIREBASE_DATABASE_EMULATOR_HOST,authHost=process.env.FIREBASE_AUTH_EMULATOR_HOST;
 for(const host of [databaseHost,authHost]) if(!host || !/^127\.0\.0\.1:\d+$/.test(host)) throw Error('Local Auth and Database emulators required.');
 const root=path.resolve(__dirname,'..'),namespace='demo-tiny-gang-default-rtdb';
-const source=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const source=fs.readFileSync(path.join(root,'smash-or-pass.html'),'utf8');
 // Emulator-only connections are injected into the served fixture, never the app.
 const html=source
  .replace(/const firebaseConfig = \{[\s\S]*?\n    \};/,`const firebaseConfig={apiKey:'fixture',authDomain:'demo-tiny-gang.firebaseapp.com',projectId:'demo-tiny-gang',databaseURL:'https://${namespace}.firebaseio.com'};`)
@@ -57,16 +57,16 @@ async function denied(response){assert.equal(response.status,401,await response.
  async function token(p){return p.evaluate(async()=>{const {getAuth}=await import('https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js');return getAuth().currentUser.getIdToken();});}
  const lobby=async p=>p.locator('#waiting').waitFor({state:'visible'});
  try{
-  const host=await page();await host.goto(baseURL+'/');try{await host.waitForFunction(()=>dbReady);}catch(error){console.error({startup:await host.evaluate(()=>window._fbError),blocked,errors});throw error;}
+  const host=await page();await host.goto(baseURL+'/smash-or-pass.html');try{await host.waitForFunction(()=>dbReady);}catch(error){console.error({startup:await host.evaluate(()=>window._fbError),blocked,errors});throw error;}
   assert.equal(await host.locator('input[type=password]').count(),0);
   await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');
   await host.getByRole('button',{name:'Create lobby',exact:true}).click();await lobby(host);
   await host.waitForFunction(()=>!!_latestRoom.sharedSlideImages?.[2]);
   const code=await host.evaluate(()=>me.code),hostId=await host.evaluate(()=>deviceId),saved=await host.evaluate(()=>storageRead('sop-session'));
-  const player=await page();await player.goto(baseURL+'/');await player.waitForFunction(()=>dbReady);
+  const player=await page();await player.goto(baseURL+'/smash-or-pass.html');await player.waitForFunction(()=>dbReady);
   // Copying the host's old device/session identifiers never gives host access.
   await player.evaluate(({hostId,saved})=>{localStorage.setItem('sop-device',JSON.stringify(hostId));localStorage.setItem('sop-session',JSON.stringify(saved));},{hostId,saved});
-  await player.goto(baseURL+'/?room='+code);await player.waitForFunction(()=>dbReady && document.getElementById('resumeStatus').hidden);
+  await player.goto(baseURL+'/smash-or-pass.html?room='+code);await player.waitForFunction(()=>dbReady && document.getElementById('resumeStatus').hidden);
   const playerId=await player.evaluate(()=>deviceId);assert.notEqual(playerId,hostId);assert.equal(await player.evaluate(()=>me.isMaster),false);
   await player.locator('#joinName').fill('Player');await player.getByRole('button',{name:'Join game',exact:true}).click();await lobby(player);
   const playerToken=await token(player);
@@ -83,13 +83,13 @@ async function denied(response){assert.equal(response.status,401,await response.
   assert.equal(await (await rest(`ddused/${code}/${playerId}`)).json(),1);
   await denied(await rest(`votes/${code}/1/${hostId}`,'PUT','smash',playerToken));
   await denied(await rest(`votes/${code}/1/${playerId}`,'PUT','pass',playerToken));
-  const viewer=await page();await viewer.goto(`${baseURL}/?room=${code}&spectator=1`);await viewer.waitForFunction(()=>audienceReady && _latestRoom?.timer?.status==='running');
+  const viewer=await page();await viewer.goto(`${baseURL}/smash-or-pass.html?room=${code}&spectator=1`);await viewer.waitForFunction(()=>audienceReady && _latestRoom?.timer?.status==='running');
   const viewerId=await viewer.evaluate(()=>deviceId),viewerToken=await token(viewer);
   await viewer.locator('#spectatorPass').click();await viewer.waitForFunction(()=>document.getElementById('spectatorStatus').textContent.includes('Vote accepted'));
   await denied(await rest(`audienceVotes/${code}/1/invented-id`,'PUT','smash',viewerToken));
   await viewer.reload();await viewer.waitForFunction(()=>audienceReady);assert.equal(await viewer.evaluate(()=>deviceId),viewerId);assert(await viewer.locator('#spectatorSmash').isDisabled());
   // A real late join writes just its profile and eligibility, not the whole room.
-  const late=await page();await late.goto(`${baseURL}/?room=${code}`);await late.waitForFunction(()=>dbReady);await late.locator('#joinName').fill('Late');await late.getByRole('button',{name:'Join game',exact:true}).click();await late.locator('#game').waitFor({state:'visible'});
+  const late=await page();await late.goto(`${baseURL}/smash-or-pass.html?room=${code}`);await late.waitForFunction(()=>dbReady);await late.locator('#joinName').fill('Late');await late.getByRole('button',{name:'Join game',exact:true}).click();await late.locator('#game').waitFor({state:'visible'});
   await late.waitForFunction(()=>timerState.slideReady);await late.evaluate(()=>castVote('pass'));await late.waitForFunction(()=>myVotedSlides[1]==='pass');
   // Publish the host URL only after the player has started a stalled fallback.
   // All reads/writes stay on the emulator, using the real Firebase SDK/rules.

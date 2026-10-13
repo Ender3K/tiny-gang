@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
-const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../smash-or-pass.html'),'utf8');
 const section=(a,b)=>html.slice(html.indexOf(a),html.indexOf(b,html.indexOf(a)));
 function app(extra={}){
  const c=vm.createContext({roomEntryRevision:0,roomNow:()=>1000,isSlideUnrated:(r,s)=>r.slideVotingDisabled?.[s]===true || !!r.vetoed?.[s],playedSlides:r=>Object.keys(r.rounds||{}).map(Number),...extra});

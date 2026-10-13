@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../smash-or-pass.html'),'utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const src=page=>'https://lh7-us.googleusercontent.com/'+page;
 const shared=(page='p1',changes={})=>({src:src(page),expiresAt:2200000,pageId:page,cacheVersion:'v1',...changes});

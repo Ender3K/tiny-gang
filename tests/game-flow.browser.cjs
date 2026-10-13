@@ -1,6 +1,6 @@
 const {chromium}=require('playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
 const root=require('node:path').resolve(__dirname,'..');
-const html=fs.readFileSync(root+'/index.html','utf8');
+const html=fs.readFileSync(root+'/smash-or-pass.html','utf8');
 const deck={ok:true,totalSlides:8,slidePageIds:Array.from({length:8},(_,i)=>'s'+(i+1)),slideDurations:{1:20,5:10},slideVotingDisabled:{5:true},timingVersion:1,notesRulesVersion:1,imageCacheVersion:'fixture'};
 const svg='<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1600" height="900" fill="#272730"/><text x="800" y="450" fill="white" text-anchor="middle" font-size="60">Results test slide</text></svg>';
 const image={ok:true,dataUrl:'data:image/svg+xml;base64,'+Buffer.from(svg).toString('base64')};
@@ -35,16 +35,16 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
  // A failed SDK download has a usable recovery screen and retry action.
  const startup=await page(390);let failSDK=true;
  await startup.route('**/firebase-app.js',route=>failSDK?route.abort():route.fallback());
- await startup.goto('http://127.0.0.1:8000/');await startup.locator('#cfgScreen').waitFor({state:'visible'});
+ await startup.goto('http://127.0.0.1:8000/smash-or-pass.html');await startup.locator('#cfgScreen').waitFor({state:'visible'});
  assert((await startup.locator('#cfgWarn').innerText()).includes('Firebase Connection Failed'));failSDK=false;
  await startup.getByRole('button',{name:'Retry connection',exact:true}).click();await startup.waitForFunction(()=>dbReady);await startup.close();
- const host=await page(1440);await host.goto('http://127.0.0.1:8000/');await host.waitForFunction(()=>dbReady);await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');await host.getByRole('button',{name:'Create lobby',exact:true}).click();await host.locator('#waiting').waitFor({state:'visible'});const code=await host.locator('#displayCode').innerText();
+ const host=await page(1440);await host.goto('http://127.0.0.1:8000/smash-or-pass.html');await host.waitForFunction(()=>dbReady);await host.locator('#entryModeSwitch').click();await host.locator('#hostName').fill('Host');await host.locator('#slidesUrl').fill('https://docs.google.com/presentation/d/fixture/edit');await host.getByRole('button',{name:'Create lobby',exact:true}).click();await host.locator('#waiting').waitFor({state:'visible'});const code=await host.locator('#displayCode').innerText();
  await host.evaluate(()=>{timerCfg={enabled:true,duration:30};document.getElementById('lateJoinEnabled').checked=false;persistWaitingSettings()});
  await host.locator('#lobbyCodePrivacy').click();assert.equal(await host.locator('#displayCode').innerText(),'••••••');await host.getByRole('button',{name:'Show QR code',exact:true}).click();assert.equal(await host.locator('#joinQR canvas').count(),0);assert.equal(await host.locator('#joinQR').isVisible(),false);assert.equal(await host.locator('#shareLink').getAttribute('type'),'password');assert(!(await host.locator('#shareDialog').innerText()).includes(code));await host.locator('#shareDialog .dialog-close').click();
  await host.reload();await host.waitForFunction(()=>_latestRoom?.state==='waiting');assert.equal(await host.evaluate(()=>timerCfg.duration),30);assert.equal(await host.locator('#lateJoinEnabled').isChecked(),false);await host.locator('#lateJoinEnabled').check();
  assert.equal(await host.locator('#displayCode').innerText(),'••••••');await host.locator('#lobbyCodePrivacy').click();assert.equal(await host.locator('#displayCode').innerText(),code);
  await host.getByRole('button',{name:'Show QR code',exact:true}).click();assert.equal(await host.locator('#joinQR canvas').count(),1);assert((await host.locator('#shareLink').inputValue()).includes('?room='+code));await host.locator('#shareDialog .dialog-close').click();
- const player=await page(390);await player.goto('http://127.0.0.1:8000/?room='+code);await player.waitForFunction(()=>dbReady);await player.waitForFunction(code=>document.getElementById('joinCode').value===code,code);await player.locator('#joinName').fill('Player');await player.getByRole('button',{name:'Join game',exact:true}).click();await player.locator('#waiting').waitFor({state:'visible'});
+ const player=await page(390);await player.goto('http://127.0.0.1:8000/smash-or-pass.html?room='+code);await player.waitForFunction(()=>dbReady);await player.waitForFunction(code=>document.getElementById('joinCode').value===code,code);await player.locator('#joinName').fill('Player');await player.getByRole('button',{name:'Join game',exact:true}).click();await player.locator('#waiting').waitFor({state:'visible'});
  assert.equal(await player.locator('#displayCode').innerText(),code);assert.equal(await player.locator('#lobbyCodePrivacy').isVisible(),false);
  // A failed next-slide preload recovers during the current round, before advance.
  await player.waitForFunction(()=>!!slideImageCache[slideCacheKey(_latestRoom.slidesUrl,'s2',_latestRoom.imageCacheVersion)]);
@@ -108,7 +108,7 @@ export function onValue(path,cb){const item={path,cb};listeners.add(item);window
   await host.evaluate(()=>masterNext());for(const p of [host,player])await p.waitForFunction(slide=>lastSlide===slide && timerState.slideReady,slide);
   await host.evaluate(()=>castVote('smash'));await player.evaluate(slide=>castVote(slide===3?'smash':'pass'),slide);
  }
- const late=await page(390);await late.goto('http://127.0.0.1:8000/?room='+code);await late.waitForFunction(()=>dbReady);await late.locator('#joinName').fill('Late');await late.getByRole('button',{name:'Join game',exact:true}).click();await late.locator('#game').waitFor({state:'visible'});await late.evaluate(()=>castVote('pass'));
+ const late=await page(390);await late.goto('http://127.0.0.1:8000/smash-or-pass.html?room='+code);await late.waitForFunction(()=>dbReady);await late.locator('#joinName').fill('Late');await late.getByRole('button',{name:'Join game',exact:true}).click();await late.locator('#game').waitFor({state:'visible'});await late.evaluate(()=>castVote('pass'));
  // Results must work even when a one-off votes read never returns.
  for(const p of [host,player,late])await p.evaluate(()=>{const original=window._get;window._get=ref=>ref.startsWith('votes/')?new Promise(()=>{}):original(ref);});
  host.once('dialog',d=>d.accept());await host.evaluate(()=>masterEnd());for(const p of [host,player,late])await p.locator('#results').waitFor({state:'visible'});

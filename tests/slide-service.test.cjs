@@ -11,7 +11,7 @@ const response = (data, status = 200) => ({
 });
 
 function request(implementation, retry = false, signal, options) {
-  const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '../smash-or-pass.html'), 'utf8');
   const source = html.slice(html.indexOf('async function fetchAppsScript('), html.indexOf('async function fetchSlidePageIdsViaAppsScript('));
   const calls = [];
   const timers = new Map();
